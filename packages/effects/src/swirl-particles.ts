@@ -25,10 +25,17 @@ import type {
     EffectTexture,
     EffectUniforms,
 } from "@vfx-js/core";
+import {
+    type BloomPyramid,
+    createBloomPyramid,
+    disposeBloomPyramid,
+    GLSL_BLOOM_KNEE,
+    upsampleBloomPyramid,
+} from "./_bloom-common.js";
 import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
-import { QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
+import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
 
 /**
  * One stop of a {@link SwirlParticlesParams.palette} gradient, like a
@@ -327,16 +334,30 @@ const MASK_LONG = 400;
 // between retries while it is empty (the gap doubles from the first).
 const CAPTURE_DELAY = 3;
 const CAPTURE_RETRY_MAX = 120;
+// Recapture when the element's aspect ratio drifts this far (relative)
+// from the one the shape was built with, once the size has held still
+// for RESIZE_SETTLE frames.
+const ASPECT_TOLERANCE = 0.01;
+const RESIZE_SETTLE = 5;
 // Padding of the SDF grid around the silhouette, relative to MASK_LONG.
 const SDF_PAD = 0.3;
 // Spawn points on the surface: SPAWN_SIZE² of them.
 const SPAWN_SIZE = 256;
 const BLOOM_LEVELS = 6;
+// How much of each coarser bloom level adds into the next finer one.
+const BLOOM_SCATTER = 0.85;
 // Brightness above which pixels bloom: only the HDR sparkles reach it.
 const BLOOM_THRESHOLD = 1.0;
 // Texels of the baked palette gradient.
 const PALETTE_SIZE = 256;
-const MAX_DT = 1 / 30;
+// Longest simulation step. A frame's dt (capped at 0.1 s by clampDt) is
+// split into ceil(dt / SIM_STEP) equal steps, so the flow keeps real time
+// down to 10 fps and stays as stable as at 30 fps. Below 30 fps each frame
+// then runs up to MAX_SUBSTEPS sim passes (and trail pushes), the price of
+// not slowing down.
+const SIM_STEP = 1 / 30;
+// = clampDt's 0.1 s cap / SIM_STEP.
+const MAX_SUBSTEPS = 3;
 const STILL_STEPS = 90;
 // Pitch wobble relative to the yaw wobble.
 const PITCH_WOBBLE = 0.3;
@@ -1123,7 +1144,7 @@ uniform vec2 texel;
 out vec4 outColor;
 
 const float threshold = ${BLOOM_THRESHOLD.toFixed(1)};
-
+${GLSL_BLOOM_KNEE}
 void main() {
     vec3 c = texture(scene, uv + texel * vec2(-0.5, -0.5)).rgb
            + texture(scene, uv + texel * vec2(0.5, -0.5)).rgb
@@ -1131,13 +1152,11 @@ void main() {
            + texture(scene, uv + texel * vec2(0.5, 0.5)).rgb;
     c *= 0.25;
     float br = max(c.r, max(c.g, c.b));
-    float soft = clamp(br - threshold + 0.5, 0.0, 1.0);
-    soft = soft * soft * 0.5;
-    float k = max(soft, br - threshold) / max(br, 1e-4);
-    outColor = vec4(c * k, 1.0);
+    outColor = vec4(c * bloomKnee(br, threshold, 0.5), 1.0);
 }
 `;
 
+// 5-tap downsample of the bloom and the shadow chains.
 const FRAG_BLOOM_DOWN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -1152,30 +1171,6 @@ void main() {
     c += texture(srcTex, uv + texel * vec2(-1.0, 1.0)).rgb * 0.125;
     c += texture(srcTex, uv + texel * vec2(1.0, 1.0)).rgb * 0.125;
     outColor = vec4(c, 1.0);
-}
-`;
-
-const FRAG_BLOOM_UP = `#version 300 es
-precision highp float;
-in vec2 uv;
-uniform sampler2D lowTex;
-uniform sampler2D highTex;
-uniform vec2 texel;
-uniform float scatter;
-out vec4 outColor;
-
-void main() {
-    vec3 c = texture(lowTex, uv).rgb * 4.0;
-    c += texture(lowTex, uv + texel * vec2(-1.0, 0.0)).rgb * 2.0;
-    c += texture(lowTex, uv + texel * vec2(1.0, 0.0)).rgb * 2.0;
-    c += texture(lowTex, uv + texel * vec2(0.0, -1.0)).rgb * 2.0;
-    c += texture(lowTex, uv + texel * vec2(0.0, 1.0)).rgb * 2.0;
-    c += texture(lowTex, uv + texel * vec2(-1.0, -1.0)).rgb;
-    c += texture(lowTex, uv + texel * vec2(1.0, -1.0)).rgb;
-    c += texture(lowTex, uv + texel * vec2(-1.0, 1.0)).rgb;
-    c += texture(lowTex, uv + texel * vec2(1.0, 1.0)).rgb;
-    c /= 16.0;
-    outColor = vec4(texture(highTex, uv).rgb + c * scatter, 1.0);
 }
 `;
 
@@ -1236,6 +1231,8 @@ type ShapeData = {
     shapeHalf: [number, number];
     /** RGBA: x, y, z / halfDepth (-1..1), 0. */
     spawn: Float32Array;
+    /** Width / height of the element when it was captured. */
+    aspect: number;
 };
 
 const INF = 1e20;
@@ -1320,6 +1317,7 @@ function buildShape(
     mw: number,
     mh: number,
     halfDepthHint: number,
+    aspect: number,
 ): ShapeData | null {
     const alphaScale = pixels instanceof Float32Array ? 1 : 1 / 255;
     const mLong = Math.max(mw, mh);
@@ -1469,6 +1467,7 @@ function buildShape(
         sdfRect: [minX, minY, W * px, H * px],
         shapeHalf: [mw / mLong, mh / mLong],
         spawn,
+        aspect,
     };
 }
 
@@ -1705,13 +1704,10 @@ function viewMatrix(yaw: number, pitch: number): number[] {
 // Effect
 // ---------------------------------------------------------------------------
 
-type Phase = "capture" | "reading" | "ready";
-
-type BloomLevel = {
-    down: EffectRenderTarget;
-    // The coarsest level has none: the upsample reads its `down`.
-    up: EffectRenderTarget | null;
-};
+// Silhouette capture: waiting to capture, a readback in flight, or
+// nothing to do. Drawing only needs a shape, so a recapture keeps the
+// current one on screen.
+type Phase = "capture" | "reading" | "idle";
 
 type ShadowLevel = {
     a: EffectRenderTarget;
@@ -1746,9 +1742,11 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
  * vfx.add(img, { effect: new SwirlParticlesEffect({ palette: "ember" }) });
  * ```
  *
- * The silhouette is the element's alpha, read once when the effect starts.
- * An opaque photo becomes an extruded slab. The output is premultiplied
- * over transparency, so set the page background yourself.
+ * The silhouette is the element's alpha, read back when the effect starts
+ * and again when the element's aspect ratio changes. Call
+ * {@link SwirlParticlesEffect.refresh | refresh()} after its content
+ * changes. An opaque photo becomes an extruded slab. The output is
+ * premultiplied over transparency, so set the page background yourself.
  *
  * All params, `count` and `fireflyRatio` included, are read every frame,
  * so you can mutate `params` live. Numbers that are not finite fall back
@@ -1772,6 +1770,10 @@ export class SwirlParticlesEffect implements Effect {
     #srcFrames = 0;
     // Frames to wait before the next capture; doubles while it's empty.
     #captureGap = CAPTURE_DELAY;
+    // Element size last frame, and frames it has held still: a changed
+    // aspect is recaptured once it settles.
+    #lastSize: [number, number] = [0, 0];
+    #settled = 0;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
     #needsReset = true;
@@ -1791,7 +1793,8 @@ export class SwirlParticlesEffect implements Effect {
     #scene: EffectRenderTarget | null = null;
     // Samples #scene was created with: 4 with `antialias`.
     #sceneSamples: 1 | 4 = 1;
-    #bloom: BloomLevel[] = [];
+    #bloom: BloomPyramid | null = null;
+    // Scene size the bloom pyramid was made for.
     #bloomBase: [number, number] = [0, 0];
     #shadow: ShadowLevel[] = [];
     #shadowBase: [number, number] = [0, 0];
@@ -1898,8 +1901,8 @@ export class SwirlParticlesEffect implements Effect {
             this.#spawnTex = null;
             this.#paletteTex = null;
             this.#paletteSrc = null;
-            this.#pending = this.#shape;
-            if (!this.#shape) {
+            this.#pending = this.#pending ?? this.#shape;
+            if (this.#phase === "reading") {
                 this.#phase = "capture";
                 this.#srcFrames = 0;
             }
@@ -2010,19 +2013,26 @@ export class SwirlParticlesEffect implements Effect {
                 ? this.#scene
                 : this.#createScene(ctx);
 
+        if (this.#phase === "idle" && !this.#pending) {
+            this.#watchAspect(ctx);
+        }
         if (this.#phase === "capture") {
             this.#capture(ctx);
         }
         if (this.#pending && this.#upload(ctx, this.#pending)) {
+            // The first shape spawns every particle. A new one takes over
+            // without a reset: the particles flow onto it and respawn on
+            // it. A still frame is simulated again from scratch.
+            if (!this.#shape || this.#still) {
+                this.#needsReset = true;
+            }
             this.#shape = this.#pending;
             this.#pending = null;
-            this.#phase = "ready";
-            this.#needsReset = true;
         }
         this.#updatePalette(ctx);
 
         const ready = !!(
-            this.#phase === "ready" &&
+            this.#shape &&
             this.#sdfTex &&
             this.#spawnTex &&
             this.#paletteTex
@@ -2040,15 +2050,19 @@ export class SwirlParticlesEffect implements Effect {
             }
             // A still frame that's done is drawn again only when what it
             // shows changed.
-            const keyChanged = this.#still && this.#updateStillKey(scene);
+            const keyChanged = this.#still && this.#updateStillKey(ctx, scene);
             if (
                 !this.#still ||
                 !this.#stillDone ||
                 this.#needsReset ||
                 keyChanged
             ) {
-                this.#updateMouse(ctx);
-                this.#simulate(ctx);
+                // Capped like the sim, so a stall doesn't teleport the
+                // particles; the camera wobble and fireflies follow the
+                // sim time.
+                const dt = clampDt(ctx.deltaTime) || 0;
+                this.#updateMouse(ctx, dt);
+                this.#simulate(ctx, dt);
                 this.#cam = this.#camera(ctx);
                 const shadow = this.#drawParticles(ctx, scene, this.#cam);
                 this.#layers = {
@@ -2076,7 +2090,7 @@ export class SwirlParticlesEffect implements Effect {
 
     // Writes what the still frame depends on into #stillKey; true when
     // something changed.
-    #updateStillKey(scene: EffectRenderTarget): boolean {
+    #updateStillKey(ctx: EffectContext, scene: EffectRenderTarget): boolean {
         const r = this.#r;
         const key = this.#stillKey;
         let n = 0;
@@ -2104,6 +2118,14 @@ export class SwirlParticlesEffect implements Effect {
         put(scene.width);
         put(scene.height);
         put(this.#sceneSamples);
+        // The camera frames the element in the output rect: with
+        // "fullscreen" the scene keeps its size when the element doesn't.
+        const dims = ctx.dims;
+        const [ox, oy] = padOutputRect(r.pad, dims);
+        put(dims.elementPixel[0]);
+        put(dims.elementPixel[1]);
+        put(ox);
+        put(oy);
         return changed;
     }
 
@@ -2173,7 +2195,58 @@ export class SwirlParticlesEffect implements Effect {
         return x >= 0 && y >= 0 && x <= ew && y <= eh;
     }
 
-    // Read the element's alpha back once to build the shape.
+    /**
+     * Capture the element's silhouette again, for when its content
+     * changed: an image's `src` swapped, a text edit. For an `<img>`,
+     * call it after `vfx.update(img)` has reloaded the image.
+     *
+     * The particles keep flowing over the current shape until the new
+     * one has been read back (a few frames later), then flow onto it, and
+     * respawn on it. A change of the element's aspect ratio is
+     * recaptured automatically once its size settles; a change of size
+     * alone needs none.
+     *
+     * Safe to call at any time and any number of times; a call while a
+     * capture is pending restarts it, so the latest content wins.
+     */
+    refresh(): void {
+        this.#recapture();
+    }
+
+    // Start a new capture in CAPTURE_DELAY frames, dropping a readback in
+    // flight.
+    #recapture(): void {
+        if (this.#phase === "reading") {
+            this.#token++;
+        }
+        this.#phase = "capture";
+        this.#srcFrames = 0;
+        this.#captureGap = CAPTURE_DELAY;
+    }
+
+    // Recapture once the element's aspect ratio has drifted from the
+    // shape's and its size has held still for RESIZE_SETTLE frames, so a
+    // resize animation reads back once, at the end. The shape is in units
+    // of the element's long side, so a change of scale alone keeps it.
+    #watchAspect(ctx: EffectContext): void {
+        const shape = this.#shape;
+        const [ew, eh] = ctx.dims.elementPixel;
+        if (!shape || !(ew >= 1 && eh >= 1)) {
+            return;
+        }
+        const moved = ew !== this.#lastSize[0] || eh !== this.#lastSize[1];
+        this.#lastSize[0] = ew;
+        this.#lastSize[1] = eh;
+        this.#settled = moved ? 0 : this.#settled + 1;
+        if (
+            this.#settled >= RESIZE_SETTLE &&
+            Math.abs(ew / eh / shape.aspect - 1) > ASPECT_TOLERANCE
+        ) {
+            this.#recapture();
+        }
+    }
+
+    // Read the element's alpha back to build the shape.
     #capture(ctx: EffectContext): void {
         const [ew, eh] = ctx.dims.elementPixel;
         if (
@@ -2219,9 +2292,10 @@ export class SwirlParticlesEffect implements Effect {
                 if (token !== this.#token) {
                     return;
                 }
-                const shape = buildShape(px, mw, mh, halfDepth);
+                const shape = buildShape(px, mw, mh, halfDepth, aspect);
                 if (shape) {
                     this.#pending = shape;
+                    this.#phase = "idle";
                 } else {
                     // Nothing drawn yet: try again later, less often, in
                     // case it's a late-loading image.
@@ -2237,11 +2311,11 @@ export class SwirlParticlesEffect implements Effect {
         );
     }
 
-    // Upload the SDF and spawn textures. False (and nothing kept) when
-    // the GPU can't make them; the caller tries again next frame.
+    // Upload the SDF and spawn textures, replacing the current ones.
+    // False (and the current ones kept) when the GPU can't make them; the
+    // caller tries again next frame.
     #upload(ctx: EffectContext, shape: ShapeData): boolean {
         const gl = ctx.gl;
-        this.#deleteShapeTextures();
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
@@ -2291,6 +2365,7 @@ export class SwirlParticlesEffect implements Effect {
         gl.bindTexture(gl.TEXTURE_2D, null);
         ctx.resetState();
 
+        this.#deleteShapeTextures();
         this.#sdfRaw = sdf;
         this.#spawnRaw = spawn;
         this.#sdfTex = ctx.wrapTexture(sdf, {
@@ -2499,11 +2574,11 @@ export class SwirlParticlesEffect implements Effect {
     }
 
     // Once a frame: ease the repel force and the tilt towards what the
-    // pointer asks for. Frame-rate independent.
-    #updateMouse(ctx: EffectContext): void {
+    // pointer asks for, over the frame's dt (the one the sim advances by).
+    // Frame-rate independent.
+    #updateMouse(ctx: EffectContext, dt: number): void {
         const r = this.#r;
         const mode = this.#still ? "none" : r.mouse;
-        const dt = clamp(ctx.deltaTime, 0, 0.25) || 0;
         const hover = this.#pointerIn && !this.#still;
         const [mx, my] = ctx.mouse;
 
@@ -2607,15 +2682,16 @@ export class SwirlParticlesEffect implements Effect {
         };
     }
 
-    #simulate(ctx: EffectContext): void {
+    // Advance the simulation by `frameDt` seconds (already clamped), in
+    // steps of at most SIM_STEP.
+    #simulate(ctx: EffectContext, frameDt: number): void {
         const pos = this.#pos;
         const vel = this.#vel;
         if (!pos || !vel || !this.#sdfTex || !this.#spawnTex) {
             return;
         }
-        let steps = 1;
-        let dt = clamp(ctx.deltaTime, 0, MAX_DT) || 0;
-        this.#frameDt = dt;
+        let steps: number;
+        let dt: number;
         if (this.#still) {
             this.#frameDt = 0;
             if (this.#stillDone && !this.#needsReset) {
@@ -2623,6 +2699,11 @@ export class SwirlParticlesEffect implements Effect {
             }
             steps = STILL_STEPS;
             dt = 1 / 60;
+        } else {
+            this.#frameDt = frameDt;
+            // At least one pass, as a frame with dt 0 always ran one.
+            steps = clamp(Math.ceil(frameDt / SIM_STEP), 1, MAX_SUBSTEPS);
+            dt = frameDt / steps;
         }
         const base = this.#simUniforms(ctx);
         if (this.#needsReset) {
@@ -2641,6 +2722,8 @@ export class SwirlParticlesEffect implements Effect {
             this.#needsReset = false;
             this.#shadowHistValid = false;
         }
+        // The trail history is pushed per step: it is spaced by sim time,
+        // so trails look the same whatever the frame rate.
         for (let i = 0; i < steps; i++) {
             this.#simTime += dt;
             this.#steps = (this.#steps + 1) % 0x100000;
@@ -3014,16 +3097,17 @@ export class SwirlParticlesEffect implements Effect {
     }
 
     #disposeBloom(): void {
-        for (const l of this.#bloom) {
-            l.down.dispose();
-            l.up?.dispose();
+        if (this.#bloom) {
+            disposeBloomPyramid(this.#bloom);
         }
-        this.#bloom = [];
+        this.#bloom = null;
         this.#bloomBase = [0, 0];
     }
 
     // The bloom of the sparkles: prefilter, a downsample chain, then
     // upsample and add back. Null, and no targets kept, at `bloom` 0.
+    // It has to happen here, not in a chained BloomEffect: the composite
+    // soft-clips the HDR sparkles, so a later effect never sees them.
     #drawBloom(
         ctx: EffectContext,
         scene: EffectRenderTarget,
@@ -3032,69 +3116,45 @@ export class SwirlParticlesEffect implements Effect {
             this.#disposeBloom();
             return null;
         }
-        const bw = Math.max(1, Math.floor(scene.width / 2));
-        const bh = Math.max(1, Math.floor(scene.height / 2));
-        if (bw !== this.#bloomBase[0] || bh !== this.#bloomBase[1]) {
+        if (
+            !this.#bloom ||
+            scene.width !== this.#bloomBase[0] ||
+            scene.height !== this.#bloomBase[1]
+        ) {
             this.#disposeBloom();
-            let w = bw;
-            let h = bh;
-            for (let i = 0; i < BLOOM_LEVELS; i++) {
-                const opts = {
-                    size: [w, h] as const,
-                    float: true,
-                    filter: "linear" as const,
-                };
-                this.#bloom.push({
-                    down: ctx.createRenderTarget(opts),
-                    up:
-                        i < BLOOM_LEVELS - 1
-                            ? ctx.createRenderTarget(opts)
-                            : null,
-                });
-                w = Math.max(1, Math.floor(w / 2));
-                h = Math.max(1, Math.floor(h / 2));
-            }
-            this.#bloomBase = [bw, bh];
+            this.#bloom = createBloomPyramid(
+                ctx,
+                scene.width,
+                scene.height,
+                BLOOM_LEVELS,
+            );
+            this.#bloomBase = [scene.width, scene.height];
         }
-        const levels = this.#bloom;
+        const down = this.#bloom.down;
         ctx.draw({
             frag: FRAG_BLOOM_PREFILTER,
             uniforms: {
                 scene,
                 texel: [1 / scene.width, 1 / scene.height],
             },
-            target: levels[0].down,
+            target: down[0],
         });
-        for (let i = 1; i < levels.length; i++) {
-            const src = levels[i - 1].down;
+        for (let i = 1; i < down.length; i++) {
+            const src = down[i - 1];
             ctx.draw({
                 frag: FRAG_BLOOM_DOWN,
                 uniforms: {
                     srcTex: src,
                     texel: [1 / src.width, 1 / src.height],
                 },
-                target: levels[i].down,
+                target: down[i],
             });
         }
-        let low = levels[levels.length - 1].down;
-        for (let i = levels.length - 2; i >= 0; i--) {
-            const up = levels[i].up;
-            if (!up) {
-                break;
-            }
-            ctx.draw({
-                frag: FRAG_BLOOM_UP,
-                uniforms: {
-                    lowTex: low,
-                    highTex: levels[i].down,
-                    texel: [1 / low.width, 1 / low.height],
-                    scatter: 0.85,
-                },
-                target: up,
-            });
-            low = up;
-        }
-        return low;
+        return upsampleBloomPyramid(ctx, this.#bloom, (_i, small) => ({
+            texelSize: [1 / small.width, 1 / small.height],
+            weightLarge: 1,
+            weightSmall: BLOOM_SCATTER,
+        }));
     }
 
     dispose(): void {
@@ -3138,6 +3198,8 @@ export class SwirlParticlesEffect implements Effect {
         this.#phase = "capture";
         this.#srcFrames = 0;
         this.#captureGap = CAPTURE_DELAY;
+        this.#lastSize.fill(0);
+        this.#settled = 0;
         this.#pending = null;
         this.#shape = null;
         this.#needsReset = true;

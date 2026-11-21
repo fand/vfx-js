@@ -4,7 +4,8 @@
 
 Add `SwirlParticlesEffect`: particles flow over the element's silhouette, extruded into 3D, and peel off in curling wisps, with HDR sparkles and bloom.
 
-- The silhouette is the element's alpha, read once with `ctx.readPixels`. An opaque photo becomes an extruded slab.
+- The silhouette is the element's alpha, read back with `ctx.readPixels`. An opaque photo becomes an extruded slab.
+- `refresh()` reads the silhouette again after the element's content changes (call it after `vfx.update(img)` for a new `img.src`); the particles keep flowing and move onto the new shape. A change of aspect ratio is recaptured automatically.
 - `palette` takes a preset name or `{ offset, color }` stops, like a CSS `linear-gradient`. Presets are in `SWIRL_PARTICLES_PALETTES`: `nebula` (default), `ember`, `aurora`, `mono`, `sakura` and `ocean`.
 - `sourceColor` mixes in the source colour at each particle's spawn point, so the image's colours flow like paint. Videos keep updating.
 - Each particle draws a curved, tapering fibre through its recent positions; `streak` sets its length in seconds of travel (0 draws dots).
