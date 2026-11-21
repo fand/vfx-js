@@ -45,6 +45,8 @@ const PATTERNS: readonly GlassPatternName[] = [
     "checker",
     "dots",
     "noise",
+    "marble",
+    "rainbow",
     "none",
 ];
 const IMAGES: Record<string, string> = {
@@ -268,6 +270,26 @@ export const gem: StoryObj<Args> = {
     },
 };
 
+// Contour bands of a noise field, like zebra marble.
+export const marble: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", backdrop: "marble" },
+};
+
+// A bright hue field through dispersive, faceted glass.
+export const rainbow: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        backdrop: "rainbow",
+        params: {
+            depth: 0.3,
+            bevel: 0.06,
+            bevelShape: "chamfer",
+            dispersion: 0.25,
+            paths: 3,
+        },
+    },
+};
+
 export const htmlText: StoryObj<Args> = {
     args: { source: "HTML text", backdrop: "stripes" },
 };
@@ -287,6 +309,13 @@ export const photoRelief: StoryObj<Args> = {
     args: {
         source: "slab (photo)",
         backdrop: "stripes",
-        params: { depth: 0.15, relief: 0.08, yaw: 0.7, pitch: 0.35, zoom: 1.1 },
+        params: {
+            depth: 0.15,
+            relief: 0.08,
+            reliefBlur: 0.02,
+            yaw: 0.7,
+            pitch: 0.35,
+            zoom: 1.1,
+        },
     },
 };

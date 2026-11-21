@@ -1083,6 +1083,7 @@ export function attachGlassPane(
     bind(shape, "bulge", range(0, 0.5, 0.005));
     bind(shape, "bulgeWidth", range(0.01, 1, 0.005));
     bind(shape, "relief", range(-0.3, 0.3, 0.005));
+    bind(shape, "reliefBlur", range(0, 0.1, 0.001));
 
     const glass = pane.addFolder({ title: "Glass" });
     bind(glass, "ior", range(1, 2.5, 0.01));

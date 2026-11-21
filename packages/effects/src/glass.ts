@@ -33,14 +33,21 @@ import {
 } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 
-/** A procedural {@link GlassParams.backdrop}. `"none"` is black. */
+/**
+ * A procedural {@link GlassParams.backdrop}. `"none"` is black.
+ * `"marble"` is the contour bands of a slow noise field, like zebra
+ * marble. `"rainbow"` is a noise field through a bright hue gradient; it
+ * ignores {@link GlassParams.backdropColors}.
+ */
 export type GlassPatternName =
     | "none"
     | "stripes"
     | "grid"
     | "checker"
     | "dots"
-    | "noise";
+    | "noise"
+    | "marble"
+    | "rainbow";
 
 /**
  * An image for {@link GlassParams.backdrop}. Strings other than a
@@ -95,6 +102,12 @@ export type GlassParams = {
      * once with the silhouette, so a video gives a still relief.
      */
     relief: number;
+    /**
+     * How much the relief's height map is blurred, in the same units as
+     * `depth`. More calms a busy photo and rounds a label's edges.
+     * Changing it rebuilds the height map on the CPU.
+     */
+    reliefBlur: number;
 
     /** Index of refraction at the middle of the spectrum. */
     ior: number;
@@ -159,10 +172,14 @@ export type GlassParams = {
     backdropDistance: number;
     /**
      * Speed of the pattern, in pattern periods per second. The patterns
-     * scroll, except `"noise"`, which morphs in place.
+     * scroll, except `"noise"`, `"marble"` and `"rainbow"`, which morph
+     * in place.
      */
     backdropSpeed: number;
-    /** The two colours of a procedural pattern, `#rrggbb`. */
+    /**
+     * The two colours of a procedural pattern, `#rrggbb`. `"rainbow"`
+     * has its own.
+     */
     backdropColors: readonly [string, string];
 
     /** Brightness of the soft box lights around the shape. 0 turns them off. */
@@ -219,6 +236,7 @@ const DEFAULT_PARAMS: GlassParams = {
     bulge: 0,
     bulgeWidth: 0.15,
     relief: 0,
+    reliefBlur: 0.006,
     ior: 1.5,
     dispersion: 0.12,
     paths: 2,
@@ -258,8 +276,12 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
     checker: 3,
     dots: 4,
     noise: 5,
+    marble: 6,
+    rainbow: 7,
 };
-const IMAGE_MODE = 6;
+const IMAGE_MODE = 8;
+// Contour bands of "marble" per unit of its noise field.
+const MARBLE_BANDS = "3.0";
 const DEBUG_VIEWS: Record<GlassDebugView, number> = {
     off: 0,
     outer: 1,
@@ -288,10 +310,11 @@ const BUMP_SLOPE = "0.6";
 const GLASS_MASK_LONG = 1024;
 const SMOOTH_RADIUS = 4;
 const SMOOTH_PASSES = 3;
-// Box blurs of the relief's height map, in mask px: glyph edges become a
-// short smooth ramp instead of a cliff, which bounds the slope too.
-const RELIEF_RADIUS = 3;
+// Box blurs of the relief's height map: glyph edges become a short
+// smooth ramp instead of a cliff, which bounds the slope too. The radius
+// comes from `reliefBlur`; the default gives 3 mask px.
 const RELIEF_PASSES = 3;
+const RELIEF_MAX_RADIUS = 256;
 // A sunk relief keeps at least this share of the glass's thickness.
 const RELIEF_MIN_THICKNESS = 0.2;
 // Pitch wobble relative to the yaw wobble.
@@ -450,6 +473,23 @@ float edge(float d, float fw) {
     return smoothstep(-fw, fw, d);
 }
 
+// "rainbow": a noise field through a bright hue gradient, the hue
+// drifting slowly in space and time. q and fw are in pattern units.
+vec3 rainbow(vec2 q, float fw) {
+    vec3 n = vec3(q * 0.4, backdropOffset);
+    float f = snoise(n) * 0.7
+        + snoise(n * vec3(2.1, 2.1, 1.3) + vec3(3.1, 8.7, 2.9)) * 0.3;
+    // A wide footprint averages the field: lower its contrast, keeping
+    // the slow drift, so frost blurs to a smooth gradient, not to grey.
+    float k = 1.0 - smoothstep(0.35, 2.0, fw);
+    float t = f * 0.6 * k + (q.x - q.y) * 0.04 + backdropOffset * 0.05;
+    // Cosine palette with the channels a third apart: never grey.
+    vec3 c = 0.5 + 0.5 * cos(6.2832 * (t + vec3(0.0, 0.33, 0.67)));
+    // Brighter on the field's peaks, above 1 so highlights bloom.
+    float v = mix(0.95, 0.75 + 0.6 * smoothstep(0.2, 0.9, f), k);
+    return c * v;
+}
+
 // The backdrop plane, at view-space xy. fw is the footprint of the pixel
 // on it, in the same units.
 vec3 backdrop(vec2 p, float fw) {
@@ -492,6 +532,21 @@ vec3 backdrop(vec2 p, float fw) {
         vec2 g = fract(q + vec2(backdropOffset, 0.0)) - 0.5;
         m = edge(0.3 - length(g), fw);
         mean = 0.28;
+    } else if (backdropMode == 6) {
+        // Contour bands of a slow noise field, like zebra marble: closed
+        // loops round its peaks, bands crowding where it is steep. A
+        // weaker second octave makes the widths irregular.
+        vec3 n = vec3(q * 0.35, backdropOffset);
+        vec4 a = snoiseD(n);
+        vec4 b = snoiseD(n * vec3(2.3, 2.3, 1.5) + vec3(5.2, 1.3, 7.7));
+        float s = (a.w + 0.2 * b.w) * ${MARBLE_BANDS};
+        // The band width varies: the footprint in band periods follows
+        // the field's gradient (in pattern units).
+        vec2 g = (a.xy + 0.46 * b.xy) * 0.35;
+        fw = max(fw * ${MARBLE_BANDS} * length(g), 1e-4);
+        m = edge(0.25 - abs(fract(s) - 0.5), fw);
+    } else if (backdropMode == 7) {
+        return rainbow(q, fw);
     } else {
         // Simplex noise that morphs in place: time is its third axis.
         vec3 n = vec3(q * 0.6, backdropOffset);
@@ -969,6 +1024,10 @@ void main() {
 
 // The SDF, plus the relief's height map on the same grid.
 type GlassShape = ShapeData & {
+    /** Luminance 0..1 before the blur, kept to rebuild the relief. */
+    reliefLum: Float32Array;
+    /** Box blur radius of `relief`, in grid px. */
+    reliefRadius: number;
     /** RGBA: height 0..1, its gradient in world units, 0. */
     relief: Float32Array;
     /** Largest length of the relief's gradient, in world units. */
@@ -976,21 +1035,19 @@ type GlassShape = ShapeData & {
 };
 
 /**
- * The relief's height map from the captured RGBA pixels (bottom-up rows,
- * premultiplied): luminance, so 0 where alpha is 0, blurred, on the grid
- * of `shape`'s SDF.
+ * Luminance of the captured RGBA pixels (bottom-up rows, premultiplied),
+ * so 0 where alpha is 0, on the grid of `shape`'s SDF.
  */
-function buildRelief(
+function reliefLuminance(
     pixels: Uint8Array | Float32Array,
     mw: number,
     mh: number,
     shape: ShapeData,
-): Pick<GlassShape, "relief" | "reliefMaxGrad"> {
+): Float32Array {
     const scale = pixels instanceof Float32Array ? 1 : 1 / 255;
     const W = shape.sdfW;
-    const H = shape.sdfH;
     const pad = Math.round((W - mw) / 2);
-    const h = new Float32Array(W * H);
+    const h = new Float32Array(W * shape.sdfH);
     for (let y = 0; y < mh; y++) {
         for (let x = 0; x < mw; x++) {
             const i = (y * mw + x) * 4;
@@ -1001,13 +1058,35 @@ function buildRelief(
             h[(y + pad) * W + x + pad] = Math.min(Math.max(l * scale, 0), 1);
         }
     }
+    return h;
+}
+
+// Box blur radius in grid px for a `reliefBlur` in world units.
+function reliefRadius(blur: number, shape: ShapeData): number {
+    const px = shape.sdfRect[2] / shape.sdfW;
+    const r = Number.isFinite(blur) ? Math.round(Math.max(blur, 0) / px) : 0;
+    return Math.min(r, RELIEF_MAX_RADIUS);
+}
+
+/**
+ * The relief's height map: the luminance `lum` blurred by `RELIEF_PASSES`
+ * box blurs of `radius` grid px, and its gradient.
+ */
+function buildRelief(
+    lum: Float32Array,
+    shape: ShapeData,
+    radius: number,
+): Pick<GlassShape, "relief" | "reliefMaxGrad"> {
+    const W = shape.sdfW;
+    const H = shape.sdfH;
+    const h = lum.slice();
     const line = new Float32Array(Math.max(W, H));
     for (let pass = 0; pass < RELIEF_PASSES; pass++) {
         for (let y = 0; y < H; y++) {
-            boxBlur1d(h, y * W, 1, W, RELIEF_RADIUS, line);
+            boxBlur1d(h, y * W, 1, W, radius, line);
         }
         for (let x = 0; x < W; x++) {
-            boxBlur1d(h, x, W, H, RELIEF_RADIUS, line);
+            boxBlur1d(h, x, W, H, radius, line);
         }
     }
     // Central differences, in height per world unit.
@@ -1243,6 +1322,7 @@ export class GlassEffect implements Effect {
             this.#pending = null;
             this.#phase = "ready";
         }
+        this.#updateRelief(ctx);
         this.#updateImage(ctx);
         this.#updateBackdropMip(ctx);
         if (!this.#still) {
@@ -1460,9 +1540,13 @@ export class GlassEffect implements Effect {
                     SMOOTH_PASSES,
                 );
                 if (shape) {
+                    const lum = reliefLuminance(px, mw, mh, shape);
+                    const radius = reliefRadius(this.params.reliefBlur, shape);
                     this.#pending = {
                         ...shape,
-                        ...buildRelief(px, mw, mh, shape),
+                        reliefLum: lum,
+                        reliefRadius: radius,
+                        ...buildRelief(lum, shape, radius),
                     };
                 } else {
                     // Nothing drawn yet: try again on a later frame.
@@ -1479,14 +1563,44 @@ export class GlassEffect implements Effect {
         if (this.#sdfRaw) {
             gl.deleteTexture(this.#sdfRaw);
         }
+        this.#sdfRaw = null;
+        this.#sdfTex = null;
+        const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
+        ctx.resetState();
+        if (sdf) {
+            this.#sdfRaw = sdf;
+            this.#sdfTex = ctx.wrapTexture(sdf, {
+                size: [shape.sdfW, shape.sdfH],
+                filter: "linear",
+                wrap: "clamp",
+            });
+        }
+        this.#uploadRelief(ctx, shape);
+    }
+
+    // Rebuild the relief when `reliefBlur` changes, from the luminance
+    // kept from the readback: no new capture, and the SDF stays.
+    #updateRelief(ctx: EffectContext): void {
+        const shape = this.#shape;
+        if (!shape) {
+            return;
+        }
+        const radius = reliefRadius(this.params.reliefBlur, shape);
+        if (radius === shape.reliefRadius) {
+            return;
+        }
+        Object.assign(shape, buildRelief(shape.reliefLum, shape, radius));
+        shape.reliefRadius = radius;
+        this.#uploadRelief(ctx, shape);
+    }
+
+    #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
+        const gl = ctx.gl;
         if (this.#reliefRaw) {
             gl.deleteTexture(this.#reliefRaw);
         }
-        this.#sdfRaw = null;
-        this.#sdfTex = null;
         this.#reliefRaw = null;
         this.#reliefTex = null;
-        const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
         const rel = uploadFloatTexture(
             gl,
             shape.sdfW,
@@ -1495,14 +1609,6 @@ export class GlassEffect implements Effect {
         );
         ctx.resetState();
         const size = [shape.sdfW, shape.sdfH] as const;
-        if (sdf) {
-            this.#sdfRaw = sdf;
-            this.#sdfTex = ctx.wrapTexture(sdf, {
-                size,
-                filter: "linear",
-                wrap: "clamp",
-            });
-        }
         if (rel) {
             this.#reliefRaw = rel;
             this.#reliefTex = ctx.wrapTexture(rel, {
