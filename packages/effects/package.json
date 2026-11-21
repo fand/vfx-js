@@ -54,7 +54,7 @@
     "test:watch": "vitest --dir src"
   },
   "peerDependencies": {
-    "@vfx-js/core": ">=1.6.0"
+    "@vfx-js/core": "workspace:^"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
