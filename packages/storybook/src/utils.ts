@@ -800,13 +800,6 @@ export function attachClockPane(
     return pane;
 }
 
-// Params that are baked in when the effect is constructed (the state
-// texture size and the firefly split). Changing them rebuilds the effect.
-const SWIRL_REBUILD_KEYS: ReadonlySet<string> = new Set([
-    "count",
-    "fireflyRatio",
-]);
-
 /** Source picker for {@link attachSwirlParticlesPane}. */
 export type SwirlSourceSelector = {
     keys: readonly string[];
@@ -816,20 +809,22 @@ export type SwirlSourceSelector = {
 
 /**
  * Tweakpane for SwirlParticlesEffect. Binds to a story-owned `params`
- * object; `apply` copies live edits into the current effect, and
- * `rebuild` is called when a construction-time param changes.
+ * object; `apply` copies the edits into the current effect, which reads
+ * them every frame.
  */
 export function attachSwirlParticlesPane(
     title: string,
     params: SwirlParticlesParams,
-    cb: { apply: () => void; rebuild: () => void },
+    apply: () => void,
     source?: SwirlSourceSelector,
 ): Pane {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
-    // The effect orbits on window pointer drags; keep panel drags out.
+    // `drag` orbits on drags that start on the element's box, and the
+    // panel overlaps a wide element (the logo is 80vw): keep panel drags
+    // out.
     container.addEventListener("pointerdown", (e) => e.stopPropagation());
     document.body.appendChild(container);
 
@@ -840,24 +835,12 @@ export function attachSwirlParticlesPane(
         step,
     });
 
-    const onChange = (key: string, last: boolean) => {
-        if (SWIRL_REBUILD_KEYS.has(key)) {
-            // Rebuilding reallocates the state, so wait for the drag to end.
-            if (last) {
-                cb.rebuild();
-            }
-        } else {
-            cb.apply();
-        }
-    };
     const bind = (
         folder: FolderApi | Pane,
         key: keyof SwirlParticlesParams,
         opts: BindingParams = {},
     ) => {
-        folder
-            .addBinding(params, key, opts)
-            .on("change", (ev) => onChange(key, ev.last));
+        folder.addBinding(params, key, opts).on("change", apply);
     };
 
     if (source) {
@@ -892,14 +875,13 @@ export function attachSwirlParticlesPane(
     bind(flow, "attract", range(0, 20, 0.5));
     bind(flow, "peel", range(0, 1, 0.01));
 
-    addSwirlPaletteBindings(pane, params, cb.apply);
+    addSwirlPaletteBindings(pane, params, apply);
 
     const glow = pane.addFolder({ title: "Fireflies & Bloom" });
     bind(glow, "fireflyRatio", range(0, 0.1, 0.001));
     bind(glow, "fireflyIntensity", range(0, 20, 0.5));
     bind(glow, "fireflyColor", { view: "color" });
     bind(glow, "bloom", range(0, 3, 0.05));
-    bind(glow, "bloomThreshold", range(0, 3, 0.05));
 
     // `lightDirection` is a tuple: a Point2d pad for x / y (up is up) and
     // a slider for z, written back as a new tuple.
@@ -912,7 +894,7 @@ export function attachSwirlParticlesPane(
             lightState.direction.y,
             lightState.z,
         ];
-        cb.apply();
+        apply();
     };
     light
         .addBinding(lightState, "direction", {
@@ -960,7 +942,7 @@ export function attachSwirlParticlesPane(
     };
     const writePad = () => {
         params.pad = padState.fullscreen ? "fullscreen" : padState.pad;
-        cb.apply();
+        apply();
     };
     const output = pane.addFolder({ title: "Output", expanded: false });
     bind(output, "antialias");
@@ -973,7 +955,7 @@ export function attachSwirlParticlesPane(
 
 // Palette preset dropdown plus the current stops (offset slider + colour
 // picker each), rebuilt when the preset changes. Edits mutate the stop
-// objects in place; the effect re-bakes when the stops' JSON changes.
+// objects in place; the effect re-bakes when an offset or colour changes.
 function addSwirlPaletteBindings(
     pane: Pane,
     params: SwirlParticlesParams,

@@ -10,9 +10,10 @@ Add `SwirlParticlesEffect`: particles flow over the element's silhouette, extrud
 - Each particle draws a curved, tapering fibre through its recent positions; `streak` sets its length in seconds of travel (0 draws dots).
 - Light: `lightDirection` (view space, towards the light, normalised internally), `lightColor`, `lightIntensity`, `ambient`, `occlusion` (crease darkening) and `glint`.
 - `shadow: true` casts a soft drop shadow onto the page, a plane parallel to the screen behind the shape, from the same light. Tune it with `shadowOpacity`, `shadowSoftness` (CSS px), `shadowDistance` (world units) and `shadowColor`. Off by default.
-- Camera: `yaw`, `pitch`, `orbit` (wobble amplitude), `fov` and `zoom`. Set `drag: true` to orbit it with pointer drags.
-- `mouse: "repel"` pushes particles away from the cursor (`mouseRadius` in CSS px, `mouseStrength`); `mouse: "tilt"` turns the shape to face it. Off (`"none"`) by default.
-- Output is premultiplied over transparency, in `pad` CSS px around the element or `"fullscreen"` (default).
+- Camera: `yaw`, `pitch`, `orbit` (wobble amplitude), `fov` and `zoom`. Set `drag: true` to orbit it with pointer drags that start on the element; the window listeners are only there while `drag` is on.
+- `mouse: "repel"` pushes particles away from the cursor (`mouseRadius` in CSS px, `mouseStrength`); `mouse: "tilt"` turns the shape to face it. Off (`"none"`) by default, with no window listeners.
+- `count` (default 65536, at most 1,048,576) and `fireflyRatio` are live like every other param: lowering `count` draws fewer particles, raising it past what is allocated reallocates the particle state. Numbers that are not finite fall back to their defaults.
+- Output is premultiplied over transparency, in `pad` CSS px around the element (default 200) or `"fullscreen"`.
 - `antialias: true` smooths the fibres' edges with 4× MSAA, at about 5× the memory of the particle buffer (10× with its depth). Off by default.
-- `new SwirlParticlesEffect(params, { still: true })` renders one still frame.
+- `new SwirlParticlesEffect(params, { still: true })` renders one still frame, drawn again only when params or the element's size change.
 - New types: `SwirlParticlesParams`, `SwirlParticlesColorStop`, `SwirlParticlesPaletteName`, `SwirlParticlesEffectOptions`.

@@ -317,8 +317,7 @@ export const effectDemos: EffectDemo[] = [
         text: "Particles curling over the extruded silhouette.",
         media: "logo",
         // A small pad keeps the tile cheap; wisps that drift further are clipped.
-        create: () =>
-            new SwirlParticlesEffect({ count: 65536, pad: 40, yaw: 0.2 }),
+        create: () => new SwirlParticlesEffect({ pad: 40, yaw: 0.2 }),
     },
     {
         name: "TilePixelateEffect",

@@ -28,11 +28,7 @@ import type {
 import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
-import {
-    QUAD_VERTS,
-    sanitizeCount,
-    stateSizeFromCount,
-} from "./_particle-common.js";
+import { QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
 
 /**
  * One stop of a {@link SwirlParticlesParams.palette} gradient, like a
@@ -54,57 +50,65 @@ export type SwirlParticlesPaletteName =
     | "sakura"
     | "ocean";
 
+// Frozen, so a preset can't be edited in place by accident.
+function stops(
+    list: SwirlParticlesColorStop[],
+): readonly SwirlParticlesColorStop[] {
+    return Object.freeze(list.map((s) => Object.freeze(s)));
+}
+
 /**
  * Built-in particle gradients. Low offsets colour the shaded body, high
- * offsets the fast, glinting and peeled-off particles.
+ * offsets the fast, glinting and peeled-off particles. Frozen: copy the
+ * stops to edit them.
  */
-export const SWIRL_PARTICLES_PALETTES: Record<
-    SwirlParticlesPaletteName,
-    readonly SwirlParticlesColorStop[]
-> = {
+export const SWIRL_PARTICLES_PALETTES: Readonly<
+    Record<SwirlParticlesPaletteName, readonly SwirlParticlesColorStop[]>
+> = Object.freeze({
     // Deep navy → blue → violet-pink → near white.
-    nebula: [
+    nebula: stops([
         { offset: 0, color: "#0e1554" },
         { offset: 0.45, color: "#3a50d4" },
         { offset: 0.8, color: "#c478e0" },
         { offset: 1, color: "#f4e6ff" },
-    ],
-    ember: [
+    ]),
+    ember: stops([
         { offset: 0, color: "#2a0603" },
         { offset: 0.45, color: "#b0260c" },
         { offset: 0.8, color: "#ff9a2e" },
         { offset: 1, color: "#fff3cf" },
-    ],
-    aurora: [
+    ]),
+    aurora: stops([
         { offset: 0, color: "#03262a" },
         { offset: 0.45, color: "#0d8f72" },
         { offset: 0.8, color: "#5cf2b0" },
         { offset: 1, color: "#e4fffb" },
-    ],
-    mono: [
+    ]),
+    mono: stops([
         { offset: 0, color: "#141519" },
         { offset: 0.45, color: "#4b4f58" },
         { offset: 0.8, color: "#b4b8c0" },
         { offset: 1, color: "#ffffff" },
-    ],
-    sakura: [
+    ]),
+    sakura: stops([
         { offset: 0, color: "#3b0d2f" },
         { offset: 0.45, color: "#a8357a" },
         { offset: 0.8, color: "#f5a3c7" },
         { offset: 1, color: "#fff2f7" },
-    ],
-    ocean: [
+    ]),
+    ocean: stops([
         { offset: 0, color: "#021a35" },
         { offset: 0.45, color: "#0a61a3" },
         { offset: 0.8, color: "#2fc6da" },
         { offset: 1, color: "#e9fcff" },
-    ],
-};
+    ]),
+});
 
 export type SwirlParticlesParams = {
     /**
-     * Number of particles. Construction-time only: changing it later has
-     * no effect until the effect is re-added.
+     * Number of particles, at most 1,048,576 (2^20). Live: lowering it
+     * draws fewer particles without freeing memory; raising it past what
+     * is allocated reallocates the particle state (the trails regrow).
      */
     count: number;
     /** Extrusion depth, relative to the long side of the element (= 2). */
@@ -132,19 +136,14 @@ export type SwirlParticlesParams = {
      * widths per 0.3 s of streak.
      */
     streak: number;
-    /**
-     * Fraction of particles drawn as bright sparkles, in [0, 1].
-     * Construction-time only (see {@link count}).
-     */
+    /** Fraction of particles drawn as bright sparkles, in [0, 1]. */
     fireflyRatio: number;
     /** HDR intensity of the sparkles. */
     fireflyIntensity: number;
     /** Sparkle colour, CSS hex. */
     fireflyColor: string;
-    /** Bloom intensity. */
+    /** Bloom intensity. 0 turns the bloom passes off. */
     bloom: number;
-    /** Brightness above which pixels bloom. */
-    bloomThreshold: number;
     /**
      * Particle colour gradient: a preset name or your own stops. Stops are
      * sorted by offset, the ends clamp, and colours blend linearly. Read
@@ -214,9 +213,10 @@ export type SwirlParticlesParams = {
     /** Camera zoom. 1 = the z = 0 plane matches the element size. */
     zoom: number;
     /**
-     * Orbit the camera by dragging the pointer anywhere on the page.
-     * Off by default: it listens on `window`. UI that should not orbit
-     * can stop `pointerdown` propagation.
+     * Orbit the camera by dragging the pointer. A drag starts on the
+     * element's box and can then leave it. While on, it listens for
+     * pointer events on `window`; UI on top of the element that should
+     * not orbit can stop `pointerdown` propagation.
      */
     drag: boolean;
     /**
@@ -234,7 +234,8 @@ export type SwirlParticlesParams = {
      *   {@link yaw} / {@link pitch}, the {@link orbit} wobble and drags.
      *
      * Both ease in and out. Ignored by still frames. While not `"none"`,
-     * it listens on `window` to tell when the pointer leaves the page.
+     * it listens for pointer events on `window` to tell when the pointer
+     * leaves the page.
      */
     mouse: "none" | "repel" | "tilt";
     /** Radius of the `"repel"` hole, in CSS px on screen. */
@@ -247,17 +248,19 @@ export type SwirlParticlesParams = {
      */
     mouseStrength: number;
     /**
-     * Extra pad around the element in CSS px for the particles and bloom
-     * to draw into, or `"fullscreen"` to draw over the whole canvas. Wisps
-     * and a tilted shape reach well outside the element, so a small pad
-     * clips them.
+     * Extra pad around the element in CSS px for the particles, bloom and
+     * shadow to draw into, or `"fullscreen"` to draw over the whole
+     * canvas. The default, 200, holds the wisps and the drop shadow of
+     * the default look on elements up to about 1000 px wide. A smaller
+     * pad, a larger element, `zoom`, strong tilts or a long
+     * `shadowDistance` clip them.
      */
     pad: number | "fullscreen";
     /**
      * Smooth the edges of the fibres with 4× multisampling (MSAA).
      * Off by default: the particle buffer then takes about 5 times the
-     * memory, 10 times with its depth buffer, which adds up fast at
-     * `pad: "fullscreen"` on a high-DPR screen. Falls back to no
+     * memory, 10 times with its depth buffer, which adds up fast with a
+     * large pad or `"fullscreen"` on a high-DPR screen. Falls back to no
      * multisampling, with a warning, on GPUs that can't do it.
      */
     antialias: boolean;
@@ -267,13 +270,15 @@ export type SwirlParticlesParams = {
 export type SwirlParticlesEffectOptions = {
     /**
      * Render a still frame: simulate a fixed number of steps once, then
-     * stop. For visual tests and `prefers-reduced-motion`.
+     * stop. The frame is drawn again only when params or the element's
+     * size change, so a video source's colours stay as they were. For
+     * visual tests and `prefers-reduced-motion`.
      */
     still?: boolean;
 };
 
 const DEFAULT_PARAMS: SwirlParticlesParams = {
-    count: 512 * 512,
+    count: 65536,
     depth: 0.22,
     swirl: 1.0,
     curl: 0.8,
@@ -288,7 +293,6 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     fireflyIntensity: 6.0,
     fireflyColor: "#ffd2ec",
     bloom: 0.9,
-    bloomThreshold: 1.0,
     palette: "nebula",
     sourceColor: 0,
     lightDirection: [-0.45, 0.75, 0.55],
@@ -311,17 +315,25 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     mouse: "none",
     mouseRadius: 120,
     mouseStrength: 1,
-    pad: "fullscreen",
+    pad: 200,
     antialias: false,
 };
 
+// Largest `count`: 2^20, a 1024² state texture.
+const MAX_COUNT = 1 << 20;
 // Long side of the silhouette read back from the element, in px.
 const MASK_LONG = 400;
+// Frames to wait before reading the silhouette back, and the most frames
+// between retries while it is empty (the gap doubles from the first).
+const CAPTURE_DELAY = 3;
+const CAPTURE_RETRY_MAX = 120;
 // Padding of the SDF grid around the silhouette, relative to MASK_LONG.
 const SDF_PAD = 0.3;
 // Spawn points on the surface: SPAWN_SIZE² of them.
 const SPAWN_SIZE = 256;
 const BLOOM_LEVELS = 6;
+// Brightness above which pixels bloom: only the HDR sparkles reach it.
+const BLOOM_THRESHOLD = 1.0;
 // Texels of the baked palette gradient.
 const PALETTE_SIZE = 256;
 const MAX_DT = 1 / 30;
@@ -339,6 +351,9 @@ const HIST_COLS = Math.ceil(Math.sqrt(TRAIL_SAMPLES));
 const HIST_ROWS = Math.ceil(TRAIL_SAMPLES / HIST_COLS);
 // Ago of a slot that holds no sample.
 const HIST_NEVER = 1e9;
+// Generations wrap at this, so they stay exact in a 16-bit float
+// (integers up to 2048 are) and fit the trail's respawn check.
+const GEN_WRAP = 1024;
 // Shadow coverage levels, from 1/2 to 1/16 of the scene resolution. The
 // blur runs on the coarsest level it still needs, so wide blurs stay cheap.
 const SHADOW_LEVELS = 4;
@@ -348,7 +363,6 @@ const SHADOW_MAX_SIGMA = 6;
 // simulation. The binary coverage has holes that move every frame; the
 // average hides them, at the cost of the shadow trailing a fast move.
 const SHADOW_TAU = 0.1;
-const DEFAULT_LIGHT: readonly [number, number, number] = [-0.45, 0.75, 0.55];
 // Pointer interaction (`mouse`). Seconds for the force to fade in / out.
 const MOUSE_FADE = 0.15;
 // Time constant of the smoothed cursor that "repel" pushes from, seconds.
@@ -471,17 +485,11 @@ vec4 sdf3(vec3 p) {
 }
 `;
 
-// Spawn points are a pure function of (id, generation), so the draw pass
-// can find where a particle was born without storing it.
-const GLSL_PARTICLE_COMMON = `
-uniform int stateWidth;
-uniform float lifeMean;
+// Spawn points are a pure function of (id, generation), so the colour
+// pass can find where a particle was born without storing it.
+const GLSL_SPAWN = `
 uniform sampler2D spawnTex;
 uniform int spawnSize;
-
-float lifeOf(uint id, float gen) {
-    return lifeMean * mix(0.6, 1.4, rnd(id * 1664525u + uint(gen) * 1013904223u + 7u));
-}
 
 uint spawnKey(uint id, float gen) {
     return pcg(id ^ (uint(gen) * 2654435769u));
@@ -499,10 +507,24 @@ precision highp float;
 precision highp int;
 precision highp sampler2D;
 
+// State: pos = xyz + age / life (0..1), vel = xyz + generation (wraps at
+// GEN_WRAP). Both stay meaningful in 16-bit float targets.
 uniform sampler2D posTex;
 uniform sampler2D velTex;
+uniform int stateWidth;
+// Ids at or past \`count\` are not drawn and keep their state.
 uniform int count;
+// 1: respawn every particle. 2: the state grew; copy the first
+// \`oldCount\` particles from the old, \`oldWidth\` wide state, respawn the rest.
 uniform int reset;
+uniform sampler2D oldPosTex;
+uniform sampler2D oldVelTex;
+uniform int oldWidth;
+uniform int oldCount;
+// 1: the state targets are 16-bit floats.
+uniform int halfState;
+uniform int frameSeed;
+uniform float lifeMean;
 uniform float time;
 uniform float dt;
 uniform float swirl;
@@ -527,7 +549,20 @@ layout(location = 1) out vec4 outVel;
 ${GLSL_HASH}
 ${GLSL_NOISE}
 ${GLSL_SDF}
-${GLSL_PARTICLE_COMMON}
+${GLSL_SPAWN}
+
+float lifeOf(uint id, float gen) {
+    return lifeMean * mix(0.6, 1.4, rnd(id * 1664525u + uint(gen) * 1013904223u + 7u));
+}
+
+// Round onto the 16-bit float grid, up or down at random. In 16-bit
+// state targets, an age step smaller than half a step of the grid would
+// otherwise round away every frame and the particle would never die;
+// this way the steps add up on average.
+float roundHalf(float x, float r) {
+    float e = exp2(floor(log2(max(x, 6.2e-5))) - 10.0);
+    return floor(x / e + r) * e;
+}
 
 vec3 spawn(uint id, float gen) {
     uint key = spawnKey(id, gen);
@@ -540,28 +575,38 @@ vec3 spawn(uint id, float gen) {
 
 void main() {
     ivec2 texel = ivec2(gl_FragCoord.xy);
-    uint id = uint(texel.y * stateWidth + texel.x);
-    if (int(id) >= count) {
-        outPos = vec4(0.0);
+    int i = texel.y * stateWidth + texel.x;
+    uint id = uint(i);
+
+    if (reset == 2 && i < oldCount) {
+        ivec2 o = ivec2(i % oldWidth, i / oldWidth);
+        outPos = texelFetch(oldPosTex, o, 0);
+        outVel = texelFetch(oldVelTex, o, 0);
+        return;
+    }
+    if (reset != 0) {
+        // Random ages, so the particles don't all respawn together.
+        outPos = vec4(spawn(id, 0.0), rnd(id * 7919u + 3u));
         outVel = vec4(0.0);
         return;
     }
 
     vec4 P = texelFetch(posTex, texel, 0);
     vec4 V = texelFetch(velTex, texel, 0);
-
-    if (reset == 1) {
-        float life = lifeOf(id, 0.0);
-        outPos = vec4(spawn(id, 0.0), rnd(id * 7919u + 3u) * life);
-        outVel = vec4(0.0, 0.0, 0.0, 0.0);
+    if (i >= count) {
+        outPos = P;
+        outVel = V;
         return;
     }
 
     float gen = V.w;
-    float age = P.w + dt;
     float life = lifeOf(id, gen);
-    if (age >= life) {
-        gen += 1.0;
+    float ageN = P.w + dt / life;
+    if (halfState == 1) {
+        ageN = roundHalf(ageN, rnd(id * 2654435761u + uint(frameSeed) * 2246822519u + 29u));
+    }
+    if (ageN >= 1.0) {
+        gen = mod(gen + 1.0, ${GEN_WRAP.toFixed(1)});
         outPos = vec4(spawn(id, gen), 0.0);
         outVel = vec4(0.0, 0.0, 0.0, gen);
         return;
@@ -574,7 +619,6 @@ void main() {
     float d = s.x;
 
     // How firmly this particle still holds on to the surface.
-    float ageN = age / life;
     float peeler = smoothstep(0.5, 0.9, rnd(id * 31u + uint(gen) * 17u + 5u));
     float hold = 1.0 - peel * peeler * smoothstep(0.2, 0.9, ageN);
 
@@ -625,7 +669,7 @@ void main() {
     v = mix(v, target, 1.0 - exp(-dt * 5.0));
     p += v * dt;
 
-    outPos = vec4(p, age);
+    outPos = vec4(p, ageN);
     outVel = vec4(v, gen);
 }
 `;
@@ -647,6 +691,7 @@ uniform vec2 shapeHalf;
 uniform float sourceColor;
 uniform float time;
 uniform float speed;
+uniform int stateWidth;
 uniform int count;
 
 layout(location = 0) out vec4 outA;
@@ -655,7 +700,7 @@ layout(location = 1) out vec4 outB;
 ${GLSL_HASH}
 ${GLSL_NOISE}
 ${GLSL_SDF}
-${GLSL_PARTICLE_COMMON}
+${GLSL_SPAWN}
 
 vec3 ramp(float t) {
     float u = (clamp(t, 0.0, 1.0) * ${(PALETTE_SIZE - 1).toFixed(1)} + 0.5) / ${PALETTE_SIZE.toFixed(1)};
@@ -725,13 +770,14 @@ precision highp sampler2D;
 #define TRAIL_SAMPLES ${TRAIL_SAMPLES}
 #define HIST_COLS ${HIST_COLS}
 
+uniform int idOffset;
 #ifdef FIREFLY
-in float pid;
 uniform float fireflyIntensity;
 uniform vec3 fireflyColor;
+uniform float time;
 #else
 in vec2 position;
-uniform int idOffset;
+uniform sampler2D velTex;
 uniform float streak;
 uniform sampler2D histTex;
 // Newest first: slot in the history atlas, and seconds since it was written.
@@ -756,7 +802,7 @@ uniform float shadowDepth;
 #endif
 
 uniform sampler2D posTex;
-uniform sampler2D velTex;
+uniform int stateWidth;
 uniform mat3 viewRot;
 uniform float camDist;
 uniform float camNear;
@@ -765,15 +811,13 @@ uniform float focalPx;
 uniform vec2 centerPx;
 uniform vec2 bufferPx;
 uniform float pointPx;
-uniform float time;
 
 out vec3 vColor;
 out vec2 vLocal;
 out vec2 vShape;
 
 ${GLSL_HASH}
-${GLSL_SDF}
-${GLSL_PARTICLE_COMMON}
+${pass === "body" ? GLSL_SDF : ""}
 
 void cull() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -804,18 +848,12 @@ vec4 histAt(int k, ivec2 texel) {
 #endif
 
 void main() {
-#ifdef FIREFLY
-    int i = int(pid);
-#else
     int i = gl_InstanceID + idOffset;
-#endif
     ivec2 texel = ivec2(i % stateWidth, i / stateWidth);
     uint id = uint(i);
     vec4 P = texelFetch(posTex, texel, 0);
-    vec4 V = texelFetch(velTex, texel, 0);
     vec3 p = P.xyz;
-    float life = lifeOf(id, V.w);
-    float ageN = P.w / life;
+    float ageN = P.w;
 
     // Grow in, shrink out: opaque particles can't fade.
     float lifeScale = smoothstep(0.0, 0.08, ageN) * (1.0 - smoothstep(0.85, 1.0, ageN));
@@ -848,12 +886,12 @@ void main() {
 #endif
 
     // Walk the trail from the head to segment sg. Point j + 1 is history
-    // sample j. A sample written before the particle's last respawn (or
-    // never written) doesn't have the age this one had then: the trail
-    // ends before it, so a respawn never draws a line back. The trail is
-    // cut at \`streak\` seconds and, like a speed cap, at 14 widths on
-    // screen per 0.3 s of streak (the default), never fewer than 14.
-    float age = P.w;
+    // sample j. A sample from another generation (written before the
+    // particle's last respawn, or never written: -1) ends the trail, so a
+    // respawn never draws a line back. The trail is cut at \`streak\`
+    // seconds and, like a speed cap, at 14 widths on screen per 0.3 s of
+    // streak (the default), never fewer than 14.
+    float gen = texelFetch(velTex, texel, 0).w;
     float capLen = w * 14.0 * max(streak / 0.3, 1.0);
     float used = 0.0;
     vec3 pa = p;
@@ -866,7 +904,7 @@ void main() {
         float ago = histAgo[j];
         // ago == agoA: the newest sample was written this frame.
         bool valid = agoA < streak && used < capLen && ago >= agoA
-            && abs(age - ago - h.w) < 1e-3;
+            && abs(h.w - gen) < 0.5;
         vec3 cn = ca;
         vec3 pn = pa;
         if (valid) {
@@ -974,7 +1012,6 @@ void main() {
 // Shadow coverage: 1 inside the flattened capsule.
 const FRAG_SHADOW_COVER = `#version 300 es
 precision highp float;
-in vec3 vColor;
 in vec2 vLocal;
 in vec2 vShape;
 out vec4 outColor;
@@ -1037,23 +1074,26 @@ void main() {
 }
 `;
 
+// A sample is the position and the generation it was written in.
 const FRAG_HIST_PUSH = `#version 300 es
 precision highp float;
 precision highp sampler2D;
 uniform sampler2D posTex;
+uniform sampler2D velTex;
 uniform vec2 slotOrigin;
 out vec4 outColor;
 void main() {
-    outColor = texelFetch(posTex, ivec2(gl_FragCoord.xy - slotOrigin), 0);
+    ivec2 texel = ivec2(gl_FragCoord.xy - slotOrigin);
+    outColor = vec4(texelFetch(posTex, texel, 0).xyz, texelFetch(velTex, texel, 0).w);
 }
 `;
 
-// An age no particle can have, so every sample reads as stale.
+// A generation no particle has, so every sample reads as stale.
 const FRAG_HIST_CLEAR = `#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
-    outColor = vec4(0.0, 0.0, 0.0, -1.0e9);
+    outColor = vec4(0.0, 0.0, 0.0, -1.0);
 }
 `;
 
@@ -1080,8 +1120,9 @@ precision highp float;
 in vec2 uv;
 uniform sampler2D scene;
 uniform vec2 texel;
-uniform float threshold;
 out vec4 outColor;
+
+const float threshold = ${BLOOM_THRESHOLD.toFixed(1)};
 
 void main() {
     vec3 c = texture(scene, uv + texel * vec2(-0.5, -0.5)).rgb
@@ -1135,16 +1176,6 @@ void main() {
     c += texture(lowTex, uv + texel * vec2(1.0, 1.0)).rgb;
     c /= 16.0;
     outColor = vec4(texture(highTex, uv).rgb + c * scatter, 1.0);
-}
-`;
-
-const FRAG_COPY = `#version 300 es
-precision highp float;
-in vec2 uv;
-uniform sampler2D srcTex;
-out vec4 outColor;
-void main() {
-    outColor = texture(srcTex, uv);
 }
 `;
 
@@ -1441,13 +1472,150 @@ function buildShape(
     };
 }
 
+// ---------------------------------------------------------------------------
+// Params
+// ---------------------------------------------------------------------------
+
+type Rgb = [number, number, number];
+
+type NumKey = {
+    [K in keyof SwirlParticlesParams]-?: SwirlParticlesParams[K] extends number
+        ? K
+        : never;
+}[keyof SwirlParticlesParams];
+
+// [min, max] of every numeric param. A finite value is clamped into it,
+// anything else (NaN, ±Infinity, not a number) falls back to the default.
+const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
+    count: [1, MAX_COUNT],
+    depth: [0.01, 4],
+    swirl: [-10, 10],
+    curl: [-10, 10],
+    curlScale: [0.01, 50],
+    speed: [0, 10],
+    attract: [0, 100],
+    peel: [0, 1],
+    life: [0.1, 120],
+    pointSize: [0, 64],
+    streak: [0, 10],
+    fireflyRatio: [0, 1],
+    fireflyIntensity: [0, 1000],
+    bloom: [0, 100],
+    sourceColor: [0, 1],
+    lightIntensity: [0, 100],
+    ambient: [0, 1],
+    occlusion: [0, 1],
+    glint: [0, 100],
+    shadowOpacity: [0, 1],
+    shadowSoftness: [0, 500],
+    shadowDistance: [0, 100],
+    yaw: [-1000, 1000],
+    pitch: [-1000, 1000],
+    orbit: [-10, 10],
+    fov: [1, 150],
+    zoom: [0.01, 100],
+    mouseRadius: [0, 10000],
+    mouseStrength: [0, 100],
+};
+const NUM_KEYS = Object.keys(NUM_RANGE) as NumKey[];
+const MAX_PAD = 10000;
+
+/** Params as the frame uses them: valid, clamped, colours parsed. */
+type Resolved = Record<NumKey, number> & {
+    pad: number | "fullscreen";
+    shadow: boolean;
+    drag: boolean;
+    antialias: boolean;
+    mouse: SwirlParticlesParams["mouse"];
+    /** Unit vector towards the light. */
+    light: Rgb;
+    lightColor: Rgb;
+    fireflyColor: Rgb;
+    shadowColor: Rgb;
+};
+
+function clamp(x: number, lo: number, hi: number): number {
+    return Math.min(Math.max(x, lo), hi);
+}
+
+function padOf(pad: unknown): number | "fullscreen" {
+    if (pad === "fullscreen") {
+        return pad;
+    }
+    return typeof pad === "number" && Number.isFinite(pad)
+        ? clamp(pad, 0, MAX_PAD)
+        : (DEFAULT_PARAMS.pad as number);
+}
+
+const HEX_RE = /^#?(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+// Parsed colours by string, so a frame doesn't parse them again.
+const rgbCache = new Map<string, Rgb>();
+
+// RGB in [0, 1] of a CSS hex colour, or of `fallback` when it isn't one.
+// The result is shared: don't mutate it.
+function rgbOf(hex: unknown, fallback: string): Rgb {
+    const key = typeof hex === "string" && HEX_RE.test(hex) ? hex : fallback;
+    let rgb = rgbCache.get(key);
+    if (!rgb) {
+        if (rgbCache.size >= 64) {
+            rgbCache.clear();
+        }
+        const [r, g, b] = parseHexColor(key);
+        rgb = [r, g, b];
+        rgbCache.set(key, rgb);
+    }
+    return rgb;
+}
+
+// Unit vector towards the light, into `out`. Falls back to the default
+// for a zero or broken direction.
+function lightUnit(dir: unknown, out: Rgb): void {
+    const d = Array.isArray(dir) ? dir : [];
+    const [x, y, z] = [Number(d[0]), Number(d[1]), Number(d[2])];
+    const len = Math.hypot(x, y, z);
+    if (!Number.isFinite(len) || len < 1e-6) {
+        lightUnit(DEFAULT_PARAMS.lightDirection, out);
+        return;
+    }
+    out[0] = x / len;
+    out[1] = y / len;
+    out[2] = z / len;
+}
+
+// The one place params are checked: once a frame, into `out`.
+function resolveParams(p: SwirlParticlesParams, out?: Resolved): Resolved {
+    const r = out ?? ({ light: [0, 0, 1] } as unknown as Resolved);
+    for (const k of NUM_KEYS) {
+        const v = p[k];
+        const [lo, hi] = NUM_RANGE[k];
+        r[k] =
+            typeof v === "number" && Number.isFinite(v)
+                ? clamp(v, lo, hi)
+                : DEFAULT_PARAMS[k];
+    }
+    r.count = Math.floor(r.count);
+    r.pad = padOf(p.pad);
+    r.shadow = !!p.shadow;
+    r.drag = !!p.drag;
+    r.antialias = !!p.antialias;
+    r.mouse = p.mouse === "repel" || p.mouse === "tilt" ? p.mouse : "none";
+    lightUnit(p.lightDirection, r.light);
+    r.lightColor = rgbOf(p.lightColor, DEFAULT_PARAMS.lightColor);
+    r.fireflyColor = rgbOf(p.fireflyColor, DEFAULT_PARAMS.fireflyColor);
+    r.shadowColor = rgbOf(p.shadowColor, DEFAULT_PARAMS.shadowColor);
+    return r;
+}
+
 function resolvePalette(
     palette: SwirlParticlesParams["palette"],
 ): readonly SwirlParticlesColorStop[] {
-    const stops =
+    const stops = (
         typeof palette === "string"
             ? SWIRL_PARTICLES_PALETTES[palette]
-            : palette;
+            : Array.isArray(palette)
+              ? palette.filter((s) => s && typeof s === "object")
+              : null
+    ) as readonly SwirlParticlesColorStop[] | null | undefined;
     return stops && stops.length > 0 ? stops : SWIRL_PARTICLES_PALETTES.nebula;
 }
 
@@ -1456,10 +1624,8 @@ function resolvePalette(
 function bakePalette(palette: SwirlParticlesParams["palette"]): Uint8Array {
     const stops = resolvePalette(palette)
         .map((s) => ({
-            offset: Number.isFinite(s.offset)
-                ? Math.min(Math.max(s.offset, 0), 1)
-                : 0,
-            rgb: parseHexColor(s.color),
+            offset: Number.isFinite(s.offset) ? clamp(s.offset, 0, 1) : 0,
+            rgb: rgbOf(s.color, "#000000"),
         }))
         .sort((a, b) => a.offset - b.offset);
     const out = new Uint8Array(PALETTE_SIZE * 4);
@@ -1488,24 +1654,6 @@ function bakePalette(palette: SwirlParticlesParams["palette"]): Uint8Array {
     return out;
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-    const [r, g, b] = parseHexColor(hex);
-    return [r, g, b];
-}
-
-// Unit vector towards the light. Falls back to the default for a zero
-// or broken direction.
-function lightUnit(
-    dir: SwirlParticlesParams["lightDirection"] | undefined,
-): [number, number, number] {
-    const [x, y, z] = dir ?? DEFAULT_LIGHT;
-    const len = Math.hypot(x, y, z);
-    if (!Number.isFinite(len) || len < 1e-6) {
-        return lightUnit(DEFAULT_LIGHT);
-    }
-    return [x / len, y / len, z / len];
-}
-
 // TRAIL_SAMPLES quads, one per trail segment: corner + segment index.
 function trailGeometry(instanceCount: number): EffectGeometry {
     const corners = [-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5];
@@ -1528,16 +1676,8 @@ function trailGeometry(instanceCount: number): EffectGeometry {
     };
 }
 
-function clamp(x: number, lo: number, hi: number): number {
-    return Math.min(Math.max(x, lo), hi);
-}
-
-function finiteOr(x: number, fallback: number): number {
-    return Number.isFinite(x) ? x : fallback;
-}
-
 function smoothstep(e0: number, e1: number, x: number): number {
-    const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
+    const t = clamp((x - e0) / (e1 - e0), 0, 1);
     return t * t * (3 - 2 * t);
 }
 
@@ -1569,13 +1709,32 @@ type Phase = "capture" | "reading" | "ready";
 
 type BloomLevel = {
     down: EffectRenderTarget;
-    up: EffectRenderTarget;
+    // The coarsest level has none: the upsample reads its `down`.
+    up: EffectRenderTarget | null;
 };
 
 type ShadowLevel = {
     a: EffectRenderTarget;
     b: EffectRenderTarget;
 };
+
+type Camera = {
+    viewRot: number[];
+    camDist: number;
+    focalPx: number;
+    centerPx: [number, number];
+    origin: readonly [number, number];
+};
+
+// What the composite reads: the bloom and the blurred shadow coverage,
+// null when off.
+type Layers = {
+    bloom: EffectRenderTarget | null;
+    shadow: EffectRenderTarget | null;
+    shadowAmount: number;
+};
+
+const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
 
 /**
  * Particles that flow over the surface of the element's silhouette,
@@ -1591,26 +1750,42 @@ type ShadowLevel = {
  * An opaque photo becomes an extruded slab. The output is premultiplied
  * over transparency, so set the page background yourself.
  *
- * All params except `count` and `fireflyRatio` are read every frame, so
- * you can mutate `params` live. Set `drag: true` to orbit the camera
- * with pointer drags, `shadow: true` to cast a drop shadow onto the
- * page behind, and `antialias: true` to smooth the fibres' edges.
+ * All params, `count` and `fireflyRatio` included, are read every frame,
+ * so you can mutate `params` live. Numbers that are not finite fall back
+ * to their defaults. Set `drag: true` to orbit the camera by dragging
+ * the element, `shadow: true` to cast a drop shadow onto the page
+ * behind, and `antialias: true` to smooth the fibres' edges.
  */
 export class SwirlParticlesEffect implements Effect {
     params: SwirlParticlesParams;
     readonly #still: boolean;
-    readonly #count: number;
-    readonly #stateWidth: number;
+    // Whether float targets are 16-bit: the core falls back to RGBA16F
+    // without OES_texture_float_linear.
+    #halfState = false;
+    // This frame's params, checked (see resolveParams).
+    readonly #r: Resolved;
 
+    // Bumped by dispose and context restore, so a silhouette readback
+    // started before them is dropped.
+    #token = 0;
     #phase: Phase = "capture";
     #srcFrames = 0;
+    // Frames to wait before the next capture; doubles while it's empty.
+    #captureGap = CAPTURE_DELAY;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
     #needsReset = true;
     #simTime = 0;
+    // Sim steps so far, a seed for the age rounding.
+    #steps = 0;
     #stillDone = false;
+    // Count the still frame was simulated with.
+    #stillCount = 0;
+    // Inputs of the drawn still frame; a change draws it again.
+    #stillKey: unknown[] = [];
 
-    #mask: EffectRenderTarget | null = null;
+    // Particle state, stateWidth² particles. Grows with `count`.
+    #stateWidth = 0;
     #pos: EffectRenderTarget | null = null;
     #vel: EffectRenderTarget | null = null;
     #scene: EffectRenderTarget | null = null;
@@ -1624,8 +1799,11 @@ export class SwirlParticlesEffect implements Effect {
     #shadowHist: EffectRenderTarget | null = null;
     // False restarts the average on the next shadow frame.
     #shadowHistValid = false;
+    #layers: Layers = NO_LAYERS;
     // Seconds the simulation advanced this frame.
     #frameDt = 0;
+    // Camera of the last drawn frame; "repel" pushes in its view.
+    #cam: Camera | null = null;
     // Per particle colour, written once a frame (see FRAG_ATTR).
     #attrA: EffectRenderTarget | null = null;
     #attrB: EffectRenderTarget | null = null;
@@ -1645,27 +1823,39 @@ export class SwirlParticlesEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #spawnTex: EffectTexture | null = null;
     #paletteTex: EffectTexture | null = null;
-    #paletteKey = "";
+    // The palette last baked: the value, and for stops, a flat copy of
+    // their offsets and colours to catch edits in place.
+    #paletteSrc: SwirlParticlesParams["palette"] | null = null;
+    #paletteSnap: unknown[] = [];
+    #paletteVersion = 0;
 
-    readonly #nFire: number;
-    #trails: EffectGeometry;
-    #heads: EffectGeometry;
-    #fireflies: EffectGeometry;
+    // Draw geometry for the current body / firefly split (fireflies take
+    // the first ids), rebuilt when it changes.
+    #trails: EffectGeometry | null = null;
+    #heads: EffectGeometry | null = null;
+    #fireflies: EffectGeometry | null = null;
+    #nBody = -1;
+    #nFire = -1;
     #slotQuad: EffectGeometry = {
         attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
     };
 
-    // Pointer drag.
+    // Pointer drag. Window listeners while `drag` is on.
     #dragYaw = 0;
     #dragPitch = 0;
     #dragging = false;
     #lastPointer: [number, number] = [0, 0];
-    #unlisten: (() => void) | null = null;
+    #unlistenDrag: (() => void) | null = null;
     #unsubRestored: (() => void) | null = null;
+    // Last frame's map from viewport to element-local px (bottom-left
+    // origin, physical): add to (clientX, innerHeight - clientY) × pr.
+    #toElement: [number, number] = [0, 0];
+    #pixelRatio = 1;
+    #elementPx: [number, number] = [0, 0];
 
     // Pointer interaction (`mouse`). The core has no "pointer left"
-    // signal, so #pointerIn comes from window listeners, added the first
-    // time `mouse` is not "none".
+    // signal, so #pointerIn comes from window listeners, there while
+    // `mouse` is not "none".
     #pointerIn = false;
     #unlistenHover: (() => void) | null = null;
     // Smoothed repel cursor, element-local physical px, and the fade.
@@ -1681,30 +1871,7 @@ export class SwirlParticlesEffect implements Effect {
     ) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
         this.#still = opts.still ?? false;
-        this.#count = sanitizeCount(this.params.count);
-        this.#stateWidth = stateSizeFromCount(this.#count);
-
-        // Fireflies take the first ids. Particles are statistically
-        // identical, so that is as random as any other choice.
-        const ratio = Number.isFinite(this.params.fireflyRatio)
-            ? Math.min(Math.max(this.params.fireflyRatio, 0), 1)
-            : 0;
-        const nFire = Math.min(this.#count, Math.round(this.#count * ratio));
-        this.#nFire = nFire;
-        const ids = new Float32Array(Math.max(nFire, 1));
-        for (let i = 0; i < ids.length; i++) {
-            ids[i] = i;
-        }
-        this.#trails = trailGeometry(this.#count - nFire);
-        this.#heads = {
-            attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
-            instanceCount: this.#count - nFire,
-        };
-        this.#fireflies = {
-            mode: "points",
-            attributes: { pid: { data: ids, itemSize: 1 } },
-            drawRange: { start: 0, count: nFire },
-        };
+        this.#r = resolveParams(this.params);
     }
 
     setParams(updates: Partial<SwirlParticlesParams>): void {
@@ -1713,86 +1880,45 @@ export class SwirlParticlesEffect implements Effect {
 
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
-        const stateOpts = {
-            size: [this.#stateWidth, this.#stateWidth] as const,
-            float: true,
-            persistent: true,
-            filter: "nearest" as const,
-        };
-        this.#pos = ctx.createRenderTarget(stateOpts);
-        this.#vel = ctx.createRenderTarget(stateOpts);
-        const attrOpts = { ...stateOpts, persistent: false };
-        this.#attrA = ctx.createRenderTarget(attrOpts);
-        this.#attrB = ctx.createRenderTarget(attrOpts);
-        this.#hist = ctx.createRenderTarget({
-            ...attrOpts,
-            size: [this.#stateWidth * HIST_COLS, this.#stateWidth * HIST_ROWS],
-        });
+        this.#halfState = !ctx.gl.getExtension("OES_texture_float_linear");
+        const r = resolveParams(this.params, this.#r);
+        this.#allocState(ctx, stateSizeFromCount(r.count), false);
         this.#createScene(ctx);
 
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // Raw textures are gone; upload them again.
+            // Raw textures are gone; upload them again. A readback in
+            // flight was rejected; start over if it was the first.
+            this.#token++;
             this.#gl = ctx.gl;
+            this.#halfState = !ctx.gl.getExtension("OES_texture_float_linear");
             this.#sdfRaw = null;
             this.#spawnRaw = null;
             this.#paletteRaw = null;
             this.#sdfTex = null;
             this.#spawnTex = null;
             this.#paletteTex = null;
-            this.#paletteKey = "";
+            this.#paletteSrc = null;
             this.#pending = this.#shape;
+            if (!this.#shape) {
+                this.#phase = "capture";
+                this.#srcFrames = 0;
+            }
             // The state and trail history targets come back empty:
             // respawn and mark every history slot stale.
             this.#needsReset = true;
             this.#stillDone = false;
             this.#shadowHistValid = false;
         });
-
-        if (!this.#still && typeof window !== "undefined") {
-            const down = (e: PointerEvent) => {
-                if (!this.params.drag) {
-                    return;
-                }
-                this.#dragging = true;
-                this.#lastPointer = [e.clientX, e.clientY];
-            };
-            const move = (e: PointerEvent) => {
-                if (!this.#dragging) {
-                    return;
-                }
-                const dx = e.clientX - this.#lastPointer[0];
-                const dy = e.clientY - this.#lastPointer[1];
-                this.#lastPointer = [e.clientX, e.clientY];
-                this.#dragYaw += dx * 0.006;
-                this.#dragPitch = Math.max(
-                    -1.2,
-                    Math.min(1.2, this.#dragPitch + dy * 0.006),
-                );
-            };
-            const up = () => {
-                this.#dragging = false;
-            };
-            window.addEventListener("pointerdown", down);
-            window.addEventListener("pointermove", move);
-            window.addEventListener("pointerup", up);
-            window.addEventListener("pointercancel", up);
-            this.#unlisten = () => {
-                window.removeEventListener("pointerdown", down);
-                window.removeEventListener("pointermove", move);
-                window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", up);
-            };
-        }
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(this.params.pad, dims);
+        return padOutputRect(padOf(this.params.pad), dims);
     }
 
     // The particle buffer: HDR colour + depth, multisampled with
     // `antialias`.
     #createScene(ctx: EffectContext): EffectRenderTarget {
-        const samples = this.params.antialias ? 4 : 1;
+        const samples = this.#r.antialias ? 4 : 1;
         this.#scene?.dispose();
         const scene = ctx.createRenderTarget({
             float: true,
@@ -1804,21 +1930,90 @@ export class SwirlParticlesEffect implements Effect {
         return scene;
     }
 
+    // (Re)allocate the per-particle targets, stateWidth² particles. With
+    // `migrate`, the particles that exist carry over and the new ones
+    // spawn; the trails regrow. Needs `render()` for the migration.
+    #allocState(ctx: EffectContext, width: number, migrate: boolean): void {
+        const oldPos = this.#pos;
+        const oldVel = this.#vel;
+        const oldWidth = this.#stateWidth;
+        const stateOpts = {
+            size: [width, width] as const,
+            float: true,
+            persistent: true,
+            filter: "nearest" as const,
+        };
+        const pos = ctx.createRenderTarget(stateOpts);
+        const vel = ctx.createRenderTarget(stateOpts);
+        this.#stateWidth = width;
+        if (
+            migrate &&
+            oldPos &&
+            oldVel &&
+            !this.#needsReset &&
+            this.#sdfTex &&
+            this.#spawnTex
+        ) {
+            ctx.draw({
+                frag: FRAG_SIM,
+                uniforms: {
+                    ...this.#simUniforms(ctx),
+                    posTex: oldPos,
+                    velTex: oldVel,
+                    oldPosTex: oldPos,
+                    oldVelTex: oldVel,
+                    oldWidth,
+                    oldCount: oldWidth * oldWidth,
+                    reset: 2,
+                    dt: 0,
+                },
+                target: [pos, vel],
+            });
+        } else {
+            this.#needsReset = true;
+        }
+        oldPos?.dispose();
+        oldVel?.dispose();
+        this.#attrA?.dispose();
+        this.#attrB?.dispose();
+        this.#hist?.dispose();
+        this.#pos = pos;
+        this.#vel = vel;
+        const attrOpts = { ...stateOpts, persistent: false };
+        this.#attrA = ctx.createRenderTarget(attrOpts);
+        this.#attrB = ctx.createRenderTarget(attrOpts);
+        this.#hist = ctx.createRenderTarget({
+            ...attrOpts,
+            size: [width * HIST_COLS, width * HIST_ROWS],
+        });
+        // The new atlas reads as generation 0 everywhere; mark it stale.
+        if (!this.#needsReset) {
+            this.#resetHistory(ctx);
+        }
+    }
+
     render(ctx: EffectContext): void {
         if (!this.#scene || !this.#pos || !this.#vel) {
             return;
         }
+        const r = resolveParams(this.params, this.#r);
+        this.#syncListeners();
+        this.#toElement[0] = ctx.mouse[0] - ctx.mouseViewport[0];
+        this.#toElement[1] = ctx.mouse[1] - ctx.mouseViewport[1];
+        this.#pixelRatio = ctx.pixelRatio;
+        this.#elementPx[0] = ctx.dims.elementPixel[0];
+        this.#elementPx[1] = ctx.dims.elementPixel[1];
+
         // `antialias` changed: a new buffer with the other sample count.
         const scene =
-            (this.params.antialias ? 4 : 1) === this.#sceneSamples
+            (r.antialias ? 4 : 1) === this.#sceneSamples
                 ? this.#scene
                 : this.#createScene(ctx);
 
         if (this.#phase === "capture") {
             this.#capture(ctx);
         }
-        if (this.#pending) {
-            this.#upload(ctx, this.#pending);
+        if (this.#pending && this.#upload(ctx, this.#pending)) {
             this.#shape = this.#pending;
             this.#pending = null;
             this.#phase = "ready";
@@ -1826,87 +2021,240 @@ export class SwirlParticlesEffect implements Effect {
         }
         this.#updatePalette(ctx);
 
-        const ready =
+        const ready = !!(
             this.#phase === "ready" &&
             this.#sdfTex &&
             this.#spawnTex &&
-            this.#paletteTex;
-        let shadow: { tex: EffectRenderTarget; amount: number } | null = null;
-        if (ready) {
-            this.#updateMouse(ctx);
-            this.#simulate(ctx);
-            shadow = this.#drawParticles(ctx, scene);
-            this.#drawBloom(ctx, scene);
+            this.#paletteTex
+        );
+        if (!ready) {
+            this.#layers = NO_LAYERS;
+        } else {
+            // `count` grew past the state: reallocate it.
+            if (r.count > this.#stateWidth ** 2) {
+                this.#allocState(ctx, stateSizeFromCount(r.count), true);
+            }
+            this.#syncGeometry(ctx);
+            if (this.#still && r.count !== this.#stillCount) {
+                this.#needsReset = true;
+            }
+            // A still frame that's done is drawn again only when what it
+            // shows changed.
+            const keyChanged = this.#still && this.#updateStillKey(scene);
+            if (
+                !this.#still ||
+                !this.#stillDone ||
+                this.#needsReset ||
+                keyChanged
+            ) {
+                this.#updateMouse(ctx);
+                this.#simulate(ctx);
+                this.#cam = this.#camera(ctx);
+                const shadow = this.#drawParticles(ctx, scene, this.#cam);
+                this.#layers = {
+                    bloom: this.#drawBloom(ctx, scene),
+                    shadow: shadow ? shadow.tex : null,
+                    shadowAmount: shadow ? shadow.amount : 0,
+                };
+            }
         }
-        const top = this.#bloom[0];
+        const layers = this.#layers;
         ctx.draw({
             frag: FRAG_COMPOSITE,
             uniforms: {
                 scene,
-                bloomTex: top ? top.up : scene,
-                shadowTex: shadow ? shadow.tex : scene,
-                hasScene: ready && top ? 1 : 0,
-                bloom: this.params.bloom,
-                shadowAmount: shadow ? shadow.amount : 0,
-                shadowColor: hexToRgb(this.params.shadowColor),
+                bloomTex: layers.bloom ?? scene,
+                shadowTex: layers.shadow ?? scene,
+                hasScene: ready ? 1 : 0,
+                bloom: layers.bloom ? r.bloom : 0,
+                shadowAmount: layers.shadow ? layers.shadowAmount : 0,
+                shadowColor: r.shadowColor,
             },
             target: ctx.target,
         });
     }
 
+    // Writes what the still frame depends on into #stillKey; true when
+    // something changed.
+    #updateStillKey(scene: EffectRenderTarget): boolean {
+        const r = this.#r;
+        const key = this.#stillKey;
+        let n = 0;
+        let changed = false;
+        const put = (v: unknown) => {
+            if (key[n] !== v) {
+                key[n] = v;
+                changed = true;
+            }
+            n++;
+        };
+        for (const k of NUM_KEYS) {
+            put(r[k]);
+        }
+        put(r.pad);
+        put(r.shadow);
+        put(r.light[0]);
+        put(r.light[1]);
+        put(r.light[2]);
+        put(r.lightColor);
+        put(r.fireflyColor);
+        put(r.shadowColor);
+        put(this.#paletteVersion);
+        put(this.#stateWidth);
+        put(scene.width);
+        put(scene.height);
+        put(this.#sceneSamples);
+        return changed;
+    }
+
+    // Add or remove the window listeners `drag` and `mouse` need.
+    #syncListeners(): void {
+        const r = this.#r;
+        const live = !this.#still && typeof window !== "undefined";
+        if (live && r.drag) {
+            this.#listenDrag();
+        } else if (this.#unlistenDrag) {
+            this.#unlistenDrag();
+            this.#unlistenDrag = null;
+            this.#dragging = false;
+        }
+        if (live && r.mouse !== "none") {
+            this.#listenHover();
+        } else if (this.#unlistenHover) {
+            this.#unlistenHover();
+            this.#unlistenHover = null;
+            this.#pointerIn = false;
+        }
+    }
+
+    #listenDrag(): void {
+        if (this.#unlistenDrag) {
+            return;
+        }
+        const down = (e: PointerEvent) => {
+            if (!this.#onElement(e.clientX, e.clientY)) {
+                return;
+            }
+            this.#dragging = true;
+            this.#lastPointer = [e.clientX, e.clientY];
+        };
+        const move = (e: PointerEvent) => {
+            if (!this.#dragging) {
+                return;
+            }
+            const dx = e.clientX - this.#lastPointer[0];
+            const dy = e.clientY - this.#lastPointer[1];
+            this.#lastPointer = [e.clientX, e.clientY];
+            this.#dragYaw += dx * 0.006;
+            this.#dragPitch = clamp(this.#dragPitch + dy * 0.006, -1.2, 1.2);
+        };
+        const up = () => {
+            this.#dragging = false;
+        };
+        window.addEventListener("pointerdown", down);
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", up);
+        this.#unlistenDrag = () => {
+            window.removeEventListener("pointerdown", down);
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", up);
+        };
+    }
+
+    // Whether a client point is on the element's box, as of the last
+    // frame. Same mapping as `ctx.mouse`.
+    #onElement(clientX: number, clientY: number): boolean {
+        const pr = this.#pixelRatio;
+        const x = clientX * pr + this.#toElement[0];
+        const y = (window.innerHeight - clientY) * pr + this.#toElement[1];
+        const [ew, eh] = this.#elementPx;
+        return x >= 0 && y >= 0 && x <= ew && y <= eh;
+    }
+
     // Read the element's alpha back once to build the shape.
     #capture(ctx: EffectContext): void {
-        if (ctx.src.width === 0 || ctx.src.height === 0) {
-            return;
-        }
-        // Give the source a couple of frames to upload.
-        if (++this.#srcFrames < 3) {
-            return;
-        }
         const [ew, eh] = ctx.dims.elementPixel;
-        const aspect = ew / Math.max(eh, 1);
-        const mw = aspect >= 1 ? MASK_LONG : Math.round(MASK_LONG * aspect);
-        const mh = aspect >= 1 ? Math.round(MASK_LONG / aspect) : MASK_LONG;
         if (
-            !this.#mask ||
-            this.#mask.width !== mw ||
-            this.#mask.height !== mh
+            ctx.src.width === 0 ||
+            ctx.src.height === 0 ||
+            !(ew >= 1 && eh >= 1)
         ) {
-            this.#mask?.dispose();
-            this.#mask = ctx.createRenderTarget({ size: [mw, mh] });
+            return;
         }
-        captureContent(ctx, this.#mask);
+        // Give the source a few frames to upload.
+        if (++this.#srcFrames < this.#captureGap) {
+            return;
+        }
+        const aspect = ew / eh;
+        const mw = Math.max(
+            1,
+            aspect >= 1 ? MASK_LONG : Math.round(MASK_LONG * aspect),
+        );
+        const mh = Math.max(
+            1,
+            aspect >= 1 ? Math.round(MASK_LONG / aspect) : MASK_LONG,
+        );
+        const mask = ctx.createRenderTarget({ size: [mw, mh] });
+        captureContent(ctx, mask);
         this.#phase = "reading";
-        const halfDepth = this.params.depth / 2;
-        ctx.readPixels(this.#mask).then(
+        const token = this.#token;
+        const halfDepth = this.#r.depth / 2;
+        // The read copies the pixels now, so the mask can go.
+        const read = ctx.readPixels(mask);
+        mask.dispose();
+        const retry = (backoff: boolean) => {
+            this.#srcFrames = 0;
+            if (backoff) {
+                this.#captureGap = Math.min(
+                    this.#captureGap * 2,
+                    CAPTURE_RETRY_MAX,
+                );
+            }
+            this.#phase = "capture";
+        };
+        read.then(
             (px) => {
+                if (token !== this.#token) {
+                    return;
+                }
                 const shape = buildShape(px, mw, mh, halfDepth);
                 if (shape) {
                     this.#pending = shape;
                 } else {
-                    // Nothing drawn yet: try again on a later frame.
-                    this.#srcFrames = 0;
-                    this.#phase = "capture";
+                    // Nothing drawn yet: try again later, less often, in
+                    // case it's a late-loading image.
+                    retry(true);
                 }
             },
-            () => {},
+            () => {
+                // Disposed or context lost.
+                if (token === this.#token) {
+                    retry(false);
+                }
+            },
         );
     }
 
-    #upload(ctx: EffectContext, shape: ShapeData): void {
+    // Upload the SDF and spawn textures. False (and nothing kept) when
+    // the GPU can't make them; the caller tries again next frame.
+    #upload(ctx: EffectContext, shape: ShapeData): boolean {
         const gl = ctx.gl;
-        if (this.#sdfRaw) {
-            gl.deleteTexture(this.#sdfRaw);
-        }
-        if (this.#spawnRaw) {
-            gl.deleteTexture(this.#spawnRaw);
-        }
+        this.#deleteShapeTextures();
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
 
         // Half float so it can be filtered linearly everywhere.
         const sdf = gl.createTexture();
+        const spawn = gl.createTexture();
+        if (!sdf || !spawn) {
+            gl.deleteTexture(sdf);
+            gl.deleteTexture(spawn);
+            ctx.resetState();
+            return false;
+        }
         gl.bindTexture(gl.TEXTURE_2D, sdf);
         gl.texImage2D(
             gl.TEXTURE_2D,
@@ -1924,7 +2272,6 @@ export class SwirlParticlesEffect implements Effect {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        const spawn = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, spawn);
         gl.texImage2D(
             gl.TEXTURE_2D,
@@ -1944,9 +2291,6 @@ export class SwirlParticlesEffect implements Effect {
         gl.bindTexture(gl.TEXTURE_2D, null);
         ctx.resetState();
 
-        if (!sdf || !spawn) {
-            return;
-        }
         this.#sdfRaw = sdf;
         this.#spawnRaw = spawn;
         this.#sdfTex = ctx.wrapTexture(sdf, {
@@ -1959,14 +2303,49 @@ export class SwirlParticlesEffect implements Effect {
             filter: "nearest",
             wrap: "clamp",
         });
+        return true;
+    }
+
+    #deleteShapeTextures(): void {
+        if (this.#gl) {
+            for (const tex of [this.#sdfRaw, this.#spawnRaw]) {
+                if (tex) {
+                    this.#gl.deleteTexture(tex);
+                }
+            }
+        }
+        this.#sdfRaw = null;
+        this.#spawnRaw = null;
+        this.#sdfTex = null;
+        this.#spawnTex = null;
+    }
+
+    // Whether the palette is the one last baked, stops edited in place
+    // included. No allocation when it is.
+    #paletteUnchanged(palette: SwirlParticlesParams["palette"]): boolean {
+        if (palette !== this.#paletteSrc) {
+            return false;
+        }
+        if (!Array.isArray(palette)) {
+            return true;
+        }
+        const snap = this.#paletteSnap;
+        if (snap.length !== palette.length * 2) {
+            return false;
+        }
+        for (let i = 0; i < palette.length; i++) {
+            const s = palette[i];
+            if (snap[i * 2] !== s?.offset || snap[i * 2 + 1] !== s?.color) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Re-bake the gradient texture when the palette changes.
     #updatePalette(ctx: EffectContext): void {
         const palette = this.params.palette;
-        const key =
-            typeof palette === "string" ? palette : JSON.stringify(palette);
-        if (this.#paletteTex && key === this.#paletteKey) {
+        if (this.#paletteTex && this.#paletteUnchanged(palette)) {
             return;
         }
         const gl = ctx.gl;
@@ -2028,23 +2407,56 @@ export class SwirlParticlesEffect implements Effect {
                 wrap: "clamp",
             });
         }
-        this.#paletteKey = key;
+        this.#paletteSrc = palette;
+        this.#paletteSnap = Array.isArray(palette)
+            ? palette.flatMap((s) => [s?.offset, s?.color])
+            : [];
+        this.#paletteVersion++;
     }
 
-    #shapeUniforms(): Record<
-        string,
-        number | EffectTexture | [number, number, number, number]
-    > {
-        const halfDepth = Math.max(this.params.depth / 2, 0.005);
-        const uniforms: Record<
-            string,
-            number | EffectTexture | [number, number, number, number]
-        > = {
+    // Body and firefly geometry for this frame's count and ratio.
+    // Instance counts are fixed when a geometry is compiled, so a new
+    // split gets new (small) geometries.
+    #syncGeometry(ctx: EffectContext): void {
+        const r = this.#r;
+        const nFire = Math.min(r.count, Math.round(r.count * r.fireflyRatio));
+        const nBody = r.count - nFire;
+        if (nBody !== this.#nBody) {
+            if (this.#trails) {
+                ctx.releaseGeometry(this.#trails);
+            }
+            if (this.#heads) {
+                ctx.releaseGeometry(this.#heads);
+            }
+            this.#trails = trailGeometry(nBody);
+            this.#heads = {
+                attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
+                instanceCount: nBody,
+            };
+            this.#nBody = nBody;
+        }
+        if (nFire !== this.#nFire) {
+            if (this.#fireflies) {
+                ctx.releaseGeometry(this.#fireflies);
+            }
+            // One point per instance; the id is gl_InstanceID.
+            this.#fireflies = {
+                mode: "points",
+                attributes: {},
+                drawRange: { start: 0, count: 1 },
+                instanceCount: nFire,
+            };
+            this.#nFire = nFire;
+        }
+    }
+
+    #shapeUniforms(): EffectUniforms {
+        const halfDepth = this.#r.depth / 2;
+        const uniforms: EffectUniforms = {
             sdfRect: this.#shape?.sdfRect ?? [0, 0, 1, 1],
             halfDepth,
             rounding: Math.min(0.025, halfDepth * 0.5),
             stateWidth: this.#stateWidth,
-            lifeMean: Math.max(this.params.life, 0.1),
             spawnSize: SPAWN_SIZE,
         };
         if (this.#sdfTex && this.#spawnTex) {
@@ -2055,7 +2467,7 @@ export class SwirlParticlesEffect implements Effect {
     }
 
     #listenHover(): void {
-        if (this.#unlistenHover || typeof window === "undefined") {
+        if (this.#unlistenHover) {
             return;
         }
         // A move inside the viewport means the pointer is over the page;
@@ -2089,12 +2501,9 @@ export class SwirlParticlesEffect implements Effect {
     // Once a frame: ease the repel force and the tilt towards what the
     // pointer asks for. Frame-rate independent.
     #updateMouse(ctx: EffectContext): void {
-        const p = this.params;
-        const mode = this.#still ? "none" : p.mouse;
-        if (mode === "repel" || mode === "tilt") {
-            this.#listenHover();
-        }
-        const dt = Math.min(Math.max(ctx.deltaTime, 0), 0.25);
+        const r = this.#r;
+        const mode = this.#still ? "none" : r.mouse;
+        const dt = clamp(ctx.deltaTime, 0, 0.25) || 0;
         const hover = this.#pointerIn && !this.#still;
         const [mx, my] = ctx.mouse;
 
@@ -2132,7 +2541,7 @@ export class SwirlParticlesEffect implements Effect {
                     : ctx.dims.canvasPixel[1];
             const nx = clamp((mx - ew / 2) / Math.max(vw / 2, 1), -1, 1);
             const ny = clamp((my - eh / 2) / Math.max(vh / 2, 1), -1, 1);
-            const max = TILT_MAX * Math.max(finiteOr(p.mouseStrength, 0), 0);
+            const max = TILT_MAX * r.mouseStrength;
             yawT = max * nx;
             pitchT = -max * ny;
         }
@@ -2142,38 +2551,59 @@ export class SwirlParticlesEffect implements Effect {
     }
 
     // Camera: base angles, a slow wobble, pointer drag and tilt.
-    #camera(ctx: EffectContext): {
-        viewRot: number[];
-        camDist: number;
-        focalPx: number;
-        centerPx: [number, number];
-        origin: readonly [number, number];
-    } {
-        const p = this.params;
+    #camera(ctx: EffectContext): Camera {
+        const r = this.#r;
         const t = this.#simTime;
-        const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
         const yaw =
-            p.yaw + orbit * Math.sin(t * 0.13) + this.#dragYaw + this.#tiltYaw;
+            r.yaw +
+            r.orbit * Math.sin(t * 0.13) +
+            this.#dragYaw +
+            this.#tiltYaw;
         const pitch =
-            p.pitch +
-            orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
+            r.pitch +
+            r.orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
             this.#dragPitch +
             this.#tiltPitch;
 
         // Distance so that the long side (2 world units) spans `fov`.
-        const fov = Math.min(Math.max(p.fov, 1), 150);
-        const camDist = 1 / Math.tan((fov * Math.PI) / 360);
+        const camDist = 1 / Math.tan((r.fov * Math.PI) / 360);
 
         const dims = ctx.dims;
         const [ew, eh] = dims.elementPixel;
-        const [ox, oy] = padOutputRect(p.pad, dims);
-        const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
+        const [ox, oy] = padOutputRect(r.pad, dims);
+        const unitPx = (Math.max(ew, eh) / 2) * r.zoom;
         return {
             viewRot: viewMatrix(yaw, pitch),
             camDist,
             focalPx: camDist * unitPx,
             centerPx: [ew / 2 - ox, eh / 2 - oy],
             origin: [ox, oy],
+        };
+    }
+
+    // Uniforms of every FRAG_SIM draw but the state and the step.
+    #simUniforms(ctx: EffectContext): EffectUniforms {
+        const r = this.#r;
+        const spawn = this.#spawnTex;
+        return {
+            ...this.#shapeUniforms(),
+            count: r.count,
+            lifeMean: r.life,
+            swirl: r.swirl,
+            curl: r.curl,
+            curlScale: r.curlScale,
+            speed: r.speed,
+            attract: r.attract,
+            peel: r.peel,
+            time: this.#simTime,
+            halfState: this.#halfState ? 1 : 0,
+            frameSeed: this.#steps,
+            // Only read when the state grows; bound to something that is
+            // never the target.
+            ...(spawn ? { oldPosTex: spawn, oldVelTex: spawn } : {}),
+            oldWidth: 1,
+            oldCount: 0,
+            ...this.#repelUniforms(ctx),
         };
     }
 
@@ -2184,7 +2614,7 @@ export class SwirlParticlesEffect implements Effect {
             return;
         }
         let steps = 1;
-        let dt = Math.min(Math.max(ctx.deltaTime, 0), MAX_DT);
+        let dt = clamp(ctx.deltaTime, 0, MAX_DT) || 0;
         this.#frameDt = dt;
         if (this.#still) {
             this.#frameDt = 0;
@@ -2194,18 +2624,7 @@ export class SwirlParticlesEffect implements Effect {
             steps = STILL_STEPS;
             dt = 1 / 60;
         }
-        const p = this.params;
-        const base = {
-            ...this.#shapeUniforms(),
-            count: this.#count,
-            swirl: p.swirl,
-            curl: p.curl,
-            curlScale: p.curlScale,
-            speed: p.speed,
-            attract: p.attract,
-            peel: p.peel,
-            ...this.#repelUniforms(ctx),
-        };
+        const base = this.#simUniforms(ctx);
         if (this.#needsReset) {
             ctx.draw({
                 frag: FRAG_SIM,
@@ -2214,7 +2633,6 @@ export class SwirlParticlesEffect implements Effect {
                     posTex: pos,
                     velTex: vel,
                     reset: 1,
-                    time: this.#simTime,
                     dt: 0,
                 },
                 target: [pos, vel],
@@ -2225,6 +2643,7 @@ export class SwirlParticlesEffect implements Effect {
         }
         for (let i = 0; i < steps; i++) {
             this.#simTime += dt;
+            this.#steps = (this.#steps + 1) % 0x100000;
             ctx.draw({
                 frag: FRAG_SIM,
                 uniforms: {
@@ -2233,28 +2652,30 @@ export class SwirlParticlesEffect implements Effect {
                     velTex: vel,
                     reset: 0,
                     time: this.#simTime,
+                    frameSeed: this.#steps,
                     dt,
                 },
                 target: [pos, vel],
             });
-            this.#pushHistory(ctx, pos);
+            this.#pushHistory(ctx);
         }
         this.#stillDone = true;
+        this.#stillCount = this.#r.count;
     }
 
-    // Sim uniforms for "repel": the cursor in buffer px and the camera.
+    // Sim uniforms for "repel": the cursor in buffer px and the camera
+    // of the last drawn frame, which is where the user sees the particles.
     #repelUniforms(ctx: EffectContext): EffectUniforms {
-        const strength = Math.max(finiteOr(this.params.mouseStrength, 0), 0);
-        const radius = Math.max(finiteOr(this.params.mouseRadius, 0), 0);
-        const force = this.#repelAmount * strength;
-        const cam = this.#camera(ctx);
+        const r = this.#r;
+        const cam = this.#cam ?? this.#camera(ctx);
         return {
-            mouseForce: radius > 0 ? force : 0,
+            mouseForce:
+                r.mouseRadius > 0 ? this.#repelAmount * r.mouseStrength : 0,
             mousePx: [
                 this.#repelPos[0] - cam.origin[0],
                 this.#repelPos[1] - cam.origin[1],
             ],
-            mouseRadiusPx: Math.max(radius * ctx.pixelRatio, 1),
+            mouseRadiusPx: Math.max(r.mouseRadius * ctx.pixelRatio, 1),
             viewRot: cam.viewRot,
             camDist: cam.camDist,
             focalPx: cam.focalPx,
@@ -2262,7 +2683,7 @@ export class SwirlParticlesEffect implements Effect {
         };
     }
 
-    // Mark every history slot stale: an age no particle can have.
+    // Mark every history slot stale: a generation no particle has.
     #resetHistory(ctx: EffectContext): void {
         if (this.#hist) {
             ctx.draw({ frag: FRAG_HIST_CLEAR, target: this.#hist });
@@ -2276,10 +2697,12 @@ export class SwirlParticlesEffect implements Effect {
     // streak / (TRAIL_SAMPLES - 1) seconds since the last copy. Then the
     // history always spans at least `streak`, and the trail can be cut
     // at exactly `streak` seconds, frame-rate independent.
-    #pushHistory(ctx: EffectContext, pos: EffectRenderTarget): void {
+    #pushHistory(ctx: EffectContext): void {
         const hist = this.#hist;
-        const streak = this.params.streak;
-        if (!hist || !(streak > 0)) {
+        const pos = this.#pos;
+        const vel = this.#vel;
+        const streak = this.#r.streak;
+        if (!hist || !pos || !vel || !(streak > 0)) {
             return;
         }
         const interval = streak / (TRAIL_SAMPLES - 1);
@@ -2298,6 +2721,7 @@ export class SwirlParticlesEffect implements Effect {
             geometry: this.#slotQuad,
             uniforms: {
                 posTex: pos,
+                velTex: vel,
                 slotRect: [
                     ndcX,
                     ndcY,
@@ -2334,6 +2758,7 @@ export class SwirlParticlesEffect implements Effect {
     #drawParticles(
         ctx: EffectContext,
         scene: EffectRenderTarget,
+        cam: Camera,
     ): { tex: EffectRenderTarget; amount: number } | null {
         const pos = this.#pos;
         const vel = this.#vel;
@@ -2341,6 +2766,9 @@ export class SwirlParticlesEffect implements Effect {
         const attrA = this.#attrA;
         const attrB = this.#attrB;
         const hist = this.#hist;
+        const trails = this.#trails;
+        const heads = this.#heads;
+        const fireflies = this.#fireflies;
         if (
             !pos ||
             !vel ||
@@ -2348,18 +2776,18 @@ export class SwirlParticlesEffect implements Effect {
             !this.#paletteTex ||
             !attrA ||
             !attrB ||
-            !hist
+            !hist ||
+            !trails ||
+            !heads ||
+            !fireflies
         ) {
             return null;
         }
-        const p = this.params;
-        const t = this.#simTime;
-        const cam = this.#camera(ctx);
+        const r = this.#r;
         const camDist = cam.camDist;
         const uniforms = {
             ...this.#shapeUniforms(),
             posTex: pos,
-            velTex: vel,
             viewRot: cam.viewRot,
             camDist,
             camNear: camDist * NEAR_K,
@@ -2367,62 +2795,68 @@ export class SwirlParticlesEffect implements Effect {
             focalPx: cam.focalPx,
             centerPx: cam.centerPx,
             bufferPx: [scene.width, scene.height] as [number, number],
-            pointPx: p.pointSize * ctx.pixelRatio,
-            time: t,
+            pointPx: r.pointSize * ctx.pixelRatio,
         };
 
-        // Colour per particle, shared by all segments of its trail.
-        ctx.draw({
-            frag: FRAG_ATTR,
-            uniforms: {
-                ...uniforms,
-                count: this.#count,
-                speed: p.speed,
-                paletteTex: this.#paletteTex,
-                src: ctx.src,
-                shapeHalf: shape.shapeHalf,
-                sourceColor: Math.min(Math.max(p.sourceColor, 0), 1),
-            },
-            target: [attrA, attrB],
-        });
-
+        ctx.clear(scene);
+        if (this.#nBody > 0) {
+            // Colour per particle, shared by all segments of its trail.
+            ctx.draw({
+                frag: FRAG_ATTR,
+                uniforms: {
+                    ...uniforms,
+                    velTex: vel,
+                    count: r.count,
+                    time: this.#simTime,
+                    speed: r.speed,
+                    paletteTex: this.#paletteTex,
+                    src: ctx.src,
+                    shapeHalf: shape.shapeHalf,
+                    sourceColor: r.sourceColor,
+                },
+                target: [attrA, attrB],
+            });
+        }
         const trail = {
             ...uniforms,
             ...this.#historyUniforms(),
+            velTex: vel,
             histTex: hist,
             attrA,
             idOffset: this.#nFire,
-            streak: Math.max(p.streak, 0),
+            streak: r.streak,
         };
-        const light = lightUnit(p.lightDirection);
-        ctx.clear(scene);
-        ctx.draw({
-            vert: VERT_BODY,
-            frag: FRAG_BODY,
-            geometry: this.#trails,
-            uniforms: {
-                ...trail,
-                attrB,
-                lightDir: light,
-                lightColor: hexToRgb(p.lightColor),
-                lightIntensity: p.lightIntensity,
-                ambient: p.ambient,
-                occlusion: p.occlusion,
-                glintAmount: p.glint,
-            },
-            target: scene,
-            depthTest: true,
-            blend: "none",
-        });
+        if (this.#nBody > 0) {
+            ctx.draw({
+                vert: VERT_BODY,
+                frag: FRAG_BODY,
+                geometry: trails,
+                uniforms: {
+                    ...trail,
+                    attrB,
+                    lightDir: r.light,
+                    lightColor: r.lightColor,
+                    lightIntensity: r.lightIntensity,
+                    ambient: r.ambient,
+                    occlusion: r.occlusion,
+                    glintAmount: r.glint,
+                },
+                target: scene,
+                depthTest: true,
+                blend: "none",
+            });
+        }
         if (this.#nFire > 0) {
             ctx.draw({
                 vert: VERT_FIREFLY,
                 frag: FRAG_FIREFLY,
-                geometry: this.#fireflies,
+                geometry: fireflies,
                 uniforms: {
                     ...uniforms,
-                    fireflyIntensity: p.fireflyIntensity,
-                    fireflyColor: hexToRgb(p.fireflyColor),
+                    idOffset: 0,
+                    time: this.#simTime,
+                    fireflyIntensity: r.fireflyIntensity,
+                    fireflyColor: r.fireflyColor,
                 },
                 target: scene,
                 depthTest: true,
@@ -2433,20 +2867,41 @@ export class SwirlParticlesEffect implements Effect {
 
         // A light from behind the page casts no shadow; fade it out as
         // the light grazes the page.
-        const amount =
-            Math.min(Math.max(p.shadowOpacity, 0), 1) *
-            smoothstep(0, 0.25, light[2]);
-        if (!p.shadow || !(amount > 0)) {
-            // Start the average afresh when the shadow comes back.
-            this.#shadowHistValid = false;
+        const light = r.light;
+        const amount = r.shadowOpacity * smoothstep(0, 0.25, light[2]);
+        if (!r.shadow || !(amount > 0) || this.#nBody === 0) {
+            // Free the targets; the average starts afresh when the
+            // shadow comes back.
+            this.#disposeShadow();
             return null;
         }
-        const tex = this.#drawShadow(ctx, scene, {
+        const tex = this.#drawShadow(ctx, scene, heads, {
             ...trail,
             shadowLight: [light[0], light[1], Math.max(light[2], 0.02)],
-            shadowDepth: Math.max(p.shadowDistance, 0),
+            shadowDepth: r.shadowDistance,
         });
-        return { tex, amount };
+        return tex ? { tex, amount } : null;
+    }
+
+    // Level `i` of the shadow chain, allocated on first use.
+    #shadowLevel(ctx: EffectContext, i: number): ShadowLevel {
+        const levels = this.#shadow;
+        while (levels.length <= i) {
+            const k = 2 ** levels.length;
+            const opts = {
+                size: [
+                    Math.max(1, Math.floor(this.#shadowBase[0] / k)),
+                    Math.max(1, Math.floor(this.#shadowBase[1] / k)),
+                ] as const,
+                float: true,
+                filter: "linear" as const,
+            };
+            levels.push({
+                a: ctx.createRenderTarget(opts),
+                b: ctx.createRenderTarget(opts),
+            });
+        }
+        return levels[i];
     }
 
     // Planar projected shadow: the head capsule of each body particle,
@@ -2457,50 +2912,35 @@ export class SwirlParticlesEffect implements Effect {
     #drawShadow(
         ctx: EffectContext,
         scene: EffectRenderTarget,
+        heads: EffectGeometry,
         uniforms: EffectUniforms,
-    ): EffectRenderTarget {
+    ): EffectRenderTarget | null {
         const bw = Math.max(1, Math.floor(scene.width / 2));
         const bh = Math.max(1, Math.floor(scene.height / 2));
         if (bw !== this.#shadowBase[0] || bh !== this.#shadowBase[1]) {
             this.#disposeShadow();
-            let w = bw;
-            let h = bh;
-            for (let i = 0; i < SHADOW_LEVELS; i++) {
-                const opts = {
-                    size: [w, h] as const,
-                    float: true,
-                    filter: "linear" as const,
-                };
-                this.#shadow.push({
-                    a: ctx.createRenderTarget(opts),
-                    b: ctx.createRenderTarget(opts),
-                });
-                w = Math.max(1, Math.floor(w / 2));
-                h = Math.max(1, Math.floor(h / 2));
-            }
+            this.#shadowBase = [bw, bh];
+        }
+        if (!this.#shadowHist) {
             this.#shadowHist = ctx.createRenderTarget({
                 size: [bw, bh],
                 float: true,
                 persistent: true,
                 filter: "linear",
             });
-            this.#shadowBase = [bw, bh];
         }
-        const levels = this.#shadow;
         const hist = this.#shadowHist;
-        if (!hist) {
-            return levels[0].a;
-        }
+        const cover = this.#shadowLevel(ctx, 0).a;
 
         // The vertex shader works in scene px; NDC maps them onto this
         // smaller target as is.
-        ctx.clear(levels[0].a);
+        ctx.clear(cover);
         ctx.draw({
             vert: VERT_SHADOW,
             frag: FRAG_SHADOW_COVER,
-            geometry: this.#heads,
+            geometry: heads,
             uniforms,
-            target: levels[0].a,
+            target: cover,
             blend: "none",
         });
 
@@ -2512,26 +2952,24 @@ export class SwirlParticlesEffect implements Effect {
                 : 1;
         ctx.draw({
             frag: FRAG_SHADOW_ACCUM,
-            uniforms: { curTex: levels[0].a, histTex: hist, amount },
+            uniforms: { curTex: cover, histTex: hist, amount },
             target: hist,
         });
         this.#shadowHistValid = true;
 
         // Blur sigma in scene px, then in texels of the chosen level.
-        const soft = Number.isFinite(this.params.shadowSoftness)
-            ? Math.max(this.params.shadowSoftness, 0)
-            : 0;
-        const sigmaPx = soft * ctx.pixelRatio;
+        const sigmaPx = this.#r.shadowSoftness * ctx.pixelRatio;
         let level = 0;
         while (
-            level < levels.length - 1 &&
+            level < SHADOW_LEVELS - 1 &&
             sigmaPx / 2 ** (level + 1) > SHADOW_MAX_SIGMA
         ) {
             level++;
         }
-        // Level 0 of the chain is the average; levels[0].a only holds this
-        // frame's coverage.
-        const levelSrc = (i: number) => (i === 0 ? hist : levels[i].a);
+        // Level 0 of the chain is the average; level 0's `a` only holds
+        // this frame's coverage.
+        const levelSrc = (i: number) =>
+            i === 0 ? hist : this.#shadowLevel(ctx, i).a;
         for (let i = 1; i <= level; i++) {
             const src = levelSrc(i - 1);
             ctx.draw({
@@ -2540,15 +2978,15 @@ export class SwirlParticlesEffect implements Effect {
                     srcTex: src,
                     texel: [1 / src.width, 1 / src.height],
                 },
-                target: levels[i].a,
+                target: this.#shadowLevel(ctx, i).a,
             });
         }
-        const { a, b } = levels[level];
         const src = levelSrc(level);
         const sigma = sigmaPx / 2 ** (level + 1);
         if (sigma < 0.3) {
             return src;
         }
+        const { a, b } = this.#shadowLevel(ctx, level);
         const radius = Math.min(Math.ceil(sigma * 3), 24);
         ctx.draw({
             frag: FRAG_SHADOW_BLUR,
@@ -2575,15 +3013,29 @@ export class SwirlParticlesEffect implements Effect {
         this.#shadowBase = [0, 0];
     }
 
-    #drawBloom(ctx: EffectContext, scene: EffectRenderTarget): void {
+    #disposeBloom(): void {
+        for (const l of this.#bloom) {
+            l.down.dispose();
+            l.up?.dispose();
+        }
+        this.#bloom = [];
+        this.#bloomBase = [0, 0];
+    }
+
+    // The bloom of the sparkles: prefilter, a downsample chain, then
+    // upsample and add back. Null, and no targets kept, at `bloom` 0.
+    #drawBloom(
+        ctx: EffectContext,
+        scene: EffectRenderTarget,
+    ): EffectRenderTarget | null {
+        if (!(this.#r.bloom > 0)) {
+            this.#disposeBloom();
+            return null;
+        }
         const bw = Math.max(1, Math.floor(scene.width / 2));
         const bh = Math.max(1, Math.floor(scene.height / 2));
         if (bw !== this.#bloomBase[0] || bh !== this.#bloomBase[1]) {
-            for (const l of this.#bloom) {
-                l.down.dispose();
-                l.up.dispose();
-            }
-            this.#bloom = [];
+            this.#disposeBloom();
             let w = bw;
             let h = bh;
             for (let i = 0; i < BLOOM_LEVELS; i++) {
@@ -2594,7 +3046,10 @@ export class SwirlParticlesEffect implements Effect {
                 };
                 this.#bloom.push({
                     down: ctx.createRenderTarget(opts),
-                    up: ctx.createRenderTarget(opts),
+                    up:
+                        i < BLOOM_LEVELS - 1
+                            ? ctx.createRenderTarget(opts)
+                            : null,
                 });
                 w = Math.max(1, Math.floor(w / 2));
                 h = Math.max(1, Math.floor(h / 2));
@@ -2607,7 +3062,6 @@ export class SwirlParticlesEffect implements Effect {
             uniforms: {
                 scene,
                 texel: [1 / scene.width, 1 / scene.height],
-                threshold: this.params.bloomThreshold,
             },
             target: levels[0].down,
         });
@@ -2622,14 +3076,12 @@ export class SwirlParticlesEffect implements Effect {
                 target: levels[i].down,
             });
         }
-        const last = levels.length - 1;
-        ctx.draw({
-            frag: FRAG_COPY,
-            uniforms: { srcTex: levels[last].down },
-            target: levels[last].up,
-        });
-        for (let i = last - 1; i >= 0; i--) {
-            const low = levels[i + 1].up;
+        let low = levels[levels.length - 1].down;
+        for (let i = levels.length - 2; i >= 0; i--) {
+            const up = levels[i].up;
+            if (!up) {
+                break;
+            }
             ctx.draw({
                 frag: FRAG_BLOOM_UP,
                 uniforms: {
@@ -2638,38 +3090,27 @@ export class SwirlParticlesEffect implements Effect {
                     texel: [1 / low.width, 1 / low.height],
                     scatter: 0.85,
                 },
-                target: levels[i].up,
+                target: up,
             });
+            low = up;
         }
+        return low;
     }
 
     dispose(): void {
-        this.#unlisten?.();
-        this.#unlisten = null;
+        this.#unlistenDrag?.();
+        this.#unlistenDrag = null;
         this.#unlistenHover?.();
         this.#unlistenHover = null;
-        if (this.#gl) {
-            for (const tex of [
-                this.#sdfRaw,
-                this.#spawnRaw,
-                this.#paletteRaw,
-            ]) {
-                if (tex) {
-                    this.#gl.deleteTexture(tex);
-                }
-            }
-        }
-        this.#sdfRaw = null;
-        this.#spawnRaw = null;
-        this.#paletteRaw = null;
-        this.#sdfTex = null;
-        this.#spawnTex = null;
-        this.#paletteTex = null;
-        this.#paletteKey = "";
-        this.#gl = null;
         this.#unsubRestored?.();
         this.#unsubRestored = null;
-        this.#mask?.dispose();
+        this.#deleteShapeTextures();
+        if (this.#gl && this.#paletteRaw) {
+            this.#gl.deleteTexture(this.#paletteRaw);
+        }
+        this.#paletteRaw = null;
+        this.#paletteTex = null;
+        this.#gl = null;
         this.#pos?.dispose();
         this.#vel?.dispose();
         this.#attrA?.dispose();
@@ -2677,18 +3118,51 @@ export class SwirlParticlesEffect implements Effect {
         this.#hist?.dispose();
         this.#scene?.dispose();
         this.#disposeShadow();
-        for (const l of this.#bloom) {
-            l.down.dispose();
-            l.up.dispose();
-        }
-        this.#mask = null;
+        this.#disposeBloom();
         this.#pos = null;
         this.#vel = null;
         this.#attrA = null;
         this.#attrB = null;
         this.#hist = null;
         this.#scene = null;
-        this.#bloom = [];
-        this.#bloomBase = [0, 0];
+        this.#stateWidth = 0;
+        // The core frees the compiled geometry with the chain.
+        this.#trails = null;
+        this.#heads = null;
+        this.#fireflies = null;
+        this.#nBody = -1;
+        this.#nFire = -1;
+
+        // Start over like a new instance if it is added again.
+        this.#token++;
+        this.#phase = "capture";
+        this.#srcFrames = 0;
+        this.#captureGap = CAPTURE_DELAY;
+        this.#pending = null;
+        this.#shape = null;
+        this.#needsReset = true;
+        this.#simTime = 0;
+        this.#steps = 0;
+        this.#stillDone = false;
+        this.#stillCount = 0;
+        this.#stillKey = [];
+        this.#layers = NO_LAYERS;
+        this.#frameDt = 0;
+        this.#cam = null;
+        this.#histTime.fill(-Infinity);
+        this.#histHead = TRAIL_SAMPLES - 1;
+        this.#lastPush = -Infinity;
+        this.#paletteSrc = null;
+        this.#paletteSnap = [];
+        this.#dragYaw = 0;
+        this.#dragPitch = 0;
+        this.#dragging = false;
+        this.#toElement.fill(0);
+        this.#elementPx.fill(0);
+        this.#pointerIn = false;
+        this.#repelPos = [0, 0];
+        this.#repelAmount = 0;
+        this.#tiltYaw = 0;
+        this.#tiltPitch = 0;
     }
 }

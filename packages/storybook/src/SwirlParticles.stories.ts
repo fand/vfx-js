@@ -52,8 +52,11 @@ const BACKDROP = [
 
 // Base setup of the stories: front-on (the default `orbit` wobble still
 // turns it a little), drag to orbit, the cursor repels the particles, and
-// a drop shadow on the backdrop.
+// a drop shadow on the backdrop. The demo draws more particles than the
+// default, over the whole canvas.
 const STORY_VIEW: Partial<SwirlParticlesParams> = {
+    count: 262144,
+    pad: "fullscreen",
     yaw: 0,
     pitch: 0,
     drag: true,
@@ -158,20 +161,10 @@ export default {
             attachSwirlParticlesPane(
                 "Swirl Particles",
                 params,
-                {
-                    apply: () => {
-                        if (effect) {
-                            Object.assign(effect.params, params);
-                        }
-                    },
-                    rebuild: () => {
-                        if (!el) {
-                            return;
-                        }
-                        vfx.remove(el);
-                        effect = new SwirlParticlesEffect(params);
-                        void vfx.add(el, { effect });
-                    },
+                () => {
+                    if (effect) {
+                        Object.assign(effect.params, params);
+                    }
                 },
                 {
                     keys: Object.keys(SOURCES),
