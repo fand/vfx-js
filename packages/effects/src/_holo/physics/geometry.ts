@@ -334,36 +334,3 @@ export function envLevels(
         behind: 0.6 * t * a.backdrop,
     };
 }
-
-/**
- * Radiance of the studio environment in the world direction d (unit, env frame: before `uEnvRot`), CPU twin of
- * env.frag for the tests. The camera-side texture is represented by its mean factor 1 (the seeded blobs belong to
- * the shader); pass `cameraTex` to supply a texture factor for direction d.
- */
-export function studioEnvRadiance(
-    d: Vec3,
-    e: EnvLevels,
-    cameraTex: (d: Vec3) => number = () => 1,
-): number {
-    const wFront = smooth01((d[2] + 0.002) / 0.004); // behind-card hemisphere for z < 0 (§5.2), ±0.002 blend
-    if (wFront <= 0) {
-        return e.behind;
-    }
-    let cover = 0,
-        L = 0;
-    const P = STUDIO_ENV_PANELS;
-    const parts: readonly (readonly [EnvPanel, number])[] = [
-        [P.rimRight, e.rims],
-        [P.rimLeft, e.rims],
-        [P.fill, e.fill],
-        [P.scrim, e.scrim],
-    ];
-    for (const [p, level] of parts) {
-        const s = envPanelAt(p, d);
-        cover += s.mask;
-        L += level * s.radiance;
-    }
-    const tex = 1 + e.cameraTexture * (cameraTex(d) - 1); // mix(1, texture, amount)
-    const front = L + e.cameraSide * tex * Math.max(1 - cover, 0);
-    return e.behind + (front - e.behind) * wFront;
-}
