@@ -956,6 +956,7 @@ export function attachSwirlParticlesPane(
         cb.apply();
     };
     const output = pane.addFolder({ title: "Output", expanded: false });
+    bind(output, "antialias");
     output.addBinding(padState, "fullscreen").on("change", writePad);
     output.addBinding(padState, "pad", range(0, 600, 1)).on("change", writePad);
 

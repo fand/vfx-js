@@ -226,6 +226,14 @@ export type SwirlParticlesParams = {
      * clips them.
      */
     pad: number | "fullscreen";
+    /**
+     * Smooth the edges of the fibres with 4× multisampling (MSAA).
+     * Off by default: the particle buffer then takes about 5 times the
+     * memory, 10 times with its depth buffer, which adds up fast at
+     * `pad: "fullscreen"` on a high-DPR screen. Falls back to no
+     * multisampling, with a warning, on GPUs that can't do it.
+     */
+    antialias: boolean;
 };
 
 /** Options for {@link SwirlParticlesEffect}'s constructor. */
@@ -274,6 +282,7 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     zoom: 1.0,
     drag: false,
     pad: "fullscreen",
+    antialias: false,
 };
 
 // Long side of the silhouette read back from the element, in px.
@@ -305,6 +314,10 @@ const HIST_NEVER = 1e9;
 const SHADOW_LEVELS = 4;
 // Largest blur sigma, in texels of a shadow level, before moving down one.
 const SHADOW_MAX_SIGMA = 6;
+// Time constant of the shadow coverage's running average, in seconds of
+// simulation. The binary coverage has holes that move every frame; the
+// average hides them, at the cost of the shadow trailing a fast move.
+const SHADOW_TAU = 0.1;
 const DEFAULT_LIGHT: readonly [number, number, number] = [-0.45, 0.75, 0.55];
 
 // ---------------------------------------------------------------------------
@@ -626,8 +639,10 @@ void main() {
 
 type ParticlePass = "body" | "shadow" | "firefly";
 
-// - body: instanced trails. Each instance is TRAIL_SAMPLES capsules, one
-//   per segment of the particle's recent path, so the fibres curve.
+// - body: instanced trails. Each instance is TRAIL_SAMPLES quads, one per
+//   segment of the particle's recent path, so the fibres curve. A quad
+//   runs half its width past both ends of its segment, so consecutive
+//   segments overlap at bends.
 // - shadow: the head segment of each body particle, flattened onto the
 //   page along the light, into the shadow coverage target.
 // - firefly: points.
@@ -816,7 +831,9 @@ void main() {
         return;
     }
 
-    // Capsule from the segment's start (ca, towards the head) to its end.
+    // Quad from the segment's start (ca, towards the head) to its end,
+    // ws wide and ws / 2 longer at each end. The body draws it whole, the
+    // shadow cuts a capsule out of it.
     float ws = w * mix(1.0, 0.55, clamp(agoA / max(streak, 1e-4), 0.0, 1.0));
 #ifdef SHADOW
     // The coverage target is half-res: twice as wide (at least one of its
@@ -874,11 +891,12 @@ in vec2 vLocal;
 in vec2 vShape;
 out vec4 outColor;
 
+// No discard: the quad's sides are the fibre's edges, so multisampling
+// (antialias) smooths them. Round caps would be invisible at fibre
+// widths anyway.
 void main() {
-    // Capsule: segment of half-length vShape.x, radius vShape.y.
-    vec2 q = vec2(max(abs(vLocal.x) - vShape.x, 0.0), vLocal.y);
-    float r = length(q) / max(vShape.y, 1e-3);
-    if (r > 1.0) discard;
+    // Rounded shading across the width (vShape.y = half width).
+    float r = vLocal.y / max(vShape.y, 1e-3);
     outColor = vec4(vColor * (1.0 - 0.3 * r * r), 1.0);
 }
 `;
@@ -895,6 +913,23 @@ void main() {
     vec2 q = vec2(max(abs(vLocal.x) - vShape.x, 0.0), vLocal.y);
     if (length(q) > max(vShape.y, 1e-3)) discard;
     outColor = vec4(1.0);
+}
+`;
+
+// Running average of the coverage: hist = mix(hist, cur, amount).
+const FRAG_SHADOW_ACCUM = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D curTex;
+uniform sampler2D histTex;
+uniform float amount;
+out vec4 outColor;
+
+void main() {
+    float c = texture(curTex, uv).r;
+    // amount 1 restarts the average; skip whatever the history holds.
+    float v = amount >= 1.0 ? c : mix(texture(histTex, uv).r, c, amount);
+    outColor = vec4(v, 0.0, 0.0, 1.0);
 }
 `;
 
@@ -1480,8 +1515,8 @@ type ShadowLevel = {
  *
  * All params except `count` and `fireflyRatio` are read every frame, so
  * you can mutate `params` live. Set `drag: true` to orbit the camera
- * with pointer drags, and `shadow: true` to cast a drop shadow onto the
- * page behind.
+ * with pointer drags, `shadow: true` to cast a drop shadow onto the
+ * page behind, and `antialias: true` to smooth the fibres' edges.
  */
 export class SwirlParticlesEffect implements Effect {
     params: SwirlParticlesParams;
@@ -1501,10 +1536,18 @@ export class SwirlParticlesEffect implements Effect {
     #pos: EffectRenderTarget | null = null;
     #vel: EffectRenderTarget | null = null;
     #scene: EffectRenderTarget | null = null;
+    // Samples #scene was created with: 4 with `antialias`.
+    #sceneSamples: 1 | 4 = 1;
     #bloom: BloomLevel[] = [];
     #bloomBase: [number, number] = [0, 0];
     #shadow: ShadowLevel[] = [];
     #shadowBase: [number, number] = [0, 0];
+    // Running average of the level 0 coverage (persistent: ping-pong).
+    #shadowHist: EffectRenderTarget | null = null;
+    // False restarts the average on the next shadow frame.
+    #shadowHistValid = false;
+    // Seconds the simulation advanced this frame.
+    #frameDt = 0;
     // Per particle colour, written once a frame (see FRAG_ATTR).
     #attrA: EffectRenderTarget | null = null;
     #attrB: EffectRenderTarget | null = null;
@@ -1595,7 +1638,7 @@ export class SwirlParticlesEffect implements Effect {
             ...attrOpts,
             size: [this.#stateWidth * HIST_COLS, this.#stateWidth * HIST_ROWS],
         });
-        this.#scene = ctx.createRenderTarget({ float: true, depth: true });
+        this.#createScene(ctx);
 
         this.#unsubRestored = ctx.onContextRestored(() => {
             // Raw textures are gone; upload them again.
@@ -1612,6 +1655,7 @@ export class SwirlParticlesEffect implements Effect {
             // respawn and mark every history slot stale.
             this.#needsReset = true;
             this.#stillDone = false;
+            this.#shadowHistValid = false;
         });
 
         if (!this.#still && typeof window !== "undefined") {
@@ -1655,11 +1699,30 @@ export class SwirlParticlesEffect implements Effect {
         return padOutputRect(this.params.pad, dims);
     }
 
+    // The particle buffer: HDR colour + depth, multisampled with
+    // `antialias`.
+    #createScene(ctx: EffectContext): EffectRenderTarget {
+        const samples = this.params.antialias ? 4 : 1;
+        this.#scene?.dispose();
+        const scene = ctx.createRenderTarget({
+            float: true,
+            depth: true,
+            samples,
+        });
+        this.#scene = scene;
+        this.#sceneSamples = samples;
+        return scene;
+    }
+
     render(ctx: EffectContext): void {
-        const scene = this.#scene;
-        if (!scene || !this.#pos || !this.#vel) {
+        if (!this.#scene || !this.#pos || !this.#vel) {
             return;
         }
+        // `antialias` changed: a new buffer with the other sample count.
+        const scene =
+            (this.params.antialias ? 4 : 1) === this.#sceneSamples
+                ? this.#scene
+                : this.#createScene(ctx);
 
         if (this.#phase === "capture") {
             this.#capture(ctx);
@@ -1908,7 +1971,9 @@ export class SwirlParticlesEffect implements Effect {
         }
         let steps = 1;
         let dt = Math.min(Math.max(ctx.deltaTime, 0), MAX_DT);
+        this.#frameDt = dt;
         if (this.#still) {
+            this.#frameDt = 0;
             if (this.#stillDone && !this.#needsReset) {
                 return;
             }
@@ -1941,6 +2006,7 @@ export class SwirlParticlesEffect implements Effect {
             });
             this.#resetHistory(ctx);
             this.#needsReset = false;
+            this.#shadowHistValid = false;
         }
         for (let i = 0; i < steps; i++) {
             this.#simTime += dt;
@@ -2151,6 +2217,8 @@ export class SwirlParticlesEffect implements Effect {
             Math.min(Math.max(p.shadowOpacity, 0), 1) *
             smoothstep(0, 0.25, light[2]);
         if (!p.shadow || !(amount > 0)) {
+            // Start the average afresh when the shadow comes back.
+            this.#shadowHistValid = false;
             return null;
         }
         const tex = this.#drawShadow(ctx, scene, {
@@ -2163,7 +2231,9 @@ export class SwirlParticlesEffect implements Effect {
 
     // Planar projected shadow: the head capsule of each body particle,
     // flattened onto the page along the light, into a 1/2-res coverage
-    // target, then blurred on the coarsest level that holds the blur.
+    // target. The coverage is averaged over the last frames, then
+    // blurred on the coarsest level that holds the blur. Float targets
+    // keep the soft falloff free of banding.
     #drawShadow(
         ctx: EffectContext,
         scene: EffectRenderTarget,
@@ -2178,6 +2248,7 @@ export class SwirlParticlesEffect implements Effect {
             for (let i = 0; i < SHADOW_LEVELS; i++) {
                 const opts = {
                     size: [w, h] as const,
+                    float: true,
                     filter: "linear" as const,
                 };
                 this.#shadow.push({
@@ -2187,9 +2258,19 @@ export class SwirlParticlesEffect implements Effect {
                 w = Math.max(1, Math.floor(w / 2));
                 h = Math.max(1, Math.floor(h / 2));
             }
+            this.#shadowHist = ctx.createRenderTarget({
+                size: [bw, bh],
+                float: true,
+                persistent: true,
+                filter: "linear",
+            });
             this.#shadowBase = [bw, bh];
         }
         const levels = this.#shadow;
+        const hist = this.#shadowHist;
+        if (!hist) {
+            return levels[0].a;
+        }
 
         // The vertex shader works in scene px; NDC maps them onto this
         // smaller target as is.
@@ -2203,6 +2284,19 @@ export class SwirlParticlesEffect implements Effect {
             blend: "none",
         });
 
+        // Average out the holes that move from frame to frame. Frame-rate
+        // independent; a still frame has nothing to average.
+        const amount =
+            this.#shadowHistValid && !this.#still
+                ? 1 - Math.exp(-this.#frameDt / SHADOW_TAU)
+                : 1;
+        ctx.draw({
+            frag: FRAG_SHADOW_ACCUM,
+            uniforms: { curTex: levels[0].a, histTex: hist, amount },
+            target: hist,
+        });
+        this.#shadowHistValid = true;
+
         // Blur sigma in scene px, then in texels of the chosen level.
         const soft = Number.isFinite(this.params.shadowSoftness)
             ? Math.max(this.params.shadowSoftness, 0)
@@ -2215,8 +2309,11 @@ export class SwirlParticlesEffect implements Effect {
         ) {
             level++;
         }
+        // Level 0 of the chain is the average; levels[0].a only holds this
+        // frame's coverage.
+        const levelSrc = (i: number) => (i === 0 ? hist : levels[i].a);
         for (let i = 1; i <= level; i++) {
-            const src = levels[i - 1].a;
+            const src = levelSrc(i - 1);
             ctx.draw({
                 frag: FRAG_BLOOM_DOWN,
                 uniforms: {
@@ -2227,14 +2324,15 @@ export class SwirlParticlesEffect implements Effect {
             });
         }
         const { a, b } = levels[level];
+        const src = levelSrc(level);
         const sigma = sigmaPx / 2 ** (level + 1);
         if (sigma < 0.3) {
-            return a;
+            return src;
         }
         const radius = Math.min(Math.ceil(sigma * 3), 24);
         ctx.draw({
             frag: FRAG_SHADOW_BLUR,
-            uniforms: { srcTex: a, dir: [1 / a.width, 0], sigma, radius },
+            uniforms: { srcTex: src, dir: [1 / src.width, 0], sigma, radius },
             target: b,
         });
         ctx.draw({
@@ -2250,6 +2348,9 @@ export class SwirlParticlesEffect implements Effect {
             l.a.dispose();
             l.b.dispose();
         }
+        this.#shadowHist?.dispose();
+        this.#shadowHist = null;
+        this.#shadowHistValid = false;
         this.#shadow = [];
         this.#shadowBase = [0, 0];
     }
