@@ -41,6 +41,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `DitherEffect` | Bayer / blue-noise dither with few color levels. |
 | `DuotoneEffect` | Two-color map. |
 | `FluidEffect` | Fluid simulation driven by the pointer. |
+| `GlassEffect` | Ray-traced glass with a rainbow split, in the shape of the element's silhouette extruded to 3D. Shape `depth` / `bevel`; glass `ior` / `dispersion` / `bounces` / `tint` / `absorption`; quality `paths` (rays traced, 1 to 4) and `samples` (wavelengths, 1 to 16; equal to `paths` gives separate RGB bands). `backdrop` is what shows through the glass: a pattern (`"stripes"`, `"grid"`, `"checker"`, `"dots"`, `"noise"`, `"none"`) or an image (element, `ImageBitmap` or URL), with `backdropVisible: true` to draw it around the glass too. It does not refract the page. Camera `yaw` / `pitch` / `orbit` / `fov` / `drag`. Draws outside the element (`pad`, default `"fullscreen"`). Edges are smoothed by FXAA (`fxaa`, on by default); `resolution: 2` supersamples. Heavy per pixel: lower `resolution` or `bounces` on slow GPUs; `debug: "outer"` / `"inner"` / `"total"` (`GlassDebugView`) shows the SDF lookups per pixel as a heat map. |
 | `GlitchEffect` | Block shift and aberration glitch. |
 | `GradientMapEffect` | Map luminance to a color gradient. |
 | `HalftoneEffect` | RGB / CMYK halftone screen. |

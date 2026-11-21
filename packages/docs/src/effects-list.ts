@@ -9,6 +9,7 @@ import {
     DitherEffect,
     DuotoneEffect,
     FluidEffect,
+    GlassEffect,
     GlitchEffect,
     GradientMapEffect,
     HalftoneEffect,
@@ -192,6 +193,13 @@ export const effectDemos: EffectDemo[] = [
         media: "pigeon",
         create: () => new FluidEffect(),
         hint: "Move the pointer over it.",
+    },
+    {
+        name: "GlassEffect",
+        text: "Dispersive glass in the shape of the silhouette.",
+        media: "logo",
+        // A small pad keeps the tile cheap.
+        create: () => new GlassEffect({ pad: 40, zoom: 0.9 }),
     },
     {
         name: "GlitchEffect",
