@@ -413,3 +413,103 @@ describe("HoloEffect loads a material's code on first use", () => {
         expect(loadedMaterial("nebula")).toBeDefined();
     });
 });
+
+describe("HoloEffect when loading fails or is cut short", () => {
+    test("a material that fails to load warns once, settles ready, and the scene still updates", async () => {
+        // sparkle is not used elsewhere in this file: make its chunk fail
+        vi.doMock("./_holo/materials/sparkle.js", () => {
+            throw new Error("chunk failed");
+        });
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { ctx, draws } = makeCtx();
+        const fx = new HoloEffect();
+        await fx.init?.(ctx);
+        frame(fx, ctx);
+        fx.setParams({ material: "sparkle" });
+        const ready = fx.ready;
+        frame(fx, ctx); // the load starts when the frame resolves the settings
+        await vi.waitFor(() =>
+            expect(fx.errors.some((e) => e.includes('"sparkle"'))).toBe(true),
+        );
+        for (let i = 0; i < 10; i++) {
+            frame(fx, ctx);
+        }
+        expect(await settled(ready)).toBe("ready");
+        const loadWarnings = warn.mock.calls.filter((c) =>
+            String(c[0]).includes('"sparkle" material'),
+        );
+        expect(loadWarnings).toHaveLength(1); // not one per frame
+        // still drawing prism, with the scene as set now
+        const exposure = () =>
+            draws.filter((d) => d.uniforms && "uExposure" in d.uniforms).at(-1)
+                ?.uniforms?.uExposure;
+        const before = exposure();
+        fx.setParams({ exposure: 2 });
+        frame(fx, ctx);
+        expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
+        expect(exposure()).not.toBe(before); // the scene change is drawn
+        vi.doUnmock("./_holo/materials/sparkle.js");
+    });
+
+    test("ready settles after emboss.logo leaves the element while its readback is pending", async () => {
+        // a worker that answers at once with a 1 × 1 result, so the paper maps finish
+        vi.stubGlobal(
+            "Worker",
+            class {
+                onmessage: ((e: { data: unknown }) => void) | null = null;
+                postMessage(d: { id: number }) {
+                    setTimeout(() =>
+                        this.onmessage?.({
+                            data: {
+                                id: d.id,
+                                r: {
+                                    levels: [
+                                        {
+                                            w: 1,
+                                            h: 1,
+                                            mom: new Uint16Array(4),
+                                            aux: new Uint16Array(4),
+                                        },
+                                    ],
+                                },
+                            },
+                        }),
+                    );
+                }
+                terminate() {}
+            },
+        );
+        // the element reads as blank: the readback keeps retrying
+        const { ctx, readPixels } = makeCtx({
+            w: 2,
+            h: 2,
+            pixels: new Uint8Array(16),
+        });
+        const fx = new HoloEffect({
+            material: "emboss",
+            settings: { "emboss.logo": "element" },
+        });
+        await fx.init?.(ctx);
+        frame(fx, ctx);
+        await tick();
+        expect(readPixels).toHaveBeenCalled();
+        fx.setParams({ settings: { "emboss.logo": "" } });
+        const ready = fx.ready;
+        for (let i = 0; i < 5; i++) {
+            frame(fx, ctx);
+            await tick();
+        }
+        expect(await settled(ready)).toBe("ready");
+    });
+
+    test("an init that awaits across a dispose stops", async () => {
+        const { ctx, hasRestoreListener } = makeCtx();
+        const fx = new HoloEffect({ material: "shatter" });
+        const created = vi.spyOn(ctx, "createRenderTarget");
+        const init = fx.init?.(ctx);
+        fx.dispose?.();
+        await init;
+        expect(hasRestoreListener()).toBe(false);
+        expect(created).not.toHaveBeenCalled();
+    });
+});
