@@ -901,6 +901,42 @@ export function attachSwirlParticlesPane(
     bind(glow, "bloom", range(0, 3, 0.05));
     bind(glow, "bloomThreshold", range(0, 3, 0.05));
 
+    // `lightDirection` is a tuple: a Point2d pad for x / y (up is up) and
+    // a slider for z, written back as a new tuple.
+    const light = pane.addFolder({ title: "Light" });
+    const [lx, ly, lz] = params.lightDirection;
+    const lightState = { direction: { x: lx, y: ly }, z: lz };
+    const writeLight = () => {
+        params.lightDirection = [
+            lightState.direction.x,
+            lightState.direction.y,
+            lightState.z,
+        ];
+        cb.apply();
+    };
+    light
+        .addBinding(lightState, "direction", {
+            picker: "inline",
+            expanded: true,
+            x: { min: -1, max: 1, step: 0.01 },
+            y: { min: -1, max: 1, step: 0.01, inverted: true },
+        })
+        .on("change", writeLight);
+    light
+        .addBinding(lightState, "z", { min: -1, max: 1, step: 0.01 })
+        .on("change", writeLight);
+    bind(light, "lightColor", { view: "color" });
+    bind(light, "lightIntensity", range(0, 3, 0.01));
+    bind(light, "ambient", range(0, 1, 0.01));
+    bind(light, "glint", range(0, 3, 0.01));
+
+    const shadow = light.addFolder({ title: "Shadow" });
+    bind(shadow, "shadow");
+    bind(shadow, "shadowOpacity", range(0, 1, 0.01));
+    bind(shadow, "shadowSoftness", range(0, 80, 0.5));
+    bind(shadow, "shadowDistance", range(0, 1.5, 0.01));
+    bind(shadow, "shadowColor", { view: "color" });
+
     const camera = pane.addFolder({ title: "Camera" });
     bind(camera, "yaw", range(-Math.PI, Math.PI, 0.01));
     bind(camera, "pitch", range(-1.5, 1.5, 0.01));

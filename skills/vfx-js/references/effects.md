@@ -60,7 +60,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `ScanlineEffect` | CRT scanlines. |
 | `SinewaveEffect` | Sine wave distortion. |
 | `SliceShiftEffect` | Split into strips and shift each toward the center. |
-| `SwirlParticlesEffect` | Particles flow over the element's silhouette, extruded to 3D, and peel off in wisps. Gradient `palette` (preset name from `SWIRL_PARTICLES_PALETTES` or `{ offset, color }` stops), `sourceColor` to use the image's colors, camera `yaw` / `pitch` / `orbit` / `fov`. Draws outside the element (`pad`, default `"fullscreen"`) over transparency. |
+| `SwirlParticlesEffect` | Particles flow over the element's silhouette, extruded to 3D, and peel off in wisps. Gradient `palette` (preset name from `SWIRL_PARTICLES_PALETTES` or `{ offset, color }` stops), `sourceColor` to use the image's colors, camera `yaw` / `pitch` / `orbit` / `fov`, light `lightDirection` / `lightColor` / `lightIntensity` / `ambient` / `glint`, and an optional drop shadow on the page behind (`shadow: true`, `shadowOpacity` / `shadowSoftness` / `shadowDistance` / `shadowColor`). Draws outside the element (`pad`, default `"fullscreen"`) over transparency. |
 | `TilePixelateEffect` | Pixelate into shaped tiles. |
 | `TritoneEffect` | Three-color map. |
 | `VignetteEffect` | Vignette. |

@@ -23,6 +23,7 @@ import type {
     EffectGeometry,
     EffectRenderTarget,
     EffectTexture,
+    EffectUniforms,
 } from "@vfx-js/core";
 import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
@@ -124,7 +125,12 @@ export type SwirlParticlesParams = {
     life: number;
     /** Particle width in CSS px at the z = 0 plane. */
     pointSize: number;
-    /** Motion streak length, in seconds of travel. */
+    /**
+     * Trail length, in seconds of travel. Each particle draws a curved
+     * fibre through its recent positions, tapering towards the tail.
+     * 0 draws dots. Fast particles are capped on screen at 14 particle
+     * widths per 0.3 s of streak.
+     */
     streak: number;
     /**
      * Fraction of particles drawn as bright sparkles, in [0, 1].
@@ -150,6 +156,40 @@ export type SwirlParticlesParams = {
      * each particle's spawn point (1). Lighting still applies on top.
      */
     sourceColor: number;
+    /**
+     * Direction towards the light, in view space: +x right, +y up, +z
+     * towards the viewer. It stays fixed to the screen while the camera
+     * orbits. Normalised internally.
+     */
+    lightDirection: readonly [number, number, number];
+    /** Light colour, CSS hex. Tints the diffuse light and the glints. */
+    lightColor: string;
+    /** Strength of the diffuse light. 1 is the default look. */
+    lightIntensity: number;
+    /** Light on the side facing away from the light, in [0, 1]. */
+    ambient: number;
+    /** Strength of the glints on the fibres that face the light. */
+    glint: number;
+    /**
+     * Cast a soft shadow onto the page behind the shape. The page is a
+     * plane parallel to the screen, {@link shadowDistance} behind the
+     * shape's centre, lit by {@link lightDirection}. A light from behind
+     * (z ≤ 0) casts no shadow. The shadow is clipped to the output rect
+     * (see {@link pad}). Fireflies cast none.
+     */
+    shadow: boolean;
+    /** Opacity of the shadow, in [0, 1]. */
+    shadowOpacity: number;
+    /** Blur radius of the shadow (gaussian sigma), in CSS px. */
+    shadowSoftness: number;
+    /**
+     * Distance from the shape's centre to the page behind it, in world
+     * units (the long side of the element is 2). Further means a larger
+     * offset.
+     */
+    shadowDistance: number;
+    /** Shadow colour, CSS hex. */
+    shadowColor: string;
     /** Camera yaw in radians. 0 looks straight at the front cap. */
     yaw: number;
     /** Camera pitch in radians. 0 looks straight at the front cap. */
@@ -210,6 +250,16 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     bloomThreshold: 1.0,
     palette: "nebula",
     sourceColor: 0,
+    lightDirection: [-0.45, 0.75, 0.55],
+    lightColor: "#ffffff",
+    lightIntensity: 1,
+    ambient: 0.25,
+    glint: 0.7,
+    shadow: false,
+    shadowOpacity: 0.35,
+    shadowSoftness: 14,
+    shadowDistance: 0.15,
+    shadowColor: "#1c2233",
     yaw: 0,
     pitch: 0,
     orbit: 0.4,
@@ -235,6 +285,20 @@ const PITCH_WOBBLE = 0.3;
 // Near / far planes relative to the camera distance.
 const NEAR_K = 0.05 / 3.2;
 const FAR_K = 1 + 6 / 3.2;
+// Past positions kept per particle. The trail is TRAIL_SAMPLES segments:
+// current position → newest sample → … → oldest sample, cut at `streak`.
+const TRAIL_SAMPLES = 6;
+// The history slots are tiled in one atlas render target.
+const HIST_COLS = Math.ceil(Math.sqrt(TRAIL_SAMPLES));
+const HIST_ROWS = Math.ceil(TRAIL_SAMPLES / HIST_COLS);
+// Ago of a slot that holds no sample.
+const HIST_NEVER = 1e9;
+// Shadow coverage levels, from 1/2 to 1/16 of the scene resolution. The
+// blur runs on the coarsest level it still needs, so wide blurs stay cheap.
+const SHADOW_LEVELS = 4;
+// Largest blur sigma, in texels of a shadow level, before moving down one.
+const SHADOW_MAX_SIGMA = 6;
+const DEFAULT_LIGHT: readonly [number, number, number] = [-0.45, 0.75, 0.55];
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -476,53 +540,33 @@ void main() {
 }
 `;
 
-// Shared by the body (instanced capsules stretched along the motion, so
-// the particles read as fibres) and the fireflies (points).
-function makeParticleVert(firefly: boolean): string {
-    return `#version 300 es
+// Per particle, once a frame: the colour the body and every segment of
+// its trail share. A = base colour + how far the particle is off the
+// surface (0..1), B = highlight colour.
+const FRAG_ATTR = `#version 300 es
 precision highp float;
 precision highp int;
 precision highp sampler2D;
-${firefly ? "#define FIREFLY" : ""}
 
-#ifdef FIREFLY
-in float pid;
-#else
-in vec2 position;
-uniform int idOffset;
-uniform float streak;
+uniform sampler2D posTex;
+uniform sampler2D velTex;
 uniform sampler2D paletteTex;
 uniform sampler2D src;
 uniform vec4 srcRectUv;
 uniform vec2 shapeHalf;
 uniform float sourceColor;
-#endif
-
-uniform sampler2D posTex;
-uniform sampler2D velTex;
-uniform mat3 viewRot;
-uniform float camDist;
-uniform float camNear;
-uniform float camFar;
-uniform float focalPx;
-uniform vec2 centerPx;
-uniform vec2 bufferPx;
-uniform float pointPx;
 uniform float time;
 uniform float speed;
-uniform float fireflyIntensity;
-uniform vec3 fireflyColor;
+uniform int count;
 
-out vec3 vColor;
-out vec2 vLocal;
-out vec2 vShape;
+layout(location = 0) out vec4 outA;
+layout(location = 1) out vec4 outB;
 
 ${GLSL_HASH}
 ${GLSL_NOISE}
 ${GLSL_SDF}
 ${GLSL_PARTICLE_COMMON}
 
-#ifndef FIREFLY
 vec3 ramp(float t) {
     float u = (clamp(t, 0.0, 1.0) * ${(PALETTE_SIZE - 1).toFixed(1)} + 0.5) / ${PALETTE_SIZE.toFixed(1)};
     return textureLod(paletteTex, vec2(u, 0.5), 0.0).rgb;
@@ -538,7 +582,105 @@ vec3 spawnColor(uint id, float gen) {
     vec4 c = textureLod(src, srcRectUv.xy + uv * srcRectUv.zw, 0.0);
     return c.a > 1e-3 ? c.rgb / c.a : vec3(0.0);
 }
+
+void main() {
+    ivec2 texel = ivec2(gl_FragCoord.xy);
+    int i = texel.y * stateWidth + texel.x;
+    if (i >= count) {
+        outA = vec4(0.0);
+        outB = vec4(0.0);
+        return;
+    }
+    uint id = uint(i);
+    vec4 P = texelFetch(posTex, texel, 0);
+    vec4 V = texelFetch(velTex, texel, 0);
+    vec3 p = P.xyz;
+    float off = clamp(sdf3(p).x / 0.08, 0.0, 1.0);
+    float r = rnd(id * 2246822519u + 13u);
+
+    // Colour attribute: slow noise over the surface + speed + per particle.
+    vec3 gn;
+    float nz = snoiseGrad(p * 1.6 + vec3(0.0, time * 0.05, 0.0), gn);
+    float spd = length(V.xyz) / max(speed, 1e-4);
+    float t = 0.3 + 0.35 * nz + 0.3 * clamp(spd - 0.5, 0.0, 1.5) + 0.3 * (r - 0.5);
+    t += 0.4 * off;
+    vec3 base = ramp(t);
+    vec3 highlight = ramp(1.0);
+    if (sourceColor > 0.0) {
+        // Carried from the spawn point like paint; t keeps some texture.
+        vec3 sc = spawnColor(id, V.w);
+        base = mix(base, sc * mix(0.85, 1.15, clamp(t, 0.0, 1.0)), sourceColor);
+        highlight = mix(highlight, mix(sc, vec3(1.0), 0.5), sourceColor);
+    }
+    outA = vec4(base, off);
+    outB = vec4(highlight, 0.0);
+}
+`;
+
+type ParticlePass = "body" | "shadow" | "firefly";
+
+// - body: instanced trails. Each instance is TRAIL_SAMPLES capsules, one
+//   per segment of the particle's recent path, so the fibres curve.
+// - shadow: the head segment of each body particle, flattened onto the
+//   page along the light, into the shadow coverage target.
+// - firefly: points.
+function makeParticleVert(pass: ParticlePass): string {
+    return `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+#define ${pass.toUpperCase()}
+#define TRAIL_SAMPLES ${TRAIL_SAMPLES}
+#define HIST_COLS ${HIST_COLS}
+
+#ifdef FIREFLY
+in float pid;
+uniform float fireflyIntensity;
+uniform vec3 fireflyColor;
+#else
+in vec2 position;
+uniform int idOffset;
+uniform float streak;
+uniform sampler2D histTex;
+// Newest first: slot in the history atlas, and seconds since it was written.
+uniform float histSlot[TRAIL_SAMPLES];
+uniform float histAgo[TRAIL_SAMPLES];
+uniform sampler2D attrA;
 #endif
+#ifdef BODY
+in float seg;
+uniform sampler2D attrB;
+uniform vec3 lightDir;
+uniform vec3 lightColor;
+uniform float lightIntensity;
+uniform float ambient;
+uniform float glintAmount;
+#endif
+#ifdef SHADOW
+// Towards the light, z > 0; the page is at view z = -shadowDepth.
+uniform vec3 shadowLight;
+uniform float shadowDepth;
+#endif
+
+uniform sampler2D posTex;
+uniform sampler2D velTex;
+uniform mat3 viewRot;
+uniform float camDist;
+uniform float camNear;
+uniform float camFar;
+uniform float focalPx;
+uniform vec2 centerPx;
+uniform vec2 bufferPx;
+uniform float pointPx;
+uniform float time;
+
+out vec3 vColor;
+out vec2 vLocal;
+out vec2 vShape;
+
+${GLSL_HASH}
+${GLSL_SDF}
+${GLSL_PARTICLE_COMMON}
 
 void cull() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -551,9 +693,22 @@ void cull() {
 // Camera space: xy in buffer px, z = distance from the camera.
 vec3 project(vec3 p) {
     vec3 q = viewRot * p;
+#ifdef SHADOW
+    // Flatten onto the page along the light. Points behind the page
+    // (the page cuts the shape when shadowDepth is small) lie on it.
+    q -= shadowLight * (max(q.z + shadowDepth, 0.0) / shadowLight.z);
+#endif
     float depth = camDist - q.z;
     return vec3(centerPx + q.xy * focalPx / max(depth, 1e-3), depth);
 }
+
+#ifndef FIREFLY
+vec4 histAt(int k, ivec2 texel) {
+    int slot = int(histSlot[k]);
+    ivec2 o = ivec2(slot % HIST_COLS, slot / HIST_COLS) * stateWidth;
+    return texelFetch(histTex, o + texel, 0);
+}
+#endif
 
 void main() {
 #ifdef FIREFLY
@@ -576,13 +731,11 @@ void main() {
         cull();
         return;
     }
-    float zLin = (c.z - camNear) / (camFar - camNear);
     float persp = camDist / c.z;
-    vec4 s = sdf3(p);
-    float off = clamp(s.x / 0.08, 0.0, 1.0);
     float r = rnd(id * 2246822519u + 13u);
 
 #ifdef FIREFLY
+    float zLin = (c.z - camNear) / (camFar - camNear);
     float flick = pow(0.5 + 0.5 * sin(time * (3.0 + r * 5.0) + r * 40.0), 6.0);
     // Nudge towards the camera so the fibres don't bury every sparkle.
     zLin -= 0.03 / (camFar - camNear);
@@ -592,57 +745,119 @@ void main() {
     vLocal = vec2(0.0);
     vShape = vec2(0.0);
 #else
-    // Shade from the SDF normal, in view space.
+    vec4 A = texelFetch(attrA, texel, 0);
+    float off = A.w;
+    float w = max(pointPx * persp * lifeScale * mix(1.0, 0.6, off), 1.0);
+#ifdef BODY
+    int sg = int(seg + 0.5);
+#else
+    int sg = 0;
+#endif
+
+    // Walk the trail from the head to segment sg. Point j + 1 is history
+    // sample j. A sample written before the particle's last respawn (or
+    // never written) doesn't have the age this one had then: the trail
+    // ends before it, so a respawn never draws a line back. The trail is
+    // cut at \`streak\` seconds and, like a speed cap, at 14 widths on
+    // screen per 0.3 s of streak (the default), never fewer than 14.
+    float age = P.w;
+    float capLen = w * 14.0 * max(streak / 0.3, 1.0);
+    float used = 0.0;
+    vec3 pa = p;
+    vec3 ca = c;
+    float agoA = 0.0;
+    vec3 cb = c;
+    bool reached = false;
+    for (int j = 0; j < TRAIL_SAMPLES; j++) {
+        vec4 h = histAt(j, texel);
+        float ago = histAgo[j];
+        // ago == agoA: the newest sample was written this frame.
+        bool valid = agoA < streak && used < capLen && ago >= agoA
+            && abs(age - ago - h.w) < 1e-3;
+        vec3 cn = ca;
+        vec3 pn = pa;
+        if (valid) {
+            float f = ago > agoA ? min((streak - agoA) / (ago - agoA), 1.0) : 1.0;
+            pn = mix(pa, h.xyz, f);
+            cn = project(pn);
+            float l = length(cn.xy - ca.xy);
+            float room = capLen - used;
+            if (l > room) {
+                float k = room / l;
+                cn = mix(ca, cn, k);
+                pn = mix(pa, pn, k);
+                l = room;
+            }
+            used += l;
+        }
+        if (j == sg) {
+            cb = cn;
+            // The head segment always draws, as a dot if need be.
+            reached = valid || sg == 0;
+            break;
+        }
+        if (!valid) {
+            break;
+        }
+        pa = pn;
+        ca = cn;
+        agoA = ago;
+    }
+    if (!reached) {
+        cull();
+        return;
+    }
+
+    // Capsule from the segment's start (ca, towards the head) to its end.
+    float ws = w * mix(1.0, 0.55, clamp(agoA / max(streak, 1e-4), 0.0, 1.0));
+#ifdef SHADOW
+    // The coverage target is half-res: twice as wide (at least one of its
+    // texels), so the dense body reads as solid rather than speckled.
+    ws = max(ws * 2.0, 2.0);
+#endif
+    vec2 d = ca.xy - cb.xy;
+    float len = length(d);
+    vec2 ax = len > 1e-3 ? d / len : vec2(1.0, 0.0);
+    vec2 pe = vec2(-ax.y, ax.x);
+    vec2 mid = ca.xy - ax * len * 0.5;
+    vec2 local = position * vec2(len + ws, ws);
+    vec2 px = mid + ax * local.x + pe * local.y;
+    float zA = clamp((ca.z - camNear) / (camFar - camNear), 0.0, 1.0);
+    float zB = clamp((cb.z - camNear) / (camFar - camNear), 0.0, 1.0);
+    float zLin = mix(zB, zA, position.x + 0.5);
+    gl_Position = vec4(px / bufferPx * 2.0 - 1.0, zLin * 2.0 - 1.0, 1.0);
+    vLocal = local;
+    vShape = vec2(len * 0.5, ws * 0.5);
+
+#ifdef BODY
+    // Shade from the SDF normal at the segment's start, in view space.
+    vec3 base = A.rgb;
+    vec3 highlight = texelFetch(attrB, texel, 0).rgb;
+    vec4 s = sdf3(pa);
     vec3 nv = viewRot * s.yzw;
-    vec3 L = normalize(vec3(-0.45, 0.75, 0.55));
-    float ndl = dot(nv, L);
+    float ndl = dot(nv, lightDir);
     float wrap = 0.5 + 0.5 * ndl;
     // Cheap occlusion: how far the field is clear along the normal.
-    float aoDist = sdf3(p + s.yzw * 0.07).x;
+    float aoDist = sdf3(pa + s.yzw * 0.07).x;
     float ao = mix(0.3, 1.0, clamp(aoDist / 0.07, 0.0, 1.0));
-
-    // Colour attribute: slow noise over the surface + speed + per particle.
-    vec3 gn;
-    float nz = snoiseGrad(p * 1.6 + vec3(0.0, time * 0.05, 0.0), gn);
-    float spd = length(V.xyz) / max(speed, 1e-4);
-    float t = 0.3 + 0.35 * nz + 0.3 * clamp(spd - 0.5, 0.0, 1.5) + 0.3 * (r - 0.5);
-    t += 0.4 * off;
-    vec3 base = ramp(t);
-    vec3 highlight = ramp(1.0);
-    if (sourceColor > 0.0) {
-        // Carried from the spawn point like paint; t keeps some texture.
-        vec3 sc = spawnColor(id, V.w);
-        base = mix(base, sc * mix(0.85, 1.15, clamp(t, 0.0, 1.0)), sourceColor);
-        highlight = mix(highlight, mix(sc, vec3(1.0), 0.5), sourceColor);
-    }
-    vec3 col = base * mix(0.25, 1.15, wrap) * ao;
+    vec3 col = base * (ambient + 0.9 * lightIntensity * wrap * lightColor) * ao;
     // Some fibres catch the light.
     float glint = pow(max(ndl, 0.0), 3.0) * step(0.65, fract(r * 7.13));
-    col += highlight * glint * 0.7 * ao;
+    col += highlight * lightColor * glint * glintAmount * ao;
     // Peeled-off wisps get lighter.
     col = mix(col, highlight * 0.85, off * 0.5);
-
-    // Capsule from the previous position to the current one, on screen.
-    float w = max(pointPx * persp * lifeScale * mix(1.0, 0.6, off), 1.0);
-    vec3 b = project(p - V.xyz * streak);
-    vec2 d = c.xy - b.xy;
-    float len = min(length(d), w * 14.0);
-    vec2 ax = len > 1e-3 ? normalize(d) : vec2(1.0, 0.0);
-    vec2 pe = vec2(-ax.y, ax.x);
-    vec2 mid = c.xy - ax * len * 0.5;
-    vec2 local = position * vec2(len + w, w);
-    vec2 px = mid + ax * local.x + pe * local.y;
-    gl_Position = vec4(px / bufferPx * 2.0 - 1.0, zLin * 2.0 - 1.0, 1.0);
     vColor = col;
-    vLocal = local;
-    vShape = vec2(len * 0.5, w * 0.5);
+#else
+    vColor = vec3(1.0);
+#endif
 #endif
 }
 `;
 }
 
-const VERT_BODY = makeParticleVert(false);
-const VERT_FIREFLY = makeParticleVert(true);
+const VERT_BODY = makeParticleVert("body");
+const VERT_SHADOW = makeParticleVert("shadow");
+const VERT_FIREFLY = makeParticleVert("firefly");
 
 const FRAG_BODY = `#version 300 es
 precision highp float;
@@ -657,6 +872,75 @@ void main() {
     float r = length(q) / max(vShape.y, 1e-3);
     if (r > 1.0) discard;
     outColor = vec4(vColor * (1.0 - 0.3 * r * r), 1.0);
+}
+`;
+
+// Shadow coverage: 1 inside the flattened capsule.
+const FRAG_SHADOW_COVER = `#version 300 es
+precision highp float;
+in vec3 vColor;
+in vec2 vLocal;
+in vec2 vShape;
+out vec4 outColor;
+
+void main() {
+    vec2 q = vec2(max(abs(vLocal.x) - vShape.x, 0.0), vLocal.y);
+    if (length(q) > max(vShape.y, 1e-3)) discard;
+    outColor = vec4(1.0);
+}
+`;
+
+// One direction of a separable gaussian on the coverage (red channel).
+const FRAG_SHADOW_BLUR = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D srcTex;
+uniform vec2 dir;
+uniform float sigma;
+uniform int radius;
+out vec4 outColor;
+
+void main() {
+    float k = -0.5 / (sigma * sigma);
+    float sum = texture(srcTex, uv).r;
+    float wsum = 1.0;
+    for (int i = 1; i <= 24; i++) {
+        if (i > radius) break;
+        float w = exp(float(i * i) * k);
+        sum += (texture(srcTex, uv + dir * float(i)).r
+              + texture(srcTex, uv - dir * float(i)).r) * w;
+        wsum += 2.0 * w;
+    }
+    outColor = vec4(sum / wsum, 0.0, 0.0, 1.0);
+}
+`;
+
+// Trail history: copy the position texture into one slot of the atlas.
+const VERT_HIST = `#version 300 es
+in vec2 position;
+uniform vec4 slotRect;
+void main() {
+    gl_Position = vec4(mix(slotRect.xy, slotRect.zw, position + 0.5), 0.0, 1.0);
+}
+`;
+
+const FRAG_HIST_PUSH = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+uniform sampler2D posTex;
+uniform vec2 slotOrigin;
+out vec4 outColor;
+void main() {
+    outColor = texelFetch(posTex, ivec2(gl_FragCoord.xy - slotOrigin), 0);
+}
+`;
+
+// An age no particle can have, so every sample reads as stale.
+const FRAG_HIST_CLEAR = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main() {
+    outColor = vec4(0.0, 0.0, 0.0, -1.0e9);
 }
 `;
 
@@ -751,15 +1035,20 @@ void main() {
 }
 `;
 
-// Premultiplied particles + bloom over transparency. Alpha covers the
-// bloom too, so the glow composites over any page background.
+// Premultiplied particles + bloom over transparency, over the shadow.
+// Alpha covers the bloom and the shadow too, so both composite over any
+// page background.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
 uniform sampler2D scene;
 uniform sampler2D bloomTex;
+uniform sampler2D shadowTex;
 uniform int hasScene;
 uniform float bloom;
+// shadowOpacity, or 0 with the shadow off.
+uniform float shadowAmount;
+uniform vec3 shadowColor;
 out vec4 outColor;
 
 vec3 softClip(vec3 x) {
@@ -776,6 +1065,11 @@ void main() {
     vec3 col = s.rgb + texture(bloomTex, uv).rgb * bloom;
     col = softClip(max(col, 0.0));
     float a = clamp(max(s.a, max(col.r, max(col.g, col.b))), 0.0, 1.0);
+    if (shadowAmount > 0.0) {
+        float sh = shadowAmount * clamp(texture(shadowTex, uv).r, 0.0, 1.0);
+        col += shadowColor * sh * (1.0 - a);
+        a += sh * (1.0 - a);
+    }
     // Noise dither against banding in the faint glow.
     float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
     col = clamp(col + dither / 255.0 * step(1.0 / 255.0, a), 0.0, a);
@@ -1086,6 +1380,46 @@ function hexToRgb(hex: string): [number, number, number] {
     return [r, g, b];
 }
 
+// Unit vector towards the light. Falls back to the default for a zero
+// or broken direction.
+function lightUnit(
+    dir: SwirlParticlesParams["lightDirection"] | undefined,
+): [number, number, number] {
+    const [x, y, z] = dir ?? DEFAULT_LIGHT;
+    const len = Math.hypot(x, y, z);
+    if (!Number.isFinite(len) || len < 1e-6) {
+        return lightUnit(DEFAULT_LIGHT);
+    }
+    return [x / len, y / len, z / len];
+}
+
+// TRAIL_SAMPLES quads, one per trail segment: corner + segment index.
+function trailGeometry(instanceCount: number): EffectGeometry {
+    const corners = [-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5];
+    const position = new Float32Array(TRAIL_SAMPLES * 8);
+    const seg = new Float32Array(TRAIL_SAMPLES * 4);
+    const indices = new Uint16Array(TRAIL_SAMPLES * 6);
+    for (let s = 0; s < TRAIL_SAMPLES; s++) {
+        position.set(corners, s * 8);
+        seg.fill(s, s * 4, s * 4 + 4);
+        const v = s * 4;
+        indices.set([v, v + 1, v + 2, v, v + 2, v + 3], s * 6);
+    }
+    return {
+        attributes: {
+            position: { data: position, itemSize: 2 },
+            seg: { data: seg, itemSize: 1 },
+        },
+        indices,
+        instanceCount,
+    };
+}
+
+function smoothstep(e0: number, e1: number, x: number): number {
+    const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
+    return t * t * (3 - 2 * t);
+}
+
 // Column-major rotation: pitch (around X) after yaw (around Y).
 function viewMatrix(yaw: number, pitch: number): number[] {
     const cy = Math.cos(yaw);
@@ -1117,6 +1451,11 @@ type BloomLevel = {
     up: EffectRenderTarget;
 };
 
+type ShadowLevel = {
+    a: EffectRenderTarget;
+    b: EffectRenderTarget;
+};
+
 /**
  * Particles that flow over the surface of the element's silhouette,
  * extruded into 3D, and peel off it in curling wisps. Fibres are shaded
@@ -1133,7 +1472,8 @@ type BloomLevel = {
  *
  * All params except `count` and `fireflyRatio` are read every frame, so
  * you can mutate `params` live. Set `drag: true` to orbit the camera
- * with pointer drags.
+ * with pointer drags, and `shadow: true` to cast a drop shadow onto the
+ * page behind.
  */
 export class SwirlParticlesEffect implements Effect {
     params: SwirlParticlesParams;
@@ -1155,6 +1495,19 @@ export class SwirlParticlesEffect implements Effect {
     #scene: EffectRenderTarget | null = null;
     #bloom: BloomLevel[] = [];
     #bloomBase: [number, number] = [0, 0];
+    #shadow: ShadowLevel[] = [];
+    #shadowBase: [number, number] = [0, 0];
+    // Per particle colour, written once a frame (see FRAG_ATTR).
+    #attrA: EffectRenderTarget | null = null;
+    #attrB: EffectRenderTarget | null = null;
+
+    // Trail history: TRAIL_SAMPLES copies of the position texture, tiled in
+    // one atlas, written round-robin. #histTime holds the sim time each
+    // slot was written (-Infinity: never).
+    #hist: EffectRenderTarget | null = null;
+    #histTime: number[] = new Array(TRAIL_SAMPLES).fill(-Infinity);
+    #histHead = TRAIL_SAMPLES - 1;
+    #lastPush = -Infinity;
 
     #gl: WebGL2RenderingContext | null = null;
     #sdfRaw: WebGLTexture | null = null;
@@ -1166,8 +1519,12 @@ export class SwirlParticlesEffect implements Effect {
     #paletteKey = "";
 
     readonly #nFire: number;
-    #body: EffectGeometry;
+    #trails: EffectGeometry;
+    #heads: EffectGeometry;
     #fireflies: EffectGeometry;
+    #slotQuad: EffectGeometry = {
+        attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
+    };
 
     // Pointer drag.
     #dragYaw = 0;
@@ -1197,7 +1554,8 @@ export class SwirlParticlesEffect implements Effect {
         for (let i = 0; i < ids.length; i++) {
             ids[i] = i;
         }
-        this.#body = {
+        this.#trails = trailGeometry(this.#count - nFire);
+        this.#heads = {
             attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
             instanceCount: this.#count - nFire,
         };
@@ -1222,6 +1580,13 @@ export class SwirlParticlesEffect implements Effect {
         };
         this.#pos = ctx.createRenderTarget(stateOpts);
         this.#vel = ctx.createRenderTarget(stateOpts);
+        const attrOpts = { ...stateOpts, persistent: false };
+        this.#attrA = ctx.createRenderTarget(attrOpts);
+        this.#attrB = ctx.createRenderTarget(attrOpts);
+        this.#hist = ctx.createRenderTarget({
+            ...attrOpts,
+            size: [this.#stateWidth * HIST_COLS, this.#stateWidth * HIST_ROWS],
+        });
         this.#scene = ctx.createRenderTarget({ float: true, depth: true });
 
         this.#unsubRestored = ctx.onContextRestored(() => {
@@ -1235,6 +1600,8 @@ export class SwirlParticlesEffect implements Effect {
             this.#paletteTex = null;
             this.#paletteKey = "";
             this.#pending = this.#shape;
+            // The state and trail history targets come back empty:
+            // respawn and mark every history slot stale.
             this.#needsReset = true;
             this.#stillDone = false;
         });
@@ -1303,9 +1670,10 @@ export class SwirlParticlesEffect implements Effect {
             this.#sdfTex &&
             this.#spawnTex &&
             this.#paletteTex;
+        let shadow: { tex: EffectRenderTarget; amount: number } | null = null;
         if (ready) {
             this.#simulate(ctx);
-            this.#drawParticles(ctx, scene);
+            shadow = this.#drawParticles(ctx, scene);
             this.#drawBloom(ctx, scene);
         }
         const top = this.#bloom[0];
@@ -1314,8 +1682,11 @@ export class SwirlParticlesEffect implements Effect {
             uniforms: {
                 scene,
                 bloomTex: top ? top.up : scene,
+                shadowTex: shadow ? shadow.tex : scene,
                 hasScene: ready && top ? 1 : 0,
                 bloom: this.params.bloom,
+                shadowAmount: shadow ? shadow.amount : 0,
+                shadowColor: hexToRgb(this.params.shadowColor),
             },
             target: ctx.target,
         });
@@ -1560,6 +1931,7 @@ export class SwirlParticlesEffect implements Effect {
                 },
                 target: [pos, vel],
             });
+            this.#resetHistory(ctx);
             this.#needsReset = false;
         }
         for (let i = 0; i < steps; i++) {
@@ -1576,16 +1948,100 @@ export class SwirlParticlesEffect implements Effect {
                 },
                 target: [pos, vel],
             });
+            this.#pushHistory(ctx, pos);
         }
         this.#stillDone = true;
     }
 
-    #drawParticles(ctx: EffectContext, scene: EffectRenderTarget): void {
+    // Mark every history slot stale: an age no particle can have.
+    #resetHistory(ctx: EffectContext): void {
+        if (this.#hist) {
+            ctx.draw({ frag: FRAG_HIST_CLEAR, target: this.#hist });
+        }
+        this.#histTime.fill(-Infinity);
+        this.#histHead = TRAIL_SAMPLES - 1;
+        this.#lastPush = -Infinity;
+    }
+
+    // Copy the positions into the next history slot once the sim has run
+    // streak / (TRAIL_SAMPLES - 1) seconds since the last copy. Then the
+    // history always spans at least `streak`, and the trail can be cut
+    // at exactly `streak` seconds, frame-rate independent.
+    #pushHistory(ctx: EffectContext, pos: EffectRenderTarget): void {
+        const hist = this.#hist;
+        const streak = this.params.streak;
+        if (!hist || !(streak > 0)) {
+            return;
+        }
+        const interval = streak / (TRAIL_SAMPLES - 1);
+        if (this.#simTime - this.#lastPush < interval) {
+            return;
+        }
+        const slot = (this.#histHead + 1) % TRAIL_SAMPLES;
+        const col = slot % HIST_COLS;
+        const row = Math.floor(slot / HIST_COLS);
+        const ndcX = (2 * col) / HIST_COLS - 1;
+        const ndcY = (2 * row) / HIST_ROWS - 1;
+        const sw = this.#stateWidth;
+        ctx.draw({
+            vert: VERT_HIST,
+            frag: FRAG_HIST_PUSH,
+            geometry: this.#slotQuad,
+            uniforms: {
+                posTex: pos,
+                slotRect: [
+                    ndcX,
+                    ndcY,
+                    ndcX + 2 / HIST_COLS,
+                    ndcY + 2 / HIST_ROWS,
+                ],
+                slotOrigin: [col * sw, row * sw],
+            },
+            target: hist,
+        });
+        this.#histHead = slot;
+        this.#histTime[slot] = this.#simTime;
+        this.#lastPush = this.#simTime;
+    }
+
+    // Uniforms that let a vertex walk the history, newest sample first.
+    #historyUniforms(): { histSlot: number[]; histAgo: number[] } {
+        const histSlot: number[] = [];
+        const histAgo: number[] = [];
+        for (let j = 0; j < TRAIL_SAMPLES; j++) {
+            const slot =
+                (this.#histHead - j + TRAIL_SAMPLES * 2) % TRAIL_SAMPLES;
+            const written = this.#histTime[slot];
+            histSlot.push(slot);
+            histAgo.push(
+                Number.isFinite(written) ? this.#simTime - written : HIST_NEVER,
+            );
+        }
+        return { histSlot, histAgo };
+    }
+
+    // Draws the particles into `scene`, and the shadow coverage when the
+    // shadow is on. Returns the blurred coverage and its opacity.
+    #drawParticles(
+        ctx: EffectContext,
+        scene: EffectRenderTarget,
+    ): { tex: EffectRenderTarget; amount: number } | null {
         const pos = this.#pos;
         const vel = this.#vel;
         const shape = this.#shape;
-        if (!pos || !vel || !shape || !this.#paletteTex) {
-            return;
+        const attrA = this.#attrA;
+        const attrB = this.#attrB;
+        const hist = this.#hist;
+        if (
+            !pos ||
+            !vel ||
+            !shape ||
+            !this.#paletteTex ||
+            !attrA ||
+            !attrB ||
+            !hist
+        ) {
+            return null;
         }
         const p = this.params;
         const t = this.#simTime;
@@ -1619,24 +2075,45 @@ export class SwirlParticlesEffect implements Effect {
             bufferPx: [scene.width, scene.height] as [number, number],
             pointPx: p.pointSize * ctx.pixelRatio,
             time: t,
-            speed: p.speed,
-            fireflyIntensity: p.fireflyIntensity,
-            fireflyColor: hexToRgb(p.fireflyColor),
         };
 
-        ctx.clear(scene);
+        // Colour per particle, shared by all segments of its trail.
         ctx.draw({
-            vert: VERT_BODY,
-            frag: FRAG_BODY,
-            geometry: this.#body,
+            frag: FRAG_ATTR,
             uniforms: {
                 ...uniforms,
-                idOffset: this.#nFire,
-                streak: p.streak,
+                count: this.#count,
+                speed: p.speed,
                 paletteTex: this.#paletteTex,
                 src: ctx.src,
                 shapeHalf: shape.shapeHalf,
                 sourceColor: Math.min(Math.max(p.sourceColor, 0), 1),
+            },
+            target: [attrA, attrB],
+        });
+
+        const trail = {
+            ...uniforms,
+            ...this.#historyUniforms(),
+            histTex: hist,
+            attrA,
+            idOffset: this.#nFire,
+            streak: Math.max(p.streak, 0),
+        };
+        const light = lightUnit(p.lightDirection);
+        ctx.clear(scene);
+        ctx.draw({
+            vert: VERT_BODY,
+            frag: FRAG_BODY,
+            geometry: this.#trails,
+            uniforms: {
+                ...trail,
+                attrB,
+                lightDir: light,
+                lightColor: hexToRgb(p.lightColor),
+                lightIntensity: p.lightIntensity,
+                ambient: p.ambient,
+                glintAmount: p.glint,
             },
             target: scene,
             depthTest: true,
@@ -1647,13 +2124,125 @@ export class SwirlParticlesEffect implements Effect {
                 vert: VERT_FIREFLY,
                 frag: FRAG_FIREFLY,
                 geometry: this.#fireflies,
-                uniforms,
+                uniforms: {
+                    ...uniforms,
+                    fireflyIntensity: p.fireflyIntensity,
+                    fireflyColor: hexToRgb(p.fireflyColor),
+                },
                 target: scene,
                 depthTest: true,
                 depthWrite: false,
                 blend: "additive",
             });
         }
+
+        // A light from behind the page casts no shadow; fade it out as
+        // the light grazes the page.
+        const amount =
+            Math.min(Math.max(p.shadowOpacity, 0), 1) *
+            smoothstep(0, 0.25, light[2]);
+        if (!p.shadow || !(amount > 0)) {
+            return null;
+        }
+        const tex = this.#drawShadow(ctx, scene, {
+            ...trail,
+            shadowLight: [light[0], light[1], Math.max(light[2], 0.02)],
+            shadowDepth: Math.max(p.shadowDistance, 0),
+        });
+        return { tex, amount };
+    }
+
+    // Planar projected shadow: the head capsule of each body particle,
+    // flattened onto the page along the light, into a 1/2-res coverage
+    // target, then blurred on the coarsest level that holds the blur.
+    #drawShadow(
+        ctx: EffectContext,
+        scene: EffectRenderTarget,
+        uniforms: EffectUniforms,
+    ): EffectRenderTarget {
+        const bw = Math.max(1, Math.floor(scene.width / 2));
+        const bh = Math.max(1, Math.floor(scene.height / 2));
+        if (bw !== this.#shadowBase[0] || bh !== this.#shadowBase[1]) {
+            this.#disposeShadow();
+            let w = bw;
+            let h = bh;
+            for (let i = 0; i < SHADOW_LEVELS; i++) {
+                const opts = {
+                    size: [w, h] as const,
+                    filter: "linear" as const,
+                };
+                this.#shadow.push({
+                    a: ctx.createRenderTarget(opts),
+                    b: ctx.createRenderTarget(opts),
+                });
+                w = Math.max(1, Math.floor(w / 2));
+                h = Math.max(1, Math.floor(h / 2));
+            }
+            this.#shadowBase = [bw, bh];
+        }
+        const levels = this.#shadow;
+
+        // The vertex shader works in scene px; NDC maps them onto this
+        // smaller target as is.
+        ctx.clear(levels[0].a);
+        ctx.draw({
+            vert: VERT_SHADOW,
+            frag: FRAG_SHADOW_COVER,
+            geometry: this.#heads,
+            uniforms,
+            target: levels[0].a,
+            blend: "none",
+        });
+
+        // Blur sigma in scene px, then in texels of the chosen level.
+        const soft = Number.isFinite(this.params.shadowSoftness)
+            ? Math.max(this.params.shadowSoftness, 0)
+            : 0;
+        const sigmaPx = soft * ctx.pixelRatio;
+        let level = 0;
+        while (
+            level < levels.length - 1 &&
+            sigmaPx / 2 ** (level + 1) > SHADOW_MAX_SIGMA
+        ) {
+            level++;
+        }
+        for (let i = 1; i <= level; i++) {
+            const src = levels[i - 1].a;
+            ctx.draw({
+                frag: FRAG_BLOOM_DOWN,
+                uniforms: {
+                    srcTex: src,
+                    texel: [1 / src.width, 1 / src.height],
+                },
+                target: levels[i].a,
+            });
+        }
+        const { a, b } = levels[level];
+        const sigma = sigmaPx / 2 ** (level + 1);
+        if (sigma < 0.3) {
+            return a;
+        }
+        const radius = Math.min(Math.ceil(sigma * 3), 24);
+        ctx.draw({
+            frag: FRAG_SHADOW_BLUR,
+            uniforms: { srcTex: a, dir: [1 / a.width, 0], sigma, radius },
+            target: b,
+        });
+        ctx.draw({
+            frag: FRAG_SHADOW_BLUR,
+            uniforms: { srcTex: b, dir: [0, 1 / b.height], sigma, radius },
+            target: a,
+        });
+        return a;
+    }
+
+    #disposeShadow(): void {
+        for (const l of this.#shadow) {
+            l.a.dispose();
+            l.b.dispose();
+        }
+        this.#shadow = [];
+        this.#shadowBase = [0, 0];
     }
 
     #drawBloom(ctx: EffectContext, scene: EffectRenderTarget): void {
@@ -1751,7 +2340,11 @@ export class SwirlParticlesEffect implements Effect {
         this.#mask?.dispose();
         this.#pos?.dispose();
         this.#vel?.dispose();
+        this.#attrA?.dispose();
+        this.#attrB?.dispose();
+        this.#hist?.dispose();
         this.#scene?.dispose();
+        this.#disposeShadow();
         for (const l of this.#bloom) {
             l.down.dispose();
             l.up.dispose();
@@ -1759,6 +2352,9 @@ export class SwirlParticlesEffect implements Effect {
         this.#mask = null;
         this.#pos = null;
         this.#vel = null;
+        this.#attrA = null;
+        this.#attrB = null;
+        this.#hist = null;
         this.#scene = null;
         this.#bloom = [];
         this.#bloomBase = [0, 0];

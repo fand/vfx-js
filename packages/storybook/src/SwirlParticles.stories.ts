@@ -50,12 +50,13 @@ const BACKDROP = [
     "linear-gradient(to bottom, #5f6b80, #707d90)",
 ].join(", ");
 
-// Base view of the stories: a little from the right and above, as the
-// demo looked before yaw / pitch became params (both default to 0).
+// Base setup of the stories: front-on (the default `orbit` wobble still
+// turns it a little), drag to orbit, and a drop shadow on the backdrop.
 const STORY_VIEW: Partial<SwirlParticlesParams> = {
-    yaw: 0.2,
-    pitch: 0.22,
+    yaw: 0,
+    pitch: 0,
     drag: true,
+    shadow: true,
 };
 
 function createElement(source: Source): HTMLImageElement | HTMLVideoElement {
