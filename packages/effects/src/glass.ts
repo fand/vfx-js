@@ -30,6 +30,7 @@ import {
     type ShapeData,
     viewMatrix,
 } from "./_silhouette.js";
+import { GLSL_SIMPLEX3 } from "./_simplex3.js";
 
 /** A procedural {@link GlassParams.backdrop}. `"none"` is black. */
 export type GlassPatternName =
@@ -116,7 +117,10 @@ export type GlassParams = {
     backdropScale: number;
     /** Distance of the backdrop plane behind the shape's centre. */
     backdropDistance: number;
-    /** Scroll speed of the pattern, in pattern periods per second. */
+    /**
+     * Speed of the pattern, in pattern periods per second. The patterns
+     * scroll, except `"noise"`, which morphs in place.
+     */
     backdropSpeed: number;
     /** The two colours of a procedural pattern, `#rrggbb`. */
     backdropColors: readonly [string, string];
@@ -184,7 +188,7 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropVisible: false,
     backdropScale: 0.25,
     backdropDistance: 0.6,
-    backdropSpeed: 0,
+    backdropSpeed: 0.15,
     backdropColors: ["#000000", "#ffffff"],
     lightIntensity: 1.5,
     lightSoftness: 0.15,
@@ -282,16 +286,7 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-float vnoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-        mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
-        mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x),
-        f.y
-    );
-}
+${GLSL_SIMPLEX3}
 
 // 0..1 mask for a signed distance in pattern periods, with an edge as
 // soft as the pixel's footprint fw.
@@ -336,10 +331,12 @@ vec3 backdrop(vec2 p, float fw) {
         m = edge(0.3 - length(g), fw);
         mean = 0.28;
     } else {
-        vec2 n = q * 1.5 + vec2(backdropOffset, 0.0);
-        float f = vnoise(n) * 0.5 + vnoise(n * 2.03 + 7.1) * 0.3
-            + vnoise(n * 4.01 + 3.7) * 0.2;
-        m = smoothstep(0.35 - fw, 0.65 + fw, f);
+        // Simplex noise that morphs in place: time is its third axis.
+        vec3 n = vec3(q * 0.6, backdropOffset);
+        float f = snoise(n) * 0.6
+            + snoise(n * vec3(2.0, 2.0, 1.4) + vec3(7.1, 3.7, 1.9)) * 0.3
+            + snoise(n * vec3(4.0, 4.0, 1.9) + vec3(2.3, 9.1, 5.3)) * 0.1;
+        m = smoothstep(-0.12 - fw, 0.12 + fw, f);
     }
     m = mix(m, mean, smoothstep(0.35, 1.0, fw));
     return mix(backdropA, backdropB, m);
