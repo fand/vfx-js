@@ -27,7 +27,6 @@ import { padOutputRect } from "./_pad.js";
 import {
     buildShape,
     GLSL_SDF,
-    MASK_LONG,
     type ShapeData,
     viewMatrix,
 } from "./_silhouette.js";
@@ -192,9 +191,13 @@ const IMAGE_MODE = 6;
 const MAX_PATHS = 4;
 const MAX_SAMPLES = 16;
 const MAX_BOUNCES = 6;
-// 3x3 blurs of the distance field. Refraction magnifies every bump of the
-// normals, so the glass wants a smoother field than the default.
-const SMOOTH_PASSES = 6;
+// Long side of the silhouette read back from the element, in px, and the
+// box blurs of the distance field built from it. Refraction magnifies
+// every bump of the normals, so the glass wants a finer and smoother
+// field than the pixel staircase of a small mask gives.
+const GLASS_MASK_LONG = 1024;
+const SMOOTH_RADIUS = 4;
+const SMOOTH_PASSES = 3;
 // Pitch wobble relative to the yaw wobble.
 const PITCH_WOBBLE = 0.3;
 
@@ -212,6 +215,8 @@ uniform float camDist;
 uniform float focalPx;
 uniform vec2 centerPx;
 uniform vec2 bufferPx;
+// Size of a pixel of the target, in output px.
+uniform float pixelSize;
 
 uniform float ior;
 uniform float dispersion;
@@ -260,14 +265,15 @@ float vnoise(vec2 p) {
     );
 }
 
-// 0..1 mask with an edge of constant softness, for a signed distance
-// in pattern periods.
-float edge(float d) {
-    return smoothstep(-0.03, 0.03, d);
+// 0..1 mask for a signed distance in pattern periods, with an edge as
+// soft as the pixel's footprint fw.
+float edge(float d, float fw) {
+    return smoothstep(-fw, fw, d);
 }
 
-// The backdrop plane, at view-space xy.
-vec3 backdrop(vec2 p) {
+// The backdrop plane, at view-space xy. fw is the footprint of the pixel
+// on it, in the same units.
+vec3 backdrop(vec2 p, float fw) {
     if (backdropMode == 0) {
         return vec3(0.0);
     }
@@ -280,27 +286,34 @@ vec3 backdrop(vec2 p) {
         return texture(backdropTex, q).rgb;
     }
     vec2 q = p / max(backdropScale, 1e-3);
+    fw = clamp(fw / max(backdropScale, 1e-3), 0.03, 4.0);
     float m = 0.0;
+    // Mean of the pattern: what it fades to when the footprint covers
+    // whole periods, where it would only alias.
+    float mean = 0.5;
     if (backdropMode == 1) {
         float s = fract((q.x + q.y) * 0.7071 + backdropOffset);
-        m = edge(0.25 - abs(s - 0.5));
+        m = edge(0.25 - abs(s - 0.5), fw);
     } else if (backdropMode == 2) {
         vec2 g = abs(fract(q + vec2(backdropOffset, 0.0)) - 0.5);
-        m = 1.0 - edge(min(g.x, g.y) - 0.06);
+        m = 1.0 - edge(min(g.x, g.y) - 0.06, fw);
+        mean = 0.23;
     } else if (backdropMode == 3) {
         vec2 g = fract(q * 0.5 + vec2(backdropOffset * 0.5, 0.0)) - 0.5;
-        float a = edge(0.25 - abs(g.x));
-        float b = edge(0.25 - abs(g.y));
+        float a = edge(0.25 - abs(g.x), fw);
+        float b = edge(0.25 - abs(g.y), fw);
         m = mix(a, 1.0 - a, b);
     } else if (backdropMode == 4) {
         vec2 g = fract(q + vec2(backdropOffset, 0.0)) - 0.5;
-        m = edge(0.3 - length(g));
+        m = edge(0.3 - length(g), fw);
+        mean = 0.28;
     } else {
         vec2 n = q * 1.5 + vec2(backdropOffset, 0.0);
         float f = vnoise(n) * 0.5 + vnoise(n * 2.03 + 7.1) * 0.3
             + vnoise(n * 4.01 + 3.7) * 0.2;
-        m = smoothstep(0.35, 0.65, f);
+        m = smoothstep(0.35 - fw, 0.65 + fw, f);
     }
+    m = mix(m, mean, smoothstep(0.35, 1.0, fw));
     return mix(backdropA, backdropB, m);
 }
 
@@ -338,7 +351,10 @@ vec3 radiance(vec3 p, vec3 d) {
     if (backdropMode != 0 && d.z < -1e-4) {
         float t = (-backdropDistance - p.z) / d.z;
         if (t > 0.0) {
-            col = backdrop(p.xy + d.xy * t);
+            vec2 q = p.xy + d.xy * t;
+            // Strong refraction squeezes a wide piece of the backdrop
+            // into one pixel; filter the pattern by that footprint.
+            col = backdrop(q, length(fwidth(q)));
         }
     }
     return col;
@@ -429,29 +445,55 @@ void main() {
     float t = max(tb.x, 0.0);
     bool hit = false;
     vec4 s;
+    // Radius of the pixel's cone per unit of distance, and the closest
+    // the ray came to the surface in those radii: the coverage of a ray
+    // that just misses the silhouette.
+    float cone = 0.75 * pixelSize / focalPx;
+    float nearest = 1e9;
+    float tNearest = t;
     for (int i = 0; i < OUTER_STEPS; i++) {
         s = sdf3(ro + rd * t);
         if (s.x < HIT) {
             hit = true;
             break;
         }
+        float k = s.x / (t * cone);
+        if (k < nearest) {
+            nearest = k;
+            tNearest = t;
+        }
         t += s.x;
         if (t > tb.y) {
             break;
         }
     }
+    float coverage = 1.0;
     if (!hit) {
-        outColor = vec4(miss, missA);
-        return;
+        if (nearest >= 1.0) {
+            outColor = vec4(miss, missA);
+            return;
+        }
+        // Shade the closest point as the edge of the glass.
+        coverage = 1.0 - nearest;
+        t = tNearest;
+        s = sdf3(ro + rd * t);
     }
 
+    // One Newton step onto the surface: the march stops anywhere within
+    // HIT of it, which would show as contour lines once refracted.
     vec3 p0 = ro + rd * t;
+    if (hit) {
+        p0 += rd * min(s.x / max(-dot(rd, s.yzw), 0.1), HIT * 4.0);
+    } else {
+        p0 -= s.yzw * s.x;
+    }
     vec3 n0 = normalAt(p0);
     float cos0 = clamp(-dot(rd, n0), 0.0, 1.0);
 
     // Reflection on the outer surface.
     float f0 = fresnel(cos0, 1.0, ior);
-    vec3 col = lights(viewRot * reflect(rd, n0)) * f0 * reflection;
+    vec3 col = radiance(viewRot * p0, viewRot * reflect(rd, n0))
+        * f0 * reflection;
 
     // Trace the inside once per path, each with its own IOR.
     vec3 exPos[MAX_PATHS];
@@ -474,8 +516,9 @@ void main() {
         int nb = 0;
         for (int b = 0; b < MAX_BOUNCES; b++) {
             float ti = 0.0;
+            vec4 si;
             for (int i = 0; i < INNER_STEPS; i++) {
-                vec4 si = sdf3(p + d * ti);
+                si = sdf3(p + d * ti);
                 float di = -si.x;
                 // At the wall, and heading out of it.
                 if (di < HIT && dot(d, si.yzw) > 0.0) {
@@ -483,6 +526,8 @@ void main() {
                 }
                 ti += max(di, HIT);
             }
+            // The same Newton step onto the wall.
+            ti += clamp(-si.x / max(dot(d, si.yzw), 0.1), 0.0, HIT * 4.0);
             p += d * ti;
             len += ti;
             vec3 ni = normalAt(p);
@@ -544,7 +589,11 @@ void main() {
     }
     col += acc / max(wsum, vec3(1e-4));
 
-    outColor = vec4(col, backdropMode == 0 ? 0.0 : 1.0);
+    outColor = mix(
+        vec4(miss, missA),
+        vec4(col, backdropMode == 0 ? 0.0 : 1.0),
+        coverage
+    );
 }
 `;
 
@@ -794,6 +843,7 @@ export class GlassEffect implements Effect {
                 focalPx: camDist * unitPx,
                 centerPx: [ew / 2 - ox, eh / 2 - oy],
                 bufferPx: [ow, oh],
+                pixelSize: ow / sw,
                 ior: Math.max(p.ior, 1.0001),
                 dispersion: p.dispersion,
                 paths: clampInt(p.paths, 1, MAX_PATHS, 2),
@@ -831,8 +881,14 @@ export class GlassEffect implements Effect {
         }
         const [ew, eh] = ctx.dims.elementPixel;
         const aspect = ew / Math.max(eh, 1);
-        const mw = aspect >= 1 ? MASK_LONG : Math.round(MASK_LONG * aspect);
-        const mh = aspect >= 1 ? Math.round(MASK_LONG / aspect) : MASK_LONG;
+        const mw =
+            aspect >= 1
+                ? GLASS_MASK_LONG
+                : Math.round(GLASS_MASK_LONG * aspect);
+        const mh =
+            aspect >= 1
+                ? Math.round(GLASS_MASK_LONG / aspect)
+                : GLASS_MASK_LONG;
         if (
             !this.#mask ||
             this.#mask.width !== mw ||
@@ -850,6 +906,7 @@ export class GlassEffect implements Effect {
                     mw,
                     mh,
                     this.params.depth / 2,
+                    SMOOTH_RADIUS,
                     SMOOTH_PASSES,
                 );
                 if (shape) {
