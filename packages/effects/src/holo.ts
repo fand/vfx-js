@@ -177,6 +177,8 @@ export type HoloSettings = Readonly<{
  */
 export type HoloCopyBlob = Readonly<{
     holoDev: 1;
+    /** The holo.spot object it was copied from: `card`, `object`, `image` (the paper card), `cloth`, `stickers`, `flag`. */
+    entity?: string;
     material?: string;
     values: Readonly<Record<string, unknown>>;
     pose?: Readonly<{ rx: number; ry: number }>;
@@ -299,6 +301,8 @@ const DEFAULT_PARAMS: HoloParams = {
 };
 
 const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
+/** holo.spot entities whose blobs HoloEffect draws as they are meant (the rest are drawn as the flat card). */
+const BLOB_ENTITIES = new Set(["card", "object", "image", "plain"]);
 /** The emboss logo's placement: CSS px here, mm on holo.spot's card in a Copy settings blob. */
 const MM_PLACEMENT = new Set(["emboss.x", "emboss.y", "emboss.width"]);
 
@@ -396,6 +400,12 @@ function applyInput(st: HoloParams, input: HoloInput): void {
                     `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${MATERIAL_NAMES.join(", ")}); keeping "${st.material}".`,
                 );
             }
+        }
+        const entity = settings.entity;
+        if (entity !== undefined && !BLOB_ENTITIES.has(String(entity))) {
+            warnOnce(
+                `HoloEffect: a holo.spot Copy settings of the "${String(entity)}" object is drawn as a flat card (HoloEffect draws holo.spot's card, 3D object look and paper card, not its cloth, stickers or flag).`,
+            );
         }
         for (const [id, v] of Object.entries(settings.values)) {
             if (
@@ -741,8 +751,8 @@ void main() {
  * Each material's code (its shaders; for `emboss` also the logo and paper builders) is a separate chunk, loaded
  * when the material is first used. `init` waits for it. After `setParams({ material })` the effect keeps drawing
  * the previous material until the new one has loaded, and `ready` waits for it. `HoloEffect.preload(...)` loads
- * materials ahead. `@vfx-js/effects/holo/static` exports the same class with every material built in, for
- * CommonJS, pages without a bundler, or when a material change must not wait.
+ * materials ahead. `@vfx-js/effects/holo/static` exports the same class with every material built in: one file,
+ * and a material change never waits for code.
  *
  * ### Differences from holo.spot
  *
@@ -756,7 +766,8 @@ void main() {
  * - **Different names:** `studio` instead of `lights`, `startingPoints`, and `flat`, because holospot uses
  *   `lights` and `View` for other things.
  * - **Not ported:** the Volume Hologram and the emboss hologram stickers, multi-element emboss cards
- *   (`emboss.doc`), depth of field blur, bump maps, and card borders and thickness.
+ *   (`emboss.doc`), depth of field blur, bump maps, and card borders and thickness. holo.spot's cloth, stickers and
+ *   flag objects are not either: a Copy settings blob of one is drawn as the flat card, with a warning.
  *
  * Rendered next to holospot in Chromium, the foils differ by about 1 per channel (0–255) on average. Glitter
  * glints differ per pixel, but match within 1 after a slight blur. holospot's and three.js's MIT notices ship in

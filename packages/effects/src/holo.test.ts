@@ -353,3 +353,21 @@ test("a Copy settings blob's holo.spot images are ignored with a warning", () =>
     expect(msgs.some((m) => m.includes("asset:print-1"))).toBe(true);
     warn.mockRestore();
 });
+
+test("a Copy settings blob of holo.spot's cloth, stickers or flag warns, and a card's does not", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const blob = (entity: string) =>
+        new HoloEffect({
+            settings: { holoDev: 1, entity, material: "prism", values: {} },
+        }).resolvedSettings();
+    blob("card");
+    blob("object");
+    expect(warn).not.toHaveBeenCalled();
+    blob("flag");
+    expect(
+        warn.mock.calls.some((c) =>
+            String(c[0]).includes('"flag" object is drawn as a flat card'),
+        ),
+    ).toBe(true);
+    warn.mockRestore();
+});

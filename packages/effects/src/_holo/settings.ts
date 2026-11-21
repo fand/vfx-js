@@ -40,6 +40,7 @@ function isSceneId(id: string): boolean {
 /** A "Copy settings" blob from holo.spot (the `</>` button of the Object tab). */
 export interface CopyBlob {
     readonly holoDev: 1;
+    readonly entity?: string;
     readonly material?: string;
     readonly values: Readonly<Record<string, unknown>>;
     readonly pose?: Readonly<{ rx: number; ry: number }>;
