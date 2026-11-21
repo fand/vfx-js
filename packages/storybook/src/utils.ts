@@ -1077,6 +1077,11 @@ export function attachGlassPane(
     const shape = pane.addFolder({ title: "Shape" });
     bind(shape, "depth", range(0.02, 1.5, 0.01));
     bind(shape, "bevel", range(0, 0.4, 0.005));
+    bind(shape, "bevelShape", {
+        options: { round: "round", chamfer: "chamfer" },
+    });
+    bind(shape, "bulge", range(0, 0.5, 0.005));
+    bind(shape, "bulgeWidth", range(0.01, 1, 0.005));
 
     const glass = pane.addFolder({ title: "Glass" });
     bind(glass, "ior", range(1, 2.5, 0.01));
@@ -1088,6 +1093,9 @@ export function attachGlassPane(
     bind(glass, "tint", { view: "color" });
     bind(glass, "absorption", range(0, 10, 0.1));
     bind(glass, "reflection", range(0, 3, 0.05));
+    bind(glass, "bump", range(0, 1, 0.01));
+    bind(glass, "bumpScale", range(0.02, 1, 0.005));
+    bind(glass, "frost", range(0, 1, 0.01));
 
     const backdrop = pane.addFolder({ title: "Backdrop" });
     pick(backdrop, "backdrop", pickers.backdrop);

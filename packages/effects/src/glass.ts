@@ -26,11 +26,11 @@ import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
 import {
     buildShape,
-    GLSL_SDF,
+    GLSL_SD2,
     type ShapeData,
     viewMatrix,
 } from "./_silhouette.js";
-import { GLSL_SIMPLEX3 } from "./_simplex3.js";
+import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 
 /** A procedural {@link GlassParams.backdrop}. `"none"` is black. */
 export type GlassPatternName =
@@ -59,14 +59,33 @@ export type GlassImageSource =
  */
 export type GlassDebugView = "off" | "outer" | "inner" | "total";
 
+/**
+ * Profile of the {@link GlassParams.bevel}: a quarter circle, or a flat
+ * 45° cut with hard edges.
+ */
+export type GlassBevelShape = "round" | "chamfer";
+
 export type GlassParams = {
     /** Extrusion depth, relative to the long side of the element (= 2). */
     depth: number;
     /**
-     * Radius of the rounded edges, in the same units as `depth`. Most of
-     * the dispersion shows on this bevel, where the surface turns.
+     * Size of the bevel on the edges, in the same units as `depth`. Most
+     * of the dispersion shows on it, where the surface turns.
      */
     bevel: number;
+    /** Profile of the bevel. */
+    bevelShape: GlassBevelShape;
+    /**
+     * How far the caps rise in the middle, in the same units as `depth`.
+     * 0 keeps them flat; more makes a lens or a gem.
+     */
+    bulge: number;
+    /**
+     * Distance from the silhouette's edge over which the caps rise to
+     * the full `bulge`. Where the shape is narrower than twice this, the
+     * bulge has a crease along its middle.
+     */
+    bulgeWidth: number;
 
     /** Index of refraction at the middle of the spectrum. */
     ior: number;
@@ -102,6 +121,18 @@ export type GlassParams = {
     absorption: number;
     /** Strength of the reflection on the outer surface. */
     reflection: number;
+    /**
+     * Ripples on the surface, 0 to 1, like hammered or old glass. Only
+     * the normals are bent; the outline stays the same.
+     */
+    bump: number;
+    /** Size of the ripples, in the same units as `depth`. */
+    bumpScale: number;
+    /**
+     * Roughness of the surface, 0 to 1: what is seen through the glass,
+     * and reflected on it, blurs with its distance from the surface.
+     */
+    frost: number;
 
     /**
      * What is seen through the glass: a pattern name, or an image (an
@@ -175,6 +206,9 @@ export type GlassEffectOptions = {
 const DEFAULT_PARAMS: GlassParams = {
     depth: 0.2,
     bevel: 0.03,
+    bevelShape: "round",
+    bulge: 0,
+    bulgeWidth: 0.15,
     ior: 1.5,
     dispersion: 0.12,
     paths: 2,
@@ -184,6 +218,9 @@ const DEFAULT_PARAMS: GlassParams = {
     tint: "#ffffff",
     absorption: 0,
     reflection: 1,
+    bump: 0,
+    bumpScale: 0.15,
+    frost: 0,
     backdrop: "stripes",
     backdropVisible: false,
     backdropScale: 0.25,
@@ -219,9 +256,21 @@ const DEBUG_VIEWS: Record<GlassDebugView, number> = {
     inner: 2,
     total: 3,
 };
+const BEVEL_SHAPES: Record<GlassBevelShape, number> = {
+    round: 0,
+    chamfer: 1,
+};
 const MAX_PATHS = 4;
 const MAX_SAMPLES = 16;
 const MAX_BOUNCES = 6;
+// Long side of the mipmapped copy of a backdrop image, at most.
+const BACKDROP_MIP_LONG = 2048;
+// Frost at 1: width of the blur per unit of distance from the surface to
+// the backdrop, and the softness of the lights' edges. GLSL floats.
+const FROST_SPREAD = "0.35";
+const FROST_LIGHT_SOFTNESS = "0.6";
+// Noise gradient to surface slope, before it saturates.
+const BUMP_SLOPE = "0.6";
 // Long side of the silhouette read back from the element, in px, and the
 // box blurs of the distance field built from it. Refraction magnifies
 // every bump of the normals, so the glass wants a finer and smoother
@@ -237,7 +286,57 @@ precision highp float;
 in vec2 uv;
 out vec4 outColor;
 
-${GLSL_SDF}
+${GLSL_SD2}
+
+uniform int bevelShape;
+uniform float bulge;
+uniform float bulgeWidth;
+// 1 / the Lipschitz constant of the bulged field, 1 without a bulge: the
+// march steps are scaled by it so they cannot step through the caps.
+uniform float stepScale;
+
+// The extrusion of a 2D sample s (from sd2) at depth z, with a bevel and
+// caps that rise by up to \`bulge\` away from the edge.
+// x = distance, yzw = unit gradient.
+vec4 extrude(vec3 s, float z) {
+    float sz = z >= 0.0 ? 1.0 : -1.0;
+    // The cap: b = |z| - height, and its gradient (k * grad2, sz).
+    float h = halfDepth;
+    float k = 0.0;
+    if (bulge > 0.0) {
+        // f(u) = 1 - (1 - u)^2: steepest at the edge, flat in the middle.
+        float u = clamp(-s.x / bulgeWidth, 0.0, 1.0);
+        h += bulge * (1.0 - (1.0 - u) * (1.0 - u));
+        k = u > 0.0 && u < 1.0 ? 2.0 * bulge * (1.0 - u) / bulgeWidth : 0.0;
+    }
+    float b = abs(z) - h;
+    vec3 gb = vec3(s.yz * k, sz);
+    if (bevelShape == 1) {
+        // Chamfer: a 45° plane across the corner. Hard edges on purpose.
+        float c = (s.x + b + rounding) * 0.7071;
+        if (c > s.x && c > b) {
+            return vec4(c, normalize(vec3(s.yz, 0.0) + gb));
+        }
+        if (s.x > b) {
+            return vec4(s.x, s.yz, 0.0);
+        }
+        return vec4(b, k > 0.0 ? normalize(gb) : gb);
+    }
+    vec2 w = vec2(s.x + rounding, b + rounding);
+    if (w.x > 0.0 && w.y > 0.0) {
+        float l = length(w);
+        vec3 g = vec3(s.yz * w.x, 0.0) + gb * w.y;
+        return vec4(l - rounding, k > 0.0 ? normalize(g) : g / l);
+    }
+    if (w.x > w.y) {
+        return vec4(w.x - rounding, s.yz, 0.0);
+    }
+    return vec4(w.y - rounding, k > 0.0 ? normalize(gb) : gb);
+}
+
+vec4 sdf3(vec3 p) {
+    return extrude(sd2(p.xy), p.z);
+}
 
 uniform vec2 sdfSize;
 uniform vec2 shapeHalf;
@@ -258,6 +357,9 @@ uniform float jitter;
 uniform vec3 tint;
 uniform float absorption;
 uniform float reflection;
+uniform float bump;
+uniform float bumpScale;
+uniform float frost;
 
 uniform int backdropMode;
 uniform sampler2D backdropTex;
@@ -287,6 +389,7 @@ float hash12(vec2 p) {
 }
 
 ${GLSL_SIMPLEX3}
+${GLSL_SIMPLEX3_GRAD}
 
 // 0..1 mask for a signed distance in pattern periods, with an edge as
 // soft as the pixel's footprint fw.
@@ -306,7 +409,13 @@ vec3 backdrop(vec2 p, float fw) {
         vec2 q = p / half_ * 0.5 + 0.5;
         // Mirrored repeat, so the image has no visible border.
         q = 1.0 - abs(mod(q, 2.0) - 1.0);
-        return texture(backdropTex, q).rgb;
+        // The mip level from the footprint: the fold of the mirror and
+        // the refraction would throw off the GPU's own derivatives.
+        // fwidth's length is about sqrt(2) times the GPU's footprint.
+        vec2 size = vec2(textureSize(backdropTex, 0));
+        float texels = fw * 0.5 * max(size.x / half_.x, size.y / half_.y);
+        float lod = log2(max(texels, 1e-4)) - 0.5;
+        return textureLod(backdropTex, q, lod).rgb;
     }
     vec2 q = p / max(backdropScale, 1e-3);
     fw = clamp(fw / max(backdropScale, 1e-3), 0.03, 4.0);
@@ -343,8 +452,8 @@ vec3 backdrop(vec2 p, float fw) {
 }
 
 // A rectangular light seen in direction d: centre c, half size in
-// tangent units.
-float boxLight(vec3 d, vec3 c, vec2 halfSize) {
+// tangent units, edges as soft as \`soft\`.
+float boxLight(vec3 d, vec3 c, vec2 halfSize, float soft) {
     c = normalize(c);
     float k = dot(d, c);
     if (k <= 0.0) {
@@ -353,33 +462,41 @@ float boxLight(vec3 d, vec3 c, vec2 halfSize) {
     vec3 u = normalize(cross(vec3(0.0, 1.0, 0.0), c));
     vec3 v = cross(c, u);
     vec2 q = abs(vec2(dot(d, u), dot(d, v)) / k);
-    vec2 s = max(lightSoftness * halfSize, vec2(1e-3));
+    vec2 s = max(soft * halfSize, vec2(1e-3));
     vec2 e = smoothstep(halfSize + s, halfSize - s, q);
     return e.x * e.y;
 }
 
-vec3 lights(vec3 d) {
+vec3 lights(vec3 d, float soft) {
     if (lightIntensity <= 0.0) {
         return vec3(0.0);
     }
-    float l = boxLight(d, vec3(-0.7, 0.55, 0.45), vec2(0.55, 0.3))
-        + boxLight(d, vec3(0.95, 0.05, 0.3), vec2(0.1, 0.9))
-        + 0.6 * boxLight(d, vec3(0.25, -0.85, 0.45), vec2(0.7, 0.15))
+    float l = boxLight(d, vec3(-0.7, 0.55, 0.45), vec2(0.55, 0.3), soft)
+        + boxLight(d, vec3(0.95, 0.05, 0.3), vec2(0.1, 0.9), soft)
+        + 0.6 * boxLight(d, vec3(0.25, -0.85, 0.45), vec2(0.7, 0.15), soft)
         // Behind the shape: only seen without a backdrop.
-        + boxLight(d, vec3(0.25, 0.15, -1.0), vec2(0.8, 0.45));
+        + boxLight(d, vec3(0.25, 0.15, -1.0), vec2(0.8, 0.45), soft);
     return vec3(l * lightIntensity);
 }
 
-// Radiance along a ray that left the glass, in view space.
-vec3 radiance(vec3 p, vec3 d) {
-    vec3 col = lights(d);
+// Radiance along a ray in view space: one that left the glass, or one
+// that misses it. \`rough\` is the frost of the surface the ray left (0
+// for a miss).
+vec3 radiance(vec3 p, vec3 d, float rough) {
+    vec3 col = lights(d, max(lightSoftness, rough * ${FROST_LIGHT_SOFTNESS}));
     if (backdropMode != 0 && d.z < -1e-4) {
         float t = (-backdropDistance - p.z) / d.z;
         if (t > 0.0) {
             vec2 q = p.xy + d.xy * t;
             // Strong refraction squeezes a wide piece of the backdrop
-            // into one pixel; filter the pattern by that footprint.
-            col = backdrop(q, length(fwidth(q)));
+            // into one pixel; filter the pattern by that footprint. A
+            // rough surface scatters into a cone, so its blur grows
+            // with the distance to the backdrop.
+            float fw = length(fwidth(q));
+            if (rough > 0.0) {
+                fw += rough * ${FROST_SPREAD} * t;
+            }
+            col = backdrop(q, fw);
         }
     }
     return col;
@@ -431,9 +548,29 @@ vec3 sd2Smooth(vec2 p) {
     return vec3(s.r, gl > 1e-5 ? s.gb / gl : vec2(0.0, 1.0));
 }
 
-// The surface normal at p.
-vec3 normalAt(vec3 p) {
-    return extrude(sd2Smooth(p.xy), p.z).yzw;
+// The surface normal at p, for a ray along d that meets it there.
+vec3 normalAt(vec3 p, vec3 d) {
+    vec3 n = extrude(sd2Smooth(p.xy), p.z).yzw;
+    if (bump <= 0.0) {
+        return n;
+    }
+    // Ripples: tilt the normal against the tangential part of a noise
+    // gradient. The noise is in object space, so it sticks to the shape.
+    vec3 g = snoiseD(p / bumpScale).xyz * ${BUMP_SLOPE};
+    g -= n * dot(g, n);
+    // Saturate the slope, so the tilt stays under 45°. Refraction
+    // through two rippled faces magnifies the tilt a lot, so the strength
+    // goes as bump^2 to leave room for subtle ripples.
+    vec3 m = normalize(n - g * (bump * bump / sqrt(1.0 + dot(g, g))));
+    // At grazing angles the tilt can turn the normal past the ray, which
+    // would refract it to the wrong side: keep the side of n.
+    float s = dot(d, n) < 0.0 ? -1.0 : 1.0;
+    float lim = min(abs(dot(d, n)), 0.1);
+    float c = dot(d, m) * s;
+    if (c < lim) {
+        m = normalize(m + d * (s * (lim - c)));
+    }
+    return m;
 }
 
 // Heat map of a count of SDF lookups, 64 per colour step.
@@ -449,7 +586,7 @@ vec4 heat(float n) {
 
 // Slab test against the shape's bounding box. x = near, y = far.
 vec2 boundsHit(vec3 ro, vec3 rd) {
-    vec3 b = vec3(shapeHalf + 0.01, halfDepth + 0.01);
+    vec3 b = vec3(shapeHalf + 0.01, halfDepth + bulge + 0.01);
     vec3 inv = 1.0 / rd;
     vec3 t0 = (-b - ro) * inv;
     vec3 t1 = (b - ro) * inv;
@@ -461,12 +598,12 @@ vec2 boundsHit(vec3 ro, vec3 rd) {
 // The glass seen along rd at surface point p0: the reflection on the
 // outside, plus the light that comes back out of the inside.
 vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
-    vec3 n0 = normalAt(p0);
+    vec3 n0 = normalAt(p0, rd);
     float cos0 = clamp(-dot(rd, n0), 0.0, 1.0);
 
     // Reflection on the outer surface.
     float f0 = fresnel(cos0, 1.0, ior);
-    vec3 col = radiance(viewRot * p0, viewRot * reflect(rd, n0))
+    vec3 col = radiance(viewRot * p0, viewRot * reflect(rd, n0), frost)
         * f0 * reflection;
 
     // Trace the inside once per path, each with its own IOR.
@@ -499,13 +636,13 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
                 if (di < HIT && dot(d, si.yzw) > 0.0) {
                     break;
                 }
-                ti += max(di, HIT);
+                ti += max(di * stepScale, HIT);
             }
             // The same Newton step onto the wall.
             ti += clamp(-si.x / max(dot(d, si.yzw), 0.1), 0.0, HIT * 4.0);
             p += d * ti;
             len += ti;
-            vec3 ni = normalAt(p);
+            vec3 ni = normalAt(p, d);
             float cosI = clamp(dot(d, ni), 0.0, 1.0);
             vec3 o = refract(d, -ni, n);
             bool last = b >= nBounces - 1;
@@ -557,7 +694,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
         vec3 d = normalize(mix(exDir[a], exDir[b], f));
         float len = mix(exLen[a], exLen[b], clamp(f, 0.0, 1.0));
         float w = mix(exW[a], exW[b], clamp(f, 0.0, 1.0));
-        vec3 l = radiance(p, d) * w * exp(-absorb * len);
+        vec3 l = radiance(p, d, frost) * w * exp(-absorb * len);
         vec3 sw = nSamples == 1 ? vec3(1.0) : spectral(ts);
         acc += sw * l;
         wsum += sw;
@@ -576,7 +713,7 @@ void main() {
     vec3 miss = vec3(0.0);
     float missA = 0.0;
     if (backdropVisible > 0.5) {
-        miss = radiance(roV, rdV) * step(0.5, float(backdropMode));
+        miss = radiance(roV, rdV, 0.0) * step(0.5, float(backdropMode));
         missA = backdropMode == 0 ? 0.0 : 1.0;
     }
 
@@ -610,7 +747,7 @@ void main() {
             if (s.x > zone) {
                 leaving = false;
             }
-            t += max(s.x, 3.0 * r);
+            t += max(s.x * stepScale, 3.0 * r);
         } else if (s.x < zone) {
             // Near the surface. Step to where the ray would cross its
             // tangent plane: a ray that hits gets there, one that
@@ -626,7 +763,7 @@ void main() {
                 if (c > -0.02) {
                     break;
                 }
-                t += min(s.x / -c, 0.05);
+                t += min(s.x / -c * stepScale, 0.05);
                 s = sdf3(ro + rd * t);
                 outerCount += 1.0;
                 k = min(k, s.x / (t * cone));
@@ -659,9 +796,9 @@ void main() {
                 break;
             }
             leaving = true;
-            t += max(s.x, 3.0 * r);
+            t += max(s.x * stepScale, 3.0 * r);
         } else {
-            t += s.x;
+            t += s.x * stepScale;
         }
         if (t > tb.y) {
             break;
@@ -758,6 +895,36 @@ void main() {
 }
 `;
 
+const FRAG_COPY = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D srcTex;
+out vec4 outColor;
+
+void main() {
+    outColor = texture(srcTex, uv);
+}
+`;
+
+type BackdropElement = Exclude<GlassImageSource, string>;
+
+// Native size of a backdrop element; 0 while a video has no frame.
+function sourceSize(el: BackdropElement): [number, number] {
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        el instanceof HTMLImageElement
+    ) {
+        return [el.naturalWidth || el.width, el.naturalHeight || el.height];
+    }
+    if (
+        typeof HTMLVideoElement !== "undefined" &&
+        el instanceof HTMLVideoElement
+    ) {
+        return [el.videoWidth || el.width, el.videoHeight || el.height];
+    }
+    return [el.width, el.height];
+}
+
 function isPattern(v: GlassParams["backdrop"]): v is GlassPatternName {
     return typeof v === "string" && v in PATTERN_MODES;
 }
@@ -765,6 +932,15 @@ function isPattern(v: GlassParams["backdrop"]): v is GlassPatternName {
 function hexToRgb(hex: string): [number, number, number] {
     const [r, g, b] = parseHexColor(hex);
     return [r, g, b];
+}
+
+// Lipschitz constant of the bulged field: the cap's gradient is
+// (k * grad2, 1) with k up to 2 * bulge / bulgeWidth, and the bevel mixes
+// it with the side's (grad2, 0). The worst mix is the largest singular
+// value of [[1, k], [0, 1]], a little above sqrt(1 + k^2).
+function bulgeLipschitz(bulge: number, bulgeWidth: number): number {
+    const k = (2 * bulge) / bulgeWidth;
+    return Math.sqrt((2 + k * k + k * Math.sqrt(k * k + 4)) / 2);
 }
 
 function clampInt(v: number, lo: number, hi: number, fallback: number): number {
@@ -811,6 +987,13 @@ export class GlassEffect implements Effect {
     #image: EffectTexture | null = null;
     #imageKey: GlassParams["backdrop"] | null = null;
     #imageAspect = 1;
+    #imageEl: BackdropElement | null = null;
+    // Videos and canvases change every frame; images only when replaced.
+    #imageLive = false;
+    // The image copied into a mipmapped target, so it can be filtered by
+    // the footprint of a pixel on it.
+    #backdropMip: EffectRenderTarget | null = null;
+    #backdropDirty = false;
 
     #time = 0;
     #dragYaw = 0;
@@ -842,6 +1025,7 @@ export class GlassEffect implements Effect {
             this.#sdfRaw = null;
             this.#sdfTex = null;
             this.#pending = this.#shape;
+            this.#backdropDirty = true;
         });
 
         if (!this.#still && typeof window !== "undefined") {
@@ -896,6 +1080,7 @@ export class GlassEffect implements Effect {
             this.#phase = "ready";
         }
         this.#updateImage(ctx);
+        this.#updateBackdropMip(ctx);
         if (!this.#still) {
             this.#time += Math.min(ctx.deltaTime, 0.1);
         }
@@ -987,7 +1172,9 @@ export class GlassEffect implements Effect {
         const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
 
         const halfDepth = Math.max(p.depth / 2, 0.005);
-        const image = isPattern(p.backdrop) ? null : this.#image;
+        const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
+        const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
+        const image = isPattern(p.backdrop) ? null : this.#backdropMip;
         // An image that is still loading shows as black.
         const mode = isPattern(p.backdrop)
             ? PATTERN_MODES[p.backdrop]
@@ -1003,6 +1190,11 @@ export class GlassEffect implements Effect {
                 sdfSize: [shape.sdfW, shape.sdfH],
                 halfDepth,
                 rounding: Math.min(Math.max(p.bevel, 0), halfDepth),
+                bevelShape: BEVEL_SHAPES[p.bevelShape] ?? 0,
+                bulge,
+                bulgeWidth,
+                stepScale:
+                    bulge > 0 ? 1 / bulgeLipschitz(bulge, bulgeWidth) : 1,
                 shapeHalf: shape.shapeHalf,
                 viewRot: viewMatrix(yaw, pitch),
                 camDist,
@@ -1019,12 +1211,22 @@ export class GlassEffect implements Effect {
                 tint: hexToRgb(p.tint),
                 absorption: Math.max(p.absorption, 0),
                 reflection: Math.max(p.reflection, 0),
+                bump: Number.isFinite(p.bump)
+                    ? Math.min(Math.max(p.bump, 0), 1)
+                    : 0,
+                bumpScale: Math.max(p.bumpScale, 1e-3),
+                frost: Number.isFinite(p.frost)
+                    ? Math.min(Math.max(p.frost, 0), 1)
+                    : 0,
                 backdropMode: mode,
                 backdropTex: image ?? sdfTex,
                 backdropAspect: this.#imageAspect,
                 backdropVisible: p.backdropVisible ? 1 : 0,
                 backdropScale: p.backdropScale,
-                backdropDistance: Math.max(p.backdropDistance, halfDepth),
+                backdropDistance: Math.max(
+                    p.backdropDistance,
+                    halfDepth + bulge,
+                ),
                 backdropOffset: t * p.backdropSpeed,
                 backdropA: hexToRgb(p.backdropColors[0]),
                 backdropB: hexToRgb(p.backdropColors[1]),
@@ -1137,35 +1339,25 @@ export class GlassEffect implements Effect {
         this.#imageKey = src;
         this.#image?.dispose();
         this.#image = null;
+        this.#imageEl = null;
+        this.#backdropMip?.dispose();
+        this.#backdropMip = null;
         if (isPattern(src)) {
             return;
         }
-        const wrap = (
-            el:
-                | HTMLImageElement
-                | HTMLCanvasElement
-                | HTMLVideoElement
-                | ImageBitmap,
-        ) => {
+        const wrap = (el: BackdropElement) => {
             if (this.#disposed || this.#imageKey !== src) {
                 return;
             }
-            let w = el.width;
-            let h = el.height;
-            if (
-                typeof HTMLImageElement !== "undefined" &&
-                el instanceof HTMLImageElement
-            ) {
-                w = el.naturalWidth || w;
-                h = el.naturalHeight || h;
-            } else if (
-                typeof HTMLVideoElement !== "undefined" &&
-                el instanceof HTMLVideoElement
-            ) {
-                w = el.videoWidth || w;
-                h = el.videoHeight || h;
-            }
+            const [w, h] = sourceSize(el);
             this.#imageAspect = w > 0 && h > 0 ? w / h : 1;
+            this.#imageEl = el;
+            this.#imageLive =
+                (typeof HTMLCanvasElement !== "undefined" &&
+                    el instanceof HTMLCanvasElement) ||
+                (typeof HTMLVideoElement !== "undefined" &&
+                    el instanceof HTMLVideoElement);
+            this.#backdropDirty = true;
             this.#image = ctx.wrapTexture(el, {
                 filter: "linear",
                 wrap: "clamp",
@@ -1184,6 +1376,34 @@ export class GlassEffect implements Effect {
         );
     }
 
+    // Copy the backdrop image into its mipmapped target: once per image,
+    // or every frame for a video or canvas.
+    #updateBackdropMip(ctx: EffectContext): void {
+        const image = this.#image;
+        const el = this.#imageEl;
+        if (!image || !el || !(this.#backdropDirty || this.#imageLive)) {
+            return;
+        }
+        const [iw, ih] = sourceSize(el);
+        const fit = Math.min(1, BACKDROP_MIP_LONG / Math.max(iw, ih, 1));
+        const w = Math.max(1, Math.round(iw * fit));
+        const h = Math.max(1, Math.round(ih * fit));
+        if (this.#backdropMip?.width !== w || this.#backdropMip?.height !== h) {
+            this.#backdropMip?.dispose();
+            this.#backdropMip = ctx.createRenderTarget({
+                size: [w, h],
+                filter: "linear",
+                mipmap: true,
+            });
+        }
+        ctx.draw({
+            frag: FRAG_COPY,
+            uniforms: { srcTex: image },
+            target: this.#backdropMip,
+        });
+        this.#backdropDirty = false;
+    }
+
     dispose(): void {
         this.#disposed = true;
         this.#unlisten?.();
@@ -1198,7 +1418,10 @@ export class GlassEffect implements Effect {
         this.#sdfTex = null;
         this.#image?.dispose();
         this.#image = null;
+        this.#imageEl = null;
         this.#imageKey = null;
+        this.#backdropMip?.dispose();
+        this.#backdropMip = null;
         this.#mask?.dispose();
         this.#mask = null;
         this.#scene?.dispose();
