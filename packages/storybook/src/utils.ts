@@ -3,6 +3,7 @@ import {
     type BloomEffect,
     type DatamoshEffect,
     type FluidEffect,
+    type GlassParams,
     type HalftoneEffect,
     type HalftoneInkPresetName,
     type LightStreakEffect,
@@ -1016,4 +1017,104 @@ function addSwirlPaletteBindings(
         });
     };
     rebuildStops();
+}
+
+/** Params of {@link attachGlassPane} that Tweakpane edits. */
+export type GlassPaneParams = Omit<GlassParams, "backdrop" | "backdropColors">;
+
+/**
+ * Tweakpane for GlassEffect. Binds to a story-owned `params` object and
+ * calls `apply` on every edit. `backdrop` is a key of the story's own
+ * list, so images can be picked by name.
+ */
+export function attachGlassPane(
+    title: string,
+    params: GlassPaneParams,
+    apply: () => void,
+    pickers: {
+        source: SwirlSourceSelector;
+        backdrop: SwirlSourceSelector;
+        colors: { a: string; b: string };
+    },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    // The effect orbits on window pointer drags; keep panel drags out.
+    container.addEventListener("pointerdown", (e) => e.stopPropagation());
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+    const bind = (
+        folder: FolderApi | Pane,
+        key: keyof GlassPaneParams,
+        opts: BindingParams = {},
+    ) => {
+        folder.addBinding(params, key, opts).on("change", apply);
+    };
+    const pick = (
+        folder: FolderApi | Pane,
+        label: string,
+        sel: SwirlSourceSelector,
+    ) => {
+        const state = { value: sel.value };
+        folder
+            .addBinding(state, "value", {
+                label,
+                options: Object.fromEntries(sel.keys.map((k) => [k, k])),
+            })
+            .on("change", (ev) => sel.onChange(ev.value));
+    };
+
+    pick(pane, "source", pickers.source);
+
+    const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "depth", range(0.02, 1.5, 0.01));
+    bind(shape, "bevel", range(0, 0.4, 0.005));
+
+    const glass = pane.addFolder({ title: "Glass" });
+    bind(glass, "ior", range(1, 2.5, 0.01));
+    bind(glass, "dispersion", range(0, 0.5, 0.005));
+    bind(glass, "paths", range(1, 4, 1));
+    bind(glass, "samples", range(1, 16, 1));
+    bind(glass, "bounces", range(1, 6, 1));
+    bind(glass, "jitter", range(0, 1, 0.01));
+    bind(glass, "tint", { view: "color" });
+    bind(glass, "absorption", range(0, 10, 0.1));
+    bind(glass, "reflection", range(0, 3, 0.05));
+
+    const backdrop = pane.addFolder({ title: "Backdrop" });
+    pick(backdrop, "backdrop", pickers.backdrop);
+    bind(backdrop, "backdropVisible");
+    bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
+    bind(backdrop, "backdropDistance", range(0, 3, 0.01));
+    bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
+    backdrop
+        .addBinding(pickers.colors, "a", { view: "color", label: "colorA" })
+        .on("change", apply);
+    backdrop
+        .addBinding(pickers.colors, "b", { view: "color", label: "colorB" })
+        .on("change", apply);
+
+    const light = pane.addFolder({ title: "Lights" });
+    bind(light, "lightIntensity", range(0, 8, 0.05));
+    bind(light, "lightSoftness", range(0, 1, 0.01));
+
+    const view = pane.addFolder({ title: "View" });
+    bind(view, "yaw", range(-3.15, 3.15, 0.01));
+    bind(view, "pitch", range(-1.5, 1.5, 0.01));
+    bind(view, "orbit", range(0, 1.5, 0.01));
+    bind(view, "fov", range(5, 90, 1));
+    bind(view, "zoom", range(0.1, 2, 0.01));
+    bind(view, "drag");
+    bind(view, "resolution", range(0.25, 2, 0.05));
+
+    trackPane(pane);
+    return pane;
 }
