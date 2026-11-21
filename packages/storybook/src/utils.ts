@@ -1114,6 +1114,7 @@ export function attachGlassPane(
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
     bind(view, "resolution", range(0.25, 2, 0.05));
+    bind(view, "fxaa");
     bind(view, "debug", {
         options: { off: "off", outer: "outer", inner: "inner", total: "total" },
     });
