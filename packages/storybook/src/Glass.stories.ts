@@ -272,6 +272,21 @@ export const htmlText: StoryObj<Args> = {
     args: { source: "HTML text", backdrop: "stripes" },
 };
 
+// The label shows as raised letters: a negative relief sinks the bright
+// button around them.
 export const htmlButton: StoryObj<Args> = {
-    args: { source: "HTML button", backdrop: "grid" },
+    args: {
+        source: "HTML button",
+        backdrop: "grid",
+        params: { relief: -0.05 },
+    },
+};
+
+// A photo's light and dark parts as a relief on its slab.
+export const photoRelief: StoryObj<Args> = {
+    args: {
+        source: "slab (photo)",
+        backdrop: "stripes",
+        params: { depth: 0.15, relief: 0.08, yaw: 0.7, pitch: 0.35, zoom: 1.1 },
+    },
 };

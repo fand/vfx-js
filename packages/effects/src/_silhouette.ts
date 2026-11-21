@@ -145,7 +145,7 @@ function mulberry32(seed: number): () => number {
 
 // In-place box blur of `n` values at `start + i * stride`, over
 // [i - r, i + r] clipped to the line.
-function boxBlur1d(
+export function boxBlur1d(
     data: Float32Array,
     start: number,
     stride: number,
