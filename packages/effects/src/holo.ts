@@ -851,6 +851,7 @@ export class HoloEffect implements Effect {
         }
         applyInput(this.#p, input);
         this.#dirty = true;
+        this.#defFailed = null; // a material that failed to load is tried again
         // the element as the logo is read again when emboss.logo is given again (after the element changed)
         const settings = input.settings as Record<string, unknown> | undefined;
         if (settings && "emboss.logo" in settings) {
@@ -859,9 +860,10 @@ export class HoloEffect implements Effect {
     }
 
     /**
-     * Resolves once the effect has drawn a frame with everything it loads in place: for `emboss`, the logo and the
-     * paper maps, which load in the background (until then the card is drawn without them). A logo that fails to
-     * load does not reject it; see `errors`. It also resolves when the effect is disposed.
+     * Resolves once the effect has drawn a frame with everything it loads in place: the material's code, and for
+     * `emboss` the logo, the paper maps and `emboss.print`, which load in the background (until then the card is
+     * drawn without them). A load that fails does not reject it; see `errors`. It also resolves when the effect is
+     * disposed.
      */
     get ready(): Promise<void> {
         if (this.#readyNow()) {
@@ -885,6 +887,9 @@ export class HoloEffect implements Effect {
         return (
             this.#drawnOnce &&
             !this.#dirty &&
+            // the material asked for is drawn, or failed to load (see errors)
+            (this.#renderDef?.id === this.#p.material ||
+                this.#defFailed === this.#p.material) &&
             (this.#p.material !== "emboss" ||
                 (!this.#emboss?.busy && !this.#printBusy && !this.#capPending))
         );
@@ -1125,32 +1130,53 @@ export class HoloEffect implements Effect {
     /** The material code the current render state was built with. */
     #renderDef: MaterialDef | null = null;
     #defError: string | null = null;
+    /** The material whose code is loading, and the one that failed to load (tried again on the next setParams). */
+    #defPending: { m: HoloMaterial; p: Promise<void> } | null = null;
+    #defFailed: HoloMaterial | null = null;
 
-    /** Loads a material's code; a failure is listed in `errors`, and the effect keeps drawing what it drew. */
+    /** Loads a material's code once; a failure warns once, is listed in `errors`, and the effect keeps drawing what it drew. */
     #requestDef(m: HoloMaterial): Promise<void> {
-        return loadMaterial(m).then(
-            () => {
-                this.#defError = null;
-                this.#dirty = true;
-            },
-            (e: unknown) => {
-                this.#defError = `HoloEffect: could not load the "${m}" material: ${e instanceof Error ? e.message : String(e)}`;
-                console.warn(this.#defError);
-            },
-        );
+        if (this.#defPending?.m === m) {
+            return this.#defPending.p;
+        }
+        const p = loadMaterial(m)
+            .then(
+                () => {
+                    this.#defError = null;
+                    this.#defFailed = null;
+                },
+                (e: unknown) => {
+                    this.#defFailed = m;
+                    this.#defError = `HoloEffect: could not load the "${m}" material: ${e instanceof Error ? e.message : String(e)}`;
+                    console.warn(this.#defError);
+                },
+            )
+            .finally(() => {
+                if (this.#defPending?.p === p) {
+                    this.#defPending = null;
+                }
+                this.#dirty = true; // resolve again: with the new material, or settle on the failure
+            });
+        this.#defPending = { m, p };
+        return p;
     }
 
     #resolve(): void {
         const p = this.#p;
-        const def = loadedMaterial(p.material);
+        let def = loadedMaterial(p.material);
         if (!def) {
-            // not loaded yet: keep drawing the current state (dirty stays set) until it is
-            void this.#requestDef(p.material);
-            return;
+            // not loaded yet (or failed): load it, and meanwhile draw the material drawn so far with the current settings
+            if (this.#defFailed !== p.material) {
+                void this.#requestDef(p.material);
+            }
+            def = this.#renderDef ?? undefined;
+            if (!def) {
+                return; // nothing drawn yet
+            }
         }
         this.#renderDef = def;
         this.#resolved = resolveSettings(
-            p.material,
+            def.id as HoloMaterial,
             "plain",
             p.settings as Readonly<Record<string, ParamValue>>,
         );
@@ -1594,7 +1620,7 @@ export class HoloEffect implements Effect {
     #clearPaper(): boolean {
         const v = this.#resolved?.values;
         return (
-            this.#p.material === "emboss" &&
+            this.#renderDef?.id === "emboss" &&
             v?.["emboss.logo"] === "element" &&
             !givenImage(v["emboss.print"]) &&
             this.#p.settings["emboss.paperColour"] === undefined
