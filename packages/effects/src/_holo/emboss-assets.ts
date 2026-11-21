@@ -3,6 +3,7 @@
 // float24 byte images (spectral/float24.ts) that the effect decodes into mipmapped float targets. The GPU builds the
 // mip chains (box filter, the same 2 × 2 average holospot computes on the CPU; both maps are moments or distances,
 // which average linearly).
+import { LOGO_KERNEL_SOURCE, PAPER_KERNEL_SOURCE } from "./data/kernels.js";
 import { KernelWorker, transferables } from "./scene/kernel-worker.js";
 import {
     LOGO_READ_DEFAULT,
@@ -61,8 +62,14 @@ export interface LogoState {
 }
 
 export class EmbossAssets {
-    private readonly logoWorker = new KernelWorker(logoKernel as never);
-    private readonly paperWorker = new KernelWorker(paperKernel as never);
+    private readonly logoWorker = new KernelWorker(
+        logoKernel as never,
+        LOGO_KERNEL_SOURCE,
+    );
+    private readonly paperWorker = new KernelWorker(
+        paperKernel as never,
+        PAPER_KERNEL_SOURCE,
+    );
     private logoWanted: LogoInput | null = null;
     private logoOptsKey = "";
     private paperWanted = "";

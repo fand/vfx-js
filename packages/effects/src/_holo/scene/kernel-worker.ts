@@ -1,8 +1,11 @@
 // Ported from holospot engine/scene/kernelWorker.ts (https://github.com/dmitrykurash/holospot), MIT © 2026 Dmitry Kurash.
 // A tiny inline-worker runner for self-contained CPU kernels (addendum A6: the logo SDF and the paper maps; the same
-// pattern as scene/bumpMaps.ts). The kernel factory's source text (Function.prototype.toString) becomes a Blob worker:
+// pattern as scene/bumpMaps.ts). The kernel factory's source text becomes a Blob worker:
 //   const K = (<factory source>)();  self.onmessage = (e) => reply(K[e.data.fn](e.data.arg))
-// so the factory must be self-contained (no reference outside its own body; it survives bundling and minification).
+// so the factory must be self-contained (no reference outside its own body). vfx-js port: the source text is
+// generated at this package's build (data/kernels.ts, scripts/gen-holo-kernels.mjs) rather than taken from
+// Function.prototype.toString() at run time, since a consumer's bundler may inject helpers into the function that
+// the worker does not have. The factory itself runs the kernel on the page when there is no worker.
 // Results are posted back with every ArrayBuffer of the result transferred. Without workers (CSP, old browsers) or after
 // a worker error the kernel runs on the page (a one-off stall). No DOM access at module level (node --test safe).
 
@@ -52,8 +55,12 @@ export class KernelWorker {
     private id = 0;
     private readonly jobs = new Map<number, Job>();
 
-    constructor(factory: Factory) {
+    private readonly source: string;
+
+    /** `source`: the factory as plain JavaScript (`function () { ... }`); default: its own source text. */
+    constructor(factory: Factory, source?: string) {
         this.factory = factory;
+        this.source = source ?? factory.toString();
     }
 
     /** Runs `fn(arg)` of the kernel, in the worker where possible. Typed by the caller. */
@@ -129,7 +136,7 @@ export class KernelWorker {
                 throw new Error("no workers");
             }
             const src = `"use strict";
-const K = (${this.factory.toString()})();
+const K = (${this.source})();
 function tr(v, out, seen) {
   if (v === null || typeof v !== "object" || seen.has(v)) return out;
   seen.add(v);
