@@ -15,12 +15,26 @@ import { attachGlassPane, initVFX, isChromatic } from "./utils";
 
 const PHOTO_STYLE = "max-width: min(60vw, 800px); max-height: 60vh";
 
-// The element whose silhouette becomes the glass.
+type Source =
+    | { src: string; style: string }
+    | { tag: "h1" | "button"; text: string; style: string };
+
+// The element whose silhouette becomes the glass: images, and plain HTML.
 const SOURCES = {
     "VFX-JS logo": { src: Logo, style: "width: min(80vw, 960px)" },
     amagi: { src: Amagi, style: "height: min(70vh, 640px)" },
     "slab (photo)": { src: Pigeon, style: PHOTO_STYLE },
-} satisfies Record<string, { src: string; style: string }>;
+    "HTML text": {
+        tag: "h1",
+        text: "Glass",
+        style: "margin: 0; padding: 0 0.1em; color: #fff; font: 900 min(24vw, 300px) / 1.1 system-ui, sans-serif; letter-spacing: -0.02em",
+    },
+    "HTML button": {
+        tag: "button",
+        text: "Click me",
+        style: "appearance: none; border: 0; border-radius: 999px; padding: 0.55em 1.4em; background: #fff; color: #000; font: 700 min(8vw, 96px) / 1 system-ui, sans-serif; cursor: pointer",
+    },
+} satisfies Record<string, Source>;
 
 type SourceKey = keyof typeof SOURCES;
 
@@ -53,14 +67,25 @@ type Args = {
     params?: Partial<Omit<GlassParams, "backdrop">>;
 };
 
-function createImage(key: SourceKey): HTMLImageElement {
-    const img = document.createElement("img");
-    img.style.cssText = SOURCES[key].style;
-    img.src = SOURCES[key].src;
-    return img;
+function createSource(key: SourceKey): HTMLElement {
+    const source: Source = SOURCES[key];
+    if ("src" in source) {
+        const img = document.createElement("img");
+        img.style.cssText = source.style;
+        img.src = source.src;
+        return img;
+    }
+    const el = document.createElement(source.tag);
+    el.style.cssText = source.style;
+    el.textContent = source.text;
+    return el;
 }
 
-function whenLoaded(el: HTMLImageElement): Promise<void> {
+function whenLoaded(el: HTMLElement): Promise<void> {
+    if (!(el instanceof HTMLImageElement)) {
+        // Text is captured as drawn, so its font has to be there.
+        return document.fonts.ready.then(() => {});
+    }
     return new Promise((resolve, reject) => {
         if (el.complete && el.naturalWidth > 0) {
             resolve();
@@ -98,7 +123,7 @@ export default {
         });
 
         let sourceKey: SourceKey = args.source;
-        let el: HTMLImageElement | null = null;
+        let el: HTMLElement | null = null;
         let effect: GlassEffect | null = null;
         // Bumped on every swap, so a slow load can't attach a stale element.
         let token = 0;
@@ -114,7 +139,7 @@ export default {
         const mount = async (): Promise<void> => {
             const my = ++token;
             const prev = el;
-            const next = createImage(sourceKey);
+            const next = createSource(sourceKey);
             el = next;
             if (prev) {
                 prev.replaceWith(next);
@@ -199,4 +224,12 @@ export const image: StoryObj<Args> = {
         backdrop: "image: jellyfish",
         params: { backdropScale: 1.6 },
     },
+};
+
+export const htmlText: StoryObj<Args> = {
+    args: { source: "HTML text", backdrop: "stripes" },
+};
+
+export const htmlButton: StoryObj<Args> = {
+    args: { source: "HTML button", backdrop: "grid" },
 };
