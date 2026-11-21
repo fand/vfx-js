@@ -16,6 +16,11 @@
     "./holo-static.js"
   ],
   "types": "lib/esm/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "holo/static": ["lib/esm/holo-static.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "require": {
