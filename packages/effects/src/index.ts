@@ -24,6 +24,7 @@ export { DitherEffect, type DitherParams, type DitherStyle } from "./dither.js";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone.js";
 export { FluidEffect, type FluidParams } from "./fluid.js";
 export {
+    type GlassDebugView,
     GlassEffect,
     type GlassEffectOptions,
     type GlassImageSource,
