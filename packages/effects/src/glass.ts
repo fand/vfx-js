@@ -25,6 +25,7 @@ import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
 import {
+    boxBlur1d,
     buildShape,
     GLSL_SD2,
     type ShapeData,
@@ -86,6 +87,14 @@ export type GlassParams = {
      * bulge has a crease along its middle.
      */
     bulgeWidth: number;
+    /**
+     * Height of a relief on the front cap, in the same units as `depth`,
+     * from the element's luminance: positive raises the bright parts,
+     * negative the dark ones (by sinking the bright ones). It makes a
+     * button's label or a photo's content show as shape. 0 is off. Read
+     * once with the silhouette, so a video gives a still relief.
+     */
+    relief: number;
 
     /** Index of refraction at the middle of the spectrum. */
     ior: number;
@@ -209,6 +218,7 @@ const DEFAULT_PARAMS: GlassParams = {
     bevelShape: "round",
     bulge: 0,
     bulgeWidth: 0.15,
+    relief: 0,
     ior: 1.5,
     dispersion: 0.12,
     paths: 2,
@@ -278,6 +288,12 @@ const BUMP_SLOPE = "0.6";
 const GLASS_MASK_LONG = 1024;
 const SMOOTH_RADIUS = 4;
 const SMOOTH_PASSES = 3;
+// Box blurs of the relief's height map, in mask px: glyph edges become a
+// short smooth ramp instead of a cliff, which bounds the slope too.
+const RELIEF_RADIUS = 3;
+const RELIEF_PASSES = 3;
+// A sunk relief keeps at least this share of the glass's thickness.
+const RELIEF_MIN_THICKNESS = 0.2;
 // Pitch wobble relative to the yaw wobble.
 const PITCH_WOBBLE = 0.3;
 
@@ -294,11 +310,19 @@ uniform float bulgeWidth;
 // 1 / the Lipschitz constant of the bulged field, 1 without a bulge: the
 // march steps are scaled by it so they cannot step through the caps.
 uniform float stepScale;
+// Relief of the front cap: \`relief\` times the height map in reliefTex
+// (r = height 0..1, gb = its gradient in world units), on the SDF's grid.
+uniform sampler2D reliefTex;
+uniform float relief;
+// The relief's share of the Lipschitz bound, <= 1: steps that may meet
+// the relief are scaled by it on top of stepScale.
+uniform float reliefScale;
 
 // The extrusion of a 2D sample s (from sd2) at depth z, with a bevel and
-// caps that rise by up to \`bulge\` away from the edge.
+// caps that rise by up to \`bulge\` away from the edge. hr is the relief
+// sample (height, gradient) under it, only read when relief != 0.
 // x = distance, yzw = unit gradient.
-vec4 extrude(vec3 s, float z) {
+vec4 extrude(vec3 s, vec3 hr, float z) {
     float sz = z >= 0.0 ? 1.0 : -1.0;
     // The cap: b = |z| - height, and its gradient (k * grad2, sz).
     float h = halfDepth;
@@ -311,6 +335,17 @@ vec4 extrude(vec3 s, float z) {
     }
     float b = abs(z) - h;
     vec3 gb = vec3(s.yz * k, sz);
+    bool tilted = k > 0.0;
+    if (relief != 0.0) {
+        // Only the front cap carries the relief; the nearer cap wins.
+        float bf = z - h - relief * hr.x;
+        float bb = -z - h;
+        b = max(bf, bb);
+        gb = bf >= bb
+            ? vec3(s.yz * k - relief * hr.yz, 1.0)
+            : vec3(s.yz * k, -1.0);
+        tilted = true;
+    }
     if (bevelShape == 1) {
         // Chamfer: a 45° plane across the corner. Hard edges on purpose.
         float c = (s.x + b + rounding) * 0.7071;
@@ -320,22 +355,40 @@ vec4 extrude(vec3 s, float z) {
         if (s.x > b) {
             return vec4(s.x, s.yz, 0.0);
         }
-        return vec4(b, k > 0.0 ? normalize(gb) : gb);
+        return vec4(b, tilted ? normalize(gb) : gb);
     }
     vec2 w = vec2(s.x + rounding, b + rounding);
     if (w.x > 0.0 && w.y > 0.0) {
         float l = length(w);
         vec3 g = vec3(s.yz * w.x, 0.0) + gb * w.y;
-        return vec4(l - rounding, k > 0.0 ? normalize(g) : g / l);
+        return vec4(l - rounding, tilted ? normalize(g) : g / l);
     }
     if (w.x > w.y) {
         return vec4(w.x - rounding, s.yz, 0.0);
     }
-    return vec4(w.y - rounding, k > 0.0 ? normalize(gb) : gb);
+    return vec4(w.y - rounding, tilted ? normalize(gb) : gb);
+}
+
+vec3 reliefAt(vec2 p) {
+    return texture(reliefTex, (p - sdfRect.xy) / sdfRect.zw).rgb;
 }
 
 vec4 sdf3(vec3 p) {
-    return extrude(sd2(p.xy), p.z);
+    vec3 s = sd2(p.xy);
+    if (relief == 0.0) {
+        return extrude(s, vec3(0.0), p.z);
+    }
+    vec4 e = extrude(s, reliefAt(p.xy), p.z);
+    // Steep relief needs short steps, but only near it. Two lower bounds
+    // on the distance: the field scaled by the relief's Lipschitz share,
+    // and the distance to the shape with the cap at its outermost plane
+    // (outside) or innermost plane (inside), which has no relief slope.
+    // The larger one is safe; far from the relief it is the plane's.
+    bool out_ = e.x > 0.0;
+    float hEnv = out_ == (relief > 0.0) ? 1.0 : 0.0;
+    float env = extrude(s, vec3(hEnv, 0.0, 0.0), p.z).x;
+    e.x = out_ ? max(env, e.x * reliefScale) : min(env, e.x * reliefScale);
+    return e;
 }
 
 uniform vec2 sdfSize;
@@ -521,14 +574,10 @@ vec3 spectral(float t) {
     return max(1.0 - abs(t - vec3(1.0, 3.0, 5.0) / 6.0) * 3.0, 0.0);
 }
 
-// sd2 with a bicubic (B-spline) filter, in 4 bilinear taps. The stored
-// gradient is only piecewise linear between texels, which shows as
-// streaks once it bends light; this one is smooth.
-vec3 sd2Smooth(vec2 p) {
-    vec2 uv = (p - sdfRect.xy) / sdfRect.zw;
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
-        return sd2(p);
-    }
+// A bicubic (B-spline) filtered lookup of a texture on the SDF's grid,
+// in 4 bilinear taps. Stored gradients are only piecewise linear between
+// texels, which shows as streaks once they bend light; these are smooth.
+vec4 bicubic(sampler2D tex, vec2 uv) {
     vec2 st = uv * sdfSize - 0.5;
     vec2 i = floor(st);
     vec2 f = st - i;
@@ -540,17 +589,29 @@ vec3 sd2Smooth(vec2 p) {
     vec2 g1 = w2 + w3;
     vec2 h0 = (i - 0.5 + w1 / g0) / sdfSize;
     vec2 h1 = (i + 1.5 + w3 / g1) / sdfSize;
-    vec4 s = (texture(sdfTex, vec2(h0.x, h0.y)) * g0.x
-            + texture(sdfTex, vec2(h1.x, h0.y)) * g1.x) * g0.y
-        + (texture(sdfTex, vec2(h0.x, h1.y)) * g0.x
-            + texture(sdfTex, vec2(h1.x, h1.y)) * g1.x) * g1.y;
+    return (texture(tex, vec2(h0.x, h0.y)) * g0.x
+            + texture(tex, vec2(h1.x, h0.y)) * g1.x) * g0.y
+        + (texture(tex, vec2(h0.x, h1.y)) * g0.x
+            + texture(tex, vec2(h1.x, h1.y)) * g1.x) * g1.y;
+}
+
+// sd2, bicubic filtered.
+vec3 sd2Smooth(vec2 p) {
+    vec2 uv = (p - sdfRect.xy) / sdfRect.zw;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+        return sd2(p);
+    }
+    vec4 s = bicubic(sdfTex, uv);
     float gl = length(s.gb);
     return vec3(s.r, gl > 1e-5 ? s.gb / gl : vec2(0.0, 1.0));
 }
 
 // The surface normal at p, for a ray along d that meets it there.
 vec3 normalAt(vec3 p, vec3 d) {
-    vec3 n = extrude(sd2Smooth(p.xy), p.z).yzw;
+    vec3 hr = relief != 0.0
+        ? bicubic(reliefTex, (p.xy - sdfRect.xy) / sdfRect.zw).rgb
+        : vec3(0.0);
+    vec3 n = extrude(sd2Smooth(p.xy), hr, p.z).yzw;
     if (bump <= 0.0) {
         return n;
     }
@@ -586,7 +647,7 @@ vec4 heat(float n) {
 
 // Slab test against the shape's bounding box. x = near, y = far.
 vec2 boundsHit(vec3 ro, vec3 rd) {
-    vec3 b = vec3(shapeHalf + 0.01, halfDepth + bulge + 0.01);
+    vec3 b = vec3(shapeHalf + 0.01, halfDepth + bulge + max(relief, 0.0) + 0.01);
     vec3 inv = 1.0 / rd;
     vec3 t0 = (-b - ro) * inv;
     vec3 t1 = (b - ro) * inv;
@@ -906,6 +967,105 @@ void main() {
 }
 `;
 
+// The SDF, plus the relief's height map on the same grid.
+type GlassShape = ShapeData & {
+    /** RGBA: height 0..1, its gradient in world units, 0. */
+    relief: Float32Array;
+    /** Largest length of the relief's gradient, in world units. */
+    reliefMaxGrad: number;
+};
+
+/**
+ * The relief's height map from the captured RGBA pixels (bottom-up rows,
+ * premultiplied): luminance, so 0 where alpha is 0, blurred, on the grid
+ * of `shape`'s SDF.
+ */
+function buildRelief(
+    pixels: Uint8Array | Float32Array,
+    mw: number,
+    mh: number,
+    shape: ShapeData,
+): Pick<GlassShape, "relief" | "reliefMaxGrad"> {
+    const scale = pixels instanceof Float32Array ? 1 : 1 / 255;
+    const W = shape.sdfW;
+    const H = shape.sdfH;
+    const pad = Math.round((W - mw) / 2);
+    const h = new Float32Array(W * H);
+    for (let y = 0; y < mh; y++) {
+        for (let x = 0; x < mw; x++) {
+            const i = (y * mw + x) * 4;
+            const l =
+                0.2126 * pixels[i] +
+                0.7152 * pixels[i + 1] +
+                0.0722 * pixels[i + 2];
+            h[(y + pad) * W + x + pad] = Math.min(Math.max(l * scale, 0), 1);
+        }
+    }
+    const line = new Float32Array(Math.max(W, H));
+    for (let pass = 0; pass < RELIEF_PASSES; pass++) {
+        for (let y = 0; y < H; y++) {
+            boxBlur1d(h, y * W, 1, W, RELIEF_RADIUS, line);
+        }
+        for (let x = 0; x < W; x++) {
+            boxBlur1d(h, x, W, H, RELIEF_RADIUS, line);
+        }
+    }
+    // Central differences, in height per world unit.
+    const inv = 1 / (2 * (shape.sdfRect[2] / W));
+    const out = new Float32Array(W * H * 4);
+    let maxGrad = 0;
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const i = y * W + x;
+            const gx =
+                (h[y * W + Math.min(x + 1, W - 1)] -
+                    h[y * W + Math.max(x - 1, 0)]) *
+                inv;
+            const gy =
+                (h[Math.min(y + 1, H - 1) * W + x] -
+                    h[Math.max(y - 1, 0) * W + x]) *
+                inv;
+            out[i * 4] = h[i];
+            out[i * 4 + 1] = gx;
+            out[i * 4 + 2] = gy;
+            maxGrad = Math.max(maxGrad, Math.hypot(gx, gy));
+        }
+    }
+    return { relief: out, reliefMaxGrad: maxGrad };
+}
+
+// A linearly filtered RGBA16F texture from float data. Half float so it
+// can be filtered linearly everywhere.
+function uploadFloatTexture(
+    gl: WebGL2RenderingContext,
+    w: number,
+    h: number,
+    data: Float32Array,
+): WebGLTexture | null {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA16F,
+        w,
+        h,
+        0,
+        gl.RGBA,
+        gl.FLOAT,
+        data,
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return tex;
+}
+
 type BackdropElement = Exclude<GlassImageSource, string>;
 
 // Native size of a backdrop element; 0 while a video has no frame.
@@ -934,12 +1094,12 @@ function hexToRgb(hex: string): [number, number, number] {
     return [r, g, b];
 }
 
-// Lipschitz constant of the bulged field: the cap's gradient is
-// (k * grad2, 1) with k up to 2 * bulge / bulgeWidth, and the bevel mixes
-// it with the side's (grad2, 0). The worst mix is the largest singular
-// value of [[1, k], [0, 1]], a little above sqrt(1 + k^2).
-function bulgeLipschitz(bulge: number, bulgeWidth: number): number {
-    const k = (2 * bulge) / bulgeWidth;
+// Lipschitz constant of a field whose cap has slope up to k: the cap's
+// gradient is (k * grad2, 1), k = 2 * bulge / bulgeWidth plus the
+// relief's slope, and the bevel mixes it with the side's (grad2, 0). The
+// worst mix is the largest singular value of [[1, k], [0, 1]], a little
+// above sqrt(1 + k^2).
+function capLipschitz(k: number): number {
     return Math.sqrt((2 + k * k + k * Math.sqrt(k * k + 4)) / 2);
 }
 
@@ -973,8 +1133,8 @@ export class GlassEffect implements Effect {
 
     #phase: Phase = "capture";
     #srcFrames = 0;
-    #pending: ShapeData | null = null;
-    #shape: ShapeData | null = null;
+    #pending: GlassShape | null = null;
+    #shape: GlassShape | null = null;
     #mask: EffectRenderTarget | null = null;
     #scene: EffectRenderTarget | null = null;
     #ldr: EffectRenderTarget | null = null;
@@ -982,6 +1142,8 @@ export class GlassEffect implements Effect {
     #gl: WebGL2RenderingContext | null = null;
     #sdfRaw: WebGLTexture | null = null;
     #sdfTex: EffectTexture | null = null;
+    #reliefRaw: WebGLTexture | null = null;
+    #reliefTex: EffectTexture | null = null;
 
     // The backdrop image, and the param value it was loaded from.
     #image: EffectTexture | null = null;
@@ -1024,6 +1186,8 @@ export class GlassEffect implements Effect {
             this.#gl = ctx.gl;
             this.#sdfRaw = null;
             this.#sdfTex = null;
+            this.#reliefRaw = null;
+            this.#reliefTex = null;
             this.#pending = this.#shape;
             this.#backdropDirty = true;
         });
@@ -1174,6 +1338,18 @@ export class GlassEffect implements Effect {
         const halfDepth = Math.max(p.depth / 2, 0.005);
         const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
         const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
+        const bulgeSlope = bulge > 0 ? (2 * bulge) / bulgeWidth : 0;
+        // A sunk relief must keep the front cap above the back one. UI
+        // sliders leave remainders like 5e-17; those count as 0, so the
+        // default path stays exact.
+        const relief =
+            Number.isFinite(p.relief) && Math.abs(p.relief) > 1e-6
+                ? Math.max(
+                      p.relief,
+                      -2 * halfDepth * (1 - RELIEF_MIN_THICKNESS),
+                  )
+                : 0;
+        const reliefSlope = Math.abs(relief) * shape.reliefMaxGrad;
         const image = isPattern(p.backdrop) ? null : this.#backdropMip;
         // An image that is still loading shows as black.
         const mode = isPattern(p.backdrop)
@@ -1193,8 +1369,12 @@ export class GlassEffect implements Effect {
                 bevelShape: BEVEL_SHAPES[p.bevelShape] ?? 0,
                 bulge,
                 bulgeWidth,
-                stepScale:
-                    bulge > 0 ? 1 / bulgeLipschitz(bulge, bulgeWidth) : 1,
+                stepScale: bulge > 0 ? 1 / capLipschitz(bulgeSlope) : 1,
+                reliefTex: this.#reliefTex ?? sdfTex,
+                relief,
+                reliefScale:
+                    capLipschitz(bulgeSlope) /
+                    capLipschitz(bulgeSlope + reliefSlope),
                 shapeHalf: shape.shapeHalf,
                 viewRot: viewMatrix(yaw, pitch),
                 camDist,
@@ -1225,7 +1405,7 @@ export class GlassEffect implements Effect {
                 backdropScale: p.backdropScale,
                 backdropDistance: Math.max(
                     p.backdropDistance,
-                    halfDepth + bulge,
+                    halfDepth + bulge + Math.max(relief, 0),
                 ),
                 backdropOffset: t * p.backdropSpeed,
                 backdropA: hexToRgb(p.backdropColors[0]),
@@ -1280,7 +1460,10 @@ export class GlassEffect implements Effect {
                     SMOOTH_PASSES,
                 );
                 if (shape) {
-                    this.#pending = shape;
+                    this.#pending = {
+                        ...shape,
+                        ...buildRelief(px, mw, mh, shape),
+                    };
                 } else {
                     // Nothing drawn yet: try again on a later frame.
                     this.#srcFrames = 0;
@@ -1291,43 +1474,43 @@ export class GlassEffect implements Effect {
         );
     }
 
-    #upload(ctx: EffectContext, shape: ShapeData): void {
+    #upload(ctx: EffectContext, shape: GlassShape): void {
         const gl = ctx.gl;
         if (this.#sdfRaw) {
             gl.deleteTexture(this.#sdfRaw);
         }
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-        // Half float so it can be filtered linearly everywhere.
-        const sdf = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, sdf);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA16F,
+        if (this.#reliefRaw) {
+            gl.deleteTexture(this.#reliefRaw);
+        }
+        this.#sdfRaw = null;
+        this.#sdfTex = null;
+        this.#reliefRaw = null;
+        this.#reliefTex = null;
+        const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
+        const rel = uploadFloatTexture(
+            gl,
             shape.sdfW,
             shape.sdfH,
-            0,
-            gl.RGBA,
-            gl.FLOAT,
-            shape.sdf,
+            shape.relief,
         );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.bindTexture(gl.TEXTURE_2D, null);
         ctx.resetState();
-        if (!sdf) {
-            return;
+        const size = [shape.sdfW, shape.sdfH] as const;
+        if (sdf) {
+            this.#sdfRaw = sdf;
+            this.#sdfTex = ctx.wrapTexture(sdf, {
+                size,
+                filter: "linear",
+                wrap: "clamp",
+            });
         }
-        this.#sdfRaw = sdf;
-        this.#sdfTex = ctx.wrapTexture(sdf, {
-            size: [shape.sdfW, shape.sdfH],
-            filter: "linear",
-            wrap: "clamp",
-        });
+        if (rel) {
+            this.#reliefRaw = rel;
+            this.#reliefTex = ctx.wrapTexture(rel, {
+                size,
+                filter: "linear",
+                wrap: "clamp",
+            });
+        }
     }
 
     // Load the backdrop image when `backdrop` changes to a new one.
@@ -1413,6 +1596,11 @@ export class GlassEffect implements Effect {
         if (this.#gl && this.#sdfRaw) {
             this.#gl.deleteTexture(this.#sdfRaw);
         }
+        if (this.#gl && this.#reliefRaw) {
+            this.#gl.deleteTexture(this.#reliefRaw);
+        }
+        this.#reliefRaw = null;
+        this.#reliefTex = null;
         this.#gl = null;
         this.#sdfRaw = null;
         this.#sdfTex = null;
