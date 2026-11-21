@@ -11,6 +11,7 @@ Add `SwirlParticlesEffect`: particles flow over the element's silhouette, extrud
 - Light: `lightDirection` (view space, towards the light, normalised internally), `lightColor`, `lightIntensity`, `ambient`, `occlusion` (crease darkening) and `glint`.
 - `shadow: true` casts a soft drop shadow onto the page, a plane parallel to the screen behind the shape, from the same light. Tune it with `shadowOpacity`, `shadowSoftness` (CSS px), `shadowDistance` (world units) and `shadowColor`. Off by default.
 - Camera: `yaw`, `pitch`, `orbit` (wobble amplitude), `fov` and `zoom`. Set `drag: true` to orbit it with pointer drags.
+- `mouse: "repel"` pushes particles away from the cursor (`mouseRadius` in CSS px, `mouseStrength`); `mouse: "tilt"` turns the shape to face it. Off (`"none"`) by default.
 - Output is premultiplied over transparency, in `pad` CSS px around the element or `"fullscreen"` (default).
 - `antialias: true` smooths the fibres' edges with 4× MSAA, at about 5× the memory of the particle buffer (10× with its depth). Off by default.
 - `new SwirlParticlesEffect(params, { still: true })` renders one still frame.

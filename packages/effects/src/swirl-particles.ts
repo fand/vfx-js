@@ -220,6 +220,33 @@ export type SwirlParticlesParams = {
      */
     drag: boolean;
     /**
+     * How the particles react to the pointer hovering over the page:
+     *
+     * - `"none"` (default): they don't.
+     * - `"repel"`: particles near the cursor on screen (within
+     *   {@link mouseRadius}) are pushed away from it, opening a hole the
+     *   flow goes around. The hole stays while the pointer rests and
+     *   refills once it leaves the page.
+     * - `"tilt"`: hover parallax. The shape turns to face the cursor,
+     *   up to about 0.35 rad × {@link mouseStrength} when the cursor is
+     *   half a viewport away from the element's centre, and back to
+     *   front-on once the pointer leaves the page. Adds to
+     *   {@link yaw} / {@link pitch}, the {@link orbit} wobble and drags.
+     *
+     * Both ease in and out. Ignored by still frames. While not `"none"`,
+     * it listens on `window` to tell when the pointer leaves the page.
+     */
+    mouse: "none" | "repel" | "tilt";
+    /** Radius of the `"repel"` hole, in CSS px on screen. */
+    mouseRadius: number;
+    /**
+     * Strength of the pointer interaction. `"repel"`: scales the push;
+     * at 1 the hole opens to about {@link mouseRadius} at the default
+     * `speed`. `"tilt"`: scales the largest tilt angle (about 0.35 rad
+     * at 1).
+     */
+    mouseStrength: number;
+    /**
      * Extra pad around the element in CSS px for the particles and bloom
      * to draw into, or `"fullscreen"` to draw over the whole canvas. Wisps
      * and a tilted shape reach well outside the element, so a small pad
@@ -281,6 +308,9 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     fov: 35,
     zoom: 1.0,
     drag: false,
+    mouse: "none",
+    mouseRadius: 120,
+    mouseStrength: 1,
     pad: "fullscreen",
     antialias: false,
 };
@@ -319,6 +349,16 @@ const SHADOW_MAX_SIGMA = 6;
 // average hides them, at the cost of the shadow trailing a fast move.
 const SHADOW_TAU = 0.1;
 const DEFAULT_LIGHT: readonly [number, number, number] = [-0.45, 0.75, 0.55];
+// Pointer interaction (`mouse`). Seconds for the force to fade in / out.
+const MOUSE_FADE = 0.15;
+// Time constant of the smoothed cursor that "repel" pushes from, seconds.
+const REPEL_POS_TAU = 0.06;
+// Push speed at the cursor, in radii (at the particle's depth) per second,
+// at mouseStrength 1.
+const REPEL_K = 4;
+// Largest tilt at mouseStrength 1, radians, and its time constant.
+const TILT_MAX = 0.35;
+const TILT_TAU = 0.25;
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -471,6 +511,15 @@ uniform float curlScale;
 uniform float speed;
 uniform float attract;
 uniform float peel;
+// Pointer repel: strength × fade (0 = off), the smoothed cursor and the
+// radius in buffer px, and the camera that draws the particles.
+uniform float mouseForce;
+uniform vec2 mousePx;
+uniform float mouseRadiusPx;
+uniform mat3 viewRot;
+uniform float camDist;
+uniform float focalPx;
+uniform vec2 centerPx;
 
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outVel;
@@ -551,6 +600,27 @@ void main() {
     vec3 target = speed * (sw * swirl * mix(0.5, 1.0, near) + cuT * curl)
                 - n * d * attract * hold
                 + n * speed * 0.8 * (1.0 - hold);
+
+    // Repel: measured on screen, with the camera that draws the particle,
+    // pushed in the view plane. The push is in radii (at the particle's
+    // depth) per second, so the hole is the same on any element size.
+    if (mouseForce > 0.0) {
+        vec3 qv = viewRot * p;
+        float depth = camDist - qv.z;
+        if (depth > 1e-3) {
+            vec2 dd = centerPx + qv.xy * focalPx / depth - mousePx;
+            float r = length(dd) / mouseRadiusPx;
+            if (r < 1.0) {
+                float f = 1.0 - r * r;
+                f *= f;
+                float a = rnd(id * 97u + 1u) * 6.2831853;
+                vec2 dir = r > 1e-3 ? dd / (r * mouseRadiusPx) : vec2(cos(a), sin(a));
+                float radiusW = mouseRadiusPx * depth / focalPx;
+                // Inverse rotation: view plane → world.
+                target += (vec3(dir, 0.0) * viewRot) * (mouseForce * ${REPEL_K.toFixed(1)} * radiusW * f);
+            }
+        }
+    }
 
     v = mix(v, target, 1.0 - exp(-dt * 5.0));
     p += v * dt;
@@ -1458,6 +1528,14 @@ function trailGeometry(instanceCount: number): EffectGeometry {
     };
 }
 
+function clamp(x: number, lo: number, hi: number): number {
+    return Math.min(Math.max(x, lo), hi);
+}
+
+function finiteOr(x: number, fallback: number): number {
+    return Number.isFinite(x) ? x : fallback;
+}
+
 function smoothstep(e0: number, e1: number, x: number): number {
     const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
     return t * t * (3 - 2 * t);
@@ -1584,6 +1662,18 @@ export class SwirlParticlesEffect implements Effect {
     #lastPointer: [number, number] = [0, 0];
     #unlisten: (() => void) | null = null;
     #unsubRestored: (() => void) | null = null;
+
+    // Pointer interaction (`mouse`). The core has no "pointer left"
+    // signal, so #pointerIn comes from window listeners, added the first
+    // time `mouse` is not "none".
+    #pointerIn = false;
+    #unlistenHover: (() => void) | null = null;
+    // Smoothed repel cursor, element-local physical px, and the fade.
+    #repelPos: [number, number] = [0, 0];
+    #repelAmount = 0;
+    // Smoothed tilt offsets, radians.
+    #tiltYaw = 0;
+    #tiltPitch = 0;
 
     constructor(
         initial: Partial<SwirlParticlesParams> = {},
@@ -1743,6 +1833,7 @@ export class SwirlParticlesEffect implements Effect {
             this.#paletteTex;
         let shadow: { tex: EffectRenderTarget; amount: number } | null = null;
         if (ready) {
+            this.#updateMouse(ctx);
             this.#simulate(ctx);
             shadow = this.#drawParticles(ctx, scene);
             this.#drawBloom(ctx, scene);
@@ -1963,6 +2054,129 @@ export class SwirlParticlesEffect implements Effect {
         return uniforms;
     }
 
+    #listenHover(): void {
+        if (this.#unlistenHover || typeof window === "undefined") {
+            return;
+        }
+        // A move inside the viewport means the pointer is over the page;
+        // leaving the document (relatedTarget null: out of the window,
+        // or a touch that ended) or losing focus means it is gone.
+        const move = (e: PointerEvent) => {
+            this.#pointerIn =
+                e.clientX >= 0 &&
+                e.clientY >= 0 &&
+                e.clientX < window.innerWidth &&
+                e.clientY < window.innerHeight;
+        };
+        const out = (e: PointerEvent) => {
+            if (!e.relatedTarget) {
+                this.#pointerIn = false;
+            }
+        };
+        const blur = () => {
+            this.#pointerIn = false;
+        };
+        window.addEventListener("pointermove", move, { passive: true });
+        window.addEventListener("pointerout", out, { passive: true });
+        window.addEventListener("blur", blur);
+        this.#unlistenHover = () => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerout", out);
+            window.removeEventListener("blur", blur);
+        };
+    }
+
+    // Once a frame: ease the repel force and the tilt towards what the
+    // pointer asks for. Frame-rate independent.
+    #updateMouse(ctx: EffectContext): void {
+        const p = this.params;
+        const mode = this.#still ? "none" : p.mouse;
+        if (mode === "repel" || mode === "tilt") {
+            this.#listenHover();
+        }
+        const dt = Math.min(Math.max(ctx.deltaTime, 0), 0.25);
+        const hover = this.#pointerIn && !this.#still;
+        const [mx, my] = ctx.mouse;
+
+        const repel = hover && mode === "repel";
+        if (repel) {
+            if (this.#repelAmount <= 0) {
+                // Appear under the cursor, not sweep in from where it left.
+                this.#repelPos = [mx, my];
+            } else {
+                const k = 1 - Math.exp(-dt / REPEL_POS_TAU);
+                this.#repelPos[0] += (mx - this.#repelPos[0]) * k;
+                this.#repelPos[1] += (my - this.#repelPos[1]) * k;
+            }
+        }
+        const step = dt / MOUSE_FADE;
+        this.#repelAmount = repel
+            ? Math.min(this.#repelAmount + step, 1)
+            : Math.max(this.#repelAmount - step, 0);
+
+        // Tilt: the cursor relative to the element's centre, over half the
+        // viewport. Positive yaw turns the front cap to the right,
+        // positive pitch down, so the shape faces the cursor.
+        let yawT = 0;
+        let pitchT = 0;
+        if (hover && mode === "tilt") {
+            const [ew, eh] = ctx.dims.elementPixel;
+            const pr = ctx.pixelRatio;
+            const vw =
+                typeof window !== "undefined"
+                    ? window.innerWidth * pr
+                    : ctx.dims.canvasPixel[0];
+            const vh =
+                typeof window !== "undefined"
+                    ? window.innerHeight * pr
+                    : ctx.dims.canvasPixel[1];
+            const nx = clamp((mx - ew / 2) / Math.max(vw / 2, 1), -1, 1);
+            const ny = clamp((my - eh / 2) / Math.max(vh / 2, 1), -1, 1);
+            const max = TILT_MAX * Math.max(finiteOr(p.mouseStrength, 0), 0);
+            yawT = max * nx;
+            pitchT = -max * ny;
+        }
+        const k = 1 - Math.exp(-dt / TILT_TAU);
+        this.#tiltYaw += (yawT - this.#tiltYaw) * k;
+        this.#tiltPitch += (pitchT - this.#tiltPitch) * k;
+    }
+
+    // Camera: base angles, a slow wobble, pointer drag and tilt.
+    #camera(ctx: EffectContext): {
+        viewRot: number[];
+        camDist: number;
+        focalPx: number;
+        centerPx: [number, number];
+        origin: readonly [number, number];
+    } {
+        const p = this.params;
+        const t = this.#simTime;
+        const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
+        const yaw =
+            p.yaw + orbit * Math.sin(t * 0.13) + this.#dragYaw + this.#tiltYaw;
+        const pitch =
+            p.pitch +
+            orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
+            this.#dragPitch +
+            this.#tiltPitch;
+
+        // Distance so that the long side (2 world units) spans `fov`.
+        const fov = Math.min(Math.max(p.fov, 1), 150);
+        const camDist = 1 / Math.tan((fov * Math.PI) / 360);
+
+        const dims = ctx.dims;
+        const [ew, eh] = dims.elementPixel;
+        const [ox, oy] = padOutputRect(p.pad, dims);
+        const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
+        return {
+            viewRot: viewMatrix(yaw, pitch),
+            camDist,
+            focalPx: camDist * unitPx,
+            centerPx: [ew / 2 - ox, eh / 2 - oy],
+            origin: [ox, oy],
+        };
+    }
+
     #simulate(ctx: EffectContext): void {
         const pos = this.#pos;
         const vel = this.#vel;
@@ -1990,6 +2204,7 @@ export class SwirlParticlesEffect implements Effect {
             speed: p.speed,
             attract: p.attract,
             peel: p.peel,
+            ...this.#repelUniforms(ctx),
         };
         if (this.#needsReset) {
             ctx.draw({
@@ -2025,6 +2240,26 @@ export class SwirlParticlesEffect implements Effect {
             this.#pushHistory(ctx, pos);
         }
         this.#stillDone = true;
+    }
+
+    // Sim uniforms for "repel": the cursor in buffer px and the camera.
+    #repelUniforms(ctx: EffectContext): EffectUniforms {
+        const strength = Math.max(finiteOr(this.params.mouseStrength, 0), 0);
+        const radius = Math.max(finiteOr(this.params.mouseRadius, 0), 0);
+        const force = this.#repelAmount * strength;
+        const cam = this.#camera(ctx);
+        return {
+            mouseForce: radius > 0 ? force : 0,
+            mousePx: [
+                this.#repelPos[0] - cam.origin[0],
+                this.#repelPos[1] - cam.origin[1],
+            ],
+            mouseRadiusPx: Math.max(radius * ctx.pixelRatio, 1),
+            viewRot: cam.viewRot,
+            camDist: cam.camDist,
+            focalPx: cam.focalPx,
+            centerPx: cam.centerPx,
+        };
     }
 
     // Mark every history slot stale: an age no particle can have.
@@ -2119,33 +2354,18 @@ export class SwirlParticlesEffect implements Effect {
         }
         const p = this.params;
         const t = this.#simTime;
-
-        // Camera: base angles, a slow wobble, and pointer drag.
-        const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
-        const yaw = p.yaw + orbit * Math.sin(t * 0.13) + this.#dragYaw;
-        const pitch =
-            p.pitch +
-            orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
-            this.#dragPitch;
-
-        // Distance so that the long side (2 world units) spans `fov`.
-        const fov = Math.min(Math.max(p.fov, 1), 150);
-        const camDist = 1 / Math.tan((fov * Math.PI) / 360);
-
-        const dims = ctx.dims;
-        const [ew, eh] = dims.elementPixel;
-        const [ox, oy] = padOutputRect(p.pad, dims);
-        const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
+        const cam = this.#camera(ctx);
+        const camDist = cam.camDist;
         const uniforms = {
             ...this.#shapeUniforms(),
             posTex: pos,
             velTex: vel,
-            viewRot: viewMatrix(yaw, pitch),
+            viewRot: cam.viewRot,
             camDist,
             camNear: camDist * NEAR_K,
             camFar: camDist * FAR_K,
-            focalPx: camDist * unitPx,
-            centerPx: [ew / 2 - ox, eh / 2 - oy] as [number, number],
+            focalPx: cam.focalPx,
+            centerPx: cam.centerPx,
             bufferPx: [scene.width, scene.height] as [number, number],
             pointPx: p.pointSize * ctx.pixelRatio,
             time: t,
@@ -2426,6 +2646,8 @@ export class SwirlParticlesEffect implements Effect {
     dispose(): void {
         this.#unlisten?.();
         this.#unlisten = null;
+        this.#unlistenHover?.();
+        this.#unlistenHover = null;
         if (this.#gl) {
             for (const tex of [
                 this.#sdfRaw,

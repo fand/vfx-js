@@ -51,11 +51,13 @@ const BACKDROP = [
 ].join(", ");
 
 // Base setup of the stories: front-on (the default `orbit` wobble still
-// turns it a little), drag to orbit, and a drop shadow on the backdrop.
+// turns it a little), drag to orbit, the cursor repels the particles, and
+// a drop shadow on the backdrop.
 const STORY_VIEW: Partial<SwirlParticlesParams> = {
     yaw: 0,
     pitch: 0,
     drag: true,
+    mouse: "repel",
     shadow: true,
 };
 

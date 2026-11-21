@@ -946,6 +946,13 @@ export function attachSwirlParticlesPane(
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");
 
+    const mouse = pane.addFolder({ title: "Mouse" });
+    bind(mouse, "mouse", {
+        options: { none: "none", repel: "repel", tilt: "tilt" },
+    });
+    bind(mouse, "mouseRadius", range(10, 400, 1));
+    bind(mouse, "mouseStrength", range(0, 3, 0.01));
+
     // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
     const padState = {
         fullscreen: params.pad === "fullscreen",
