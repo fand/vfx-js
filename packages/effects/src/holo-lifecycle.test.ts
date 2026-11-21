@@ -414,6 +414,45 @@ describe("HoloEffect loads a material's code on first use", () => {
     });
 });
 
+/** A worker that answers at once with a 1 × 1 result, so the logo and paper builds finish. */
+function stubAnsweringWorker() {
+    vi.stubGlobal(
+        "Worker",
+        class {
+            onmessage: ((e: { data: unknown }) => void) | null = null;
+            postMessage(d: { id: number }) {
+                setTimeout(() =>
+                    this.onmessage?.({
+                        data: {
+                            id: d.id,
+                            r: {
+                                levels: [
+                                    {
+                                        w: 1,
+                                        h: 1,
+                                        mom: new Uint16Array(4),
+                                        aux: new Uint16Array(4),
+                                    },
+                                ],
+                            },
+                        },
+                    }),
+                );
+            }
+            terminate() {}
+        },
+    );
+}
+
+/** A promise with its resolve. */
+function deferred<T>() {
+    let resolve: (v: T) => void = () => {};
+    const promise = new Promise<T>((r) => {
+        resolve = r;
+    });
+    return { promise, resolve };
+}
+
 describe("HoloEffect when loading fails or is cut short", () => {
     test("a material that fails to load warns once, settles ready, and the scene still updates", async () => {
         // sparkle is not used elsewhere in this file: make its chunk fail
@@ -452,33 +491,7 @@ describe("HoloEffect when loading fails or is cut short", () => {
     });
 
     test("ready settles after emboss.logo leaves the element while its readback is pending", async () => {
-        // a worker that answers at once with a 1 × 1 result, so the paper maps finish
-        vi.stubGlobal(
-            "Worker",
-            class {
-                onmessage: ((e: { data: unknown }) => void) | null = null;
-                postMessage(d: { id: number }) {
-                    setTimeout(() =>
-                        this.onmessage?.({
-                            data: {
-                                id: d.id,
-                                r: {
-                                    levels: [
-                                        {
-                                            w: 1,
-                                            h: 1,
-                                            mom: new Uint16Array(4),
-                                            aux: new Uint16Array(4),
-                                        },
-                                    ],
-                                },
-                            },
-                        }),
-                    );
-                }
-                terminate() {}
-            },
-        );
+        stubAnsweringWorker();
         // the element reads as blank: the readback keeps retrying
         const { ctx, readPixels } = makeCtx({
             w: 2,
@@ -500,6 +513,84 @@ describe("HoloEffect when loading fails or is cut short", () => {
             await tick();
         }
         expect(await settled(ready)).toBe("ready");
+    });
+
+    test("an emboss.print that fails to load warns once, prints nothing, and settles ready", async () => {
+        stubAnsweringWorker();
+        vi.stubGlobal(
+            "Image",
+            class {
+                crossOrigin = "";
+                src = "";
+                decode() {
+                    return Promise.reject(new Error("404"));
+                }
+            },
+        );
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { ctx, draws } = makeCtx();
+        const fx = new HoloEffect({
+            material: "emboss",
+            settings: { "emboss.print": "/missing.png" },
+        });
+        await fx.init?.(ctx);
+        const ready = fx.ready;
+        for (let i = 0; i < 5; i++) {
+            frame(fx, ctx);
+            await tick();
+        }
+        expect(
+            fx.errors.some((e) => e.includes("emboss.print /missing.png")),
+        ).toBe(true);
+        expect(
+            warn.mock.calls.filter((c) => String(c[0]).includes("emboss.print"))
+                .length,
+        ).toBe(1);
+        expect(printOn(draws)).toBe(0); // not the element instead
+        expect(await settled(ready)).toBe("ready");
+    });
+
+    test("a readPixels that rejects is tried again on the next frame", async () => {
+        const { ctx, readPixels } = makeCtx();
+        readPixels.mockImplementationOnce(() =>
+            Promise.reject(new Error("context lost")),
+        );
+        const fx = new HoloEffect({
+            material: "emboss",
+            settings: { "emboss.logo": "element" },
+        });
+        await fx.init?.(ctx);
+        frame(fx, ctx);
+        await tick();
+        expect(readPixels).toHaveBeenCalledTimes(1);
+        frame(fx, ctx);
+        expect(readPixels).toHaveBeenCalledTimes(2);
+    });
+
+    test("a restore during a readback reads the element again and drops the late result", async () => {
+        const { ctx, readPixels, restore } = makeCtx({ w: 2, h: 2 });
+        const first = deferred<Uint8Array>();
+        const second = deferred<Uint8Array>();
+        readPixels
+            .mockImplementationOnce(() => first.promise)
+            .mockImplementationOnce(() => second.promise);
+        const fx = new HoloEffect({
+            material: "emboss",
+            settings: { "emboss.logo": "element" },
+        });
+        await fx.init?.(ctx);
+        frame(fx, ctx);
+        expect(readPixels).toHaveBeenCalledTimes(1);
+        restore();
+        frame(fx, ctx);
+        expect(readPixels).toHaveBeenCalledTimes(2);
+        const reads = () => puts.filter((p) => p.w === 2 && p.h === 2).length;
+        first.resolve(new Uint8Array(16).fill(255));
+        await tick();
+        expect(reads()).toBe(0); // from before the restore: dropped
+        second.resolve(new Uint8Array(16).fill(255));
+        await tick();
+        expect(reads()).toBe(1);
     });
 
     test("an init that awaits across a dispose stops", async () => {
