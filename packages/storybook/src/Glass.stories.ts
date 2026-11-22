@@ -224,88 +224,11 @@ export const logo: StoryObj<Args> = {
     args: { source: "VFX-JS logo", backdrop: "stripes" },
 };
 
-export const amagi: StoryObj<Args> = {
-    args: { source: "amagi", backdrop: "grid" },
-};
-
-// Black world and box lights only, like a studio render.
-export const studio: StoryObj<Args> = {
-    args: {
-        source: "VFX-JS logo",
-        backdrop: "none",
-        params: { dispersion: 0.2, bounces: 4, lightIntensity: 3 },
-    },
-};
-
-// The channels split into bands instead of a smooth rainbow.
-export const bands: StoryObj<Args> = {
-    args: {
-        source: "amagi",
-        backdrop: "grid",
-        params: { paths: 3, samples: 3, dispersion: 0.2 },
-    },
-};
-
-export const image: StoryObj<Args> = {
-    args: {
-        source: "VFX-JS logo",
-        backdrop: "image: jellyfish",
-        params: { backdropScale: 1.6 },
-    },
-};
-
-// A rough surface: the image behind blurs with its distance.
-export const frosted: StoryObj<Args> = {
-    args: {
-        source: "VFX-JS logo",
-        backdrop: "image: jellyfish",
-        params: { backdropScale: 1.6, frost: 0.6, dispersion: 0.06 },
-    },
-};
-
-// Hammered glass: rippled normals on a deeper slab.
-export const bumpy: StoryObj<Args> = {
-    args: {
-        source: "amagi",
-        backdrop: "grid",
-        params: {
-            depth: 0.3,
-            bevel: 0.06,
-            bump: 0.5,
-            bumpScale: 0.12,
-            zoom: 1.2,
-        },
-    },
-};
-
-// Chamfered edges and caps that rise in the middle, like a cut stone.
-export const gem: StoryObj<Args> = {
-    args: {
-        source: "HTML button",
-        backdrop: "stripes",
-        params: {
-            depth: 0.12,
-            bevel: 0.05,
-            bevelShape: "chamfer",
-            bulge: 0.1,
-            bulgeWidth: 0.2,
-            dispersion: 0.2,
-            paths: 3,
-            zoom: 1.2,
-        },
-    },
-};
-
-// Contour bands of a noise field, like zebra marble.
-export const marble: StoryObj<Args> = {
-    args: { source: "VFX-JS logo", backdrop: "marble" },
-};
-
 // A soft holographic sheet: the pastel palette in wavering ribbons,
 // through dispersive, faceted glass.
 export const flow: StoryObj<Args> = {
     args: {
-        source: "VFX-JS logo",
+        source: "amagi",
         backdrop: "flow",
         params: {
             backdropColors: "pastel",
@@ -319,22 +242,6 @@ export const flow: StoryObj<Args> = {
     },
 };
 
-// Marble through a four-colour palette: the bands go round the colours.
-export const marblePalette: StoryObj<Args> = {
-    args: {
-        source: "VFX-JS logo",
-        backdrop: "marble",
-        params: {
-            backdropColors: ["#14142b", "#2f5bd3", "#f4efe4", "#e8553a"],
-            backdropSoftness: 0.1,
-        },
-    },
-};
-
-export const htmlText: StoryObj<Args> = {
-    args: { source: "HTML text", backdrop: "stripes" },
-};
-
 // The label shows as raised letters: a negative relief sinks the bright
 // button around them.
 export const htmlButton: StoryObj<Args> = {
@@ -342,21 +249,5 @@ export const htmlButton: StoryObj<Args> = {
         source: "HTML button",
         backdrop: "grid",
         params: { relief: -0.05 },
-    },
-};
-
-// A photo's light and dark parts as a relief on its slab.
-export const photoRelief: StoryObj<Args> = {
-    args: {
-        source: "slab (photo)",
-        backdrop: "stripes",
-        params: {
-            depth: 0.15,
-            relief: 0.08,
-            reliefBlur: 0.02,
-            yaw: 0.7,
-            pitch: 0.35,
-            zoom: 1.1,
-        },
     },
 };
