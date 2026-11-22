@@ -1,0 +1,14 @@
+---
+"@vfx-js/effects": minor
+---
+
+Add `SaberEffect`: electric lines and glow along the element's outline.
+
+- A jagged main line hugs the outline, and arcs (`lines`, 1 to 4) jump out from it and back. The glow has no seams, also in corners and between letters.
+- Shape: `amplitude`, `scale` and `thickness` in CSS px, `sharpness` (smooth bends to straight runs with kinks), `burst` (arcs everywhere or only in places).
+- Motion: `speed`, and `flicker` to snap the lines between shapes.
+- Light: `color`, `intensity`, `glow`, `glowFalloff`.
+- The outline comes from alpha, or from luminance with `edge: "luminance"` and `edgeThreshold`.
+- The outline is cached. Call `invalidate()` after `vfx.update()` changes the content but not the size, or set `dynamic: true` for video.
+- Draws outside the element, within `pad` CSS px (default 80) or `"fullscreen"`. `source: false` draws the light only.
+- New type: `SaberParams`.

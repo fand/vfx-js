@@ -1,3 +1,5 @@
+// Finds the outline once and caches it: distance and normal to the nearest contour point.
+// Each frame, pushes the outline along its normal by noise to draw thin lines, then blurs them into the glow.
 import type {
     Effect,
     EffectContext,
@@ -429,40 +431,43 @@ void main() {
 `;
 
 export type SaberParams = {
-    /** Glow color, CSS hex. */
+    /** Glow color, CSS hex. The core burns to white. */
     color: string;
-    /** Overall brightness. */
+    /** Overall brightness of the lines and glow. */
     intensity: number;
-    /** Core line width in CSS px. */
+    /** Width of the main line in CSS px. Arcs are thinner. */
     thickness: number;
-    /** How far the line jumps off the contour, in CSS px. */
+    /** How far the arcs reach from the outline, in CSS px. The main line moves less. */
     amplitude: number;
-    /** Size of the largest jags, in CSS px. */
+    /** Size of the largest jags, in CSS px. Smaller values give more kinks. */
     scale: number;
-    /** 0 = smooth wobble, 1 = sharp spikes. */
+    /** 0 = smooth bends, 1 = straight runs with sharp kinks. */
     sharpness: number;
-    /** 0 = even along the contour, 1 = bursts in places. */
+    /** 0 = arcs all along the outline, 1 = arcs only in a few places. */
     burst: number;
-    /** Animation rate. 0 = frozen. */
+    /** Animation rate. 0 freezes the lines. */
     speed: number;
-    /** 0 = smooth flow, 1 = bolts snap between shapes. */
+    /** 0 = lines flow smoothly, 1 = lines snap to new shapes many times a second. */
     flicker: number;
-    /** Number of lines, 1..4. */
+    /** Number of lines, 1..4: one main line plus arcs. */
     lines: number;
-    /** Glow brightness against the core. */
+    /** Glow brightness against the lines. */
     glow: number;
-    /** Glow reach, 0..1. */
+    /** Glow reach, 0..1. Near 0 is a tight halo, near 1 a long soft tail. */
     glowFalloff: number;
-    /** What the contour is taken from. */
+    /**
+     * What the outline is taken from.
+     * `"alpha"` for logos, text and cut-out images; `"luminance"` for photos and video.
+     */
     edge: "alpha" | "luminance";
     /** Cutoff on the edge value, 0..1. */
     edgeThreshold: number;
     /** Draw the element under the light. */
     source: boolean;
-    /** Rebuild the contour every frame, for video. */
+    /** Rebuild the outline every frame, for video and canvas. */
     dynamic: boolean;
     /**
-     * Room for the glow around the element, in CSS px.
+     * Room for the lines and glow around the element, in CSS px.
      * `"fullscreen"` fills the canvas.
      */
     pad: number | "fullscreen";
@@ -501,11 +506,22 @@ const DEFAULT_PARAMS: SaberParams = {
 };
 
 /**
- * Electric lines along the outline of an element.
+ * Electric lines along the outline of an element, with a glow.
+ * A jagged main line hugs the outline, and arcs jump out from it and back.
  *
- * The outline is cached.
- * Call {@link SaberEffect.invalidate} after the element content changes.
- * Set `dynamic` for video.
+ * ```ts
+ * vfx.add(img, { effect: new SaberEffect({ color: "#ff7a1a" }) });
+ * ```
+ *
+ * The outline comes from the element's alpha, or its luminance with `edge: "luminance"`.
+ * It is computed once and cached.
+ * It is computed again when the element's size, `edge` or `edgeThreshold` changes.
+ * After `vfx.update()` changes the content but not the size, call {@link SaberEffect.invalidate}.
+ * For video, set `dynamic: true` to follow the outline every frame.
+ *
+ * The lines and glow draw outside the element, within `pad` CSS px.
+ * Over a white element the lines inside its edge are hard to see; use `source: false` to draw the light only.
+ * All params are read every frame, so you can change `params` live.
  */
 export class SaberEffect implements Effect {
     params: SaberParams;
@@ -531,7 +547,7 @@ export class SaberEffect implements Effect {
         Object.assign(this.params, partial);
     }
 
-    /** Rebuild the outline on the next frame. */
+    /** Compute the outline again on the next frame, after the element's content changed. */
     invalidate(): void {
         this.#dirty = true;
     }

@@ -25,6 +25,7 @@ import {
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
+    SaberEffect,
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
@@ -293,6 +294,13 @@ export const effectDemos: EffectDemo[] = [
         text: "RGB channel shift.",
         media: "pigeon",
         create: () => new RgbShiftEffect(),
+    },
+    {
+        name: "SaberEffect",
+        text: "Electric lines and glow along the outline. Draws outside the element.",
+        media: "logo",
+        // A small pad keeps the tile cheap.
+        create: () => new SaberEffect({ pad: 40 }),
     },
     {
         name: "ScanlineEffect",
