@@ -1,0 +1,1 @@
+import{t as e}from"./iframe-BtbP66-C.js";e();

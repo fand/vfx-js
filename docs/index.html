@@ -561,7 +561,7 @@
                                     <details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Classes</span>
-                                                <span class="DocSidebarCount">34</span>
+                                                <span class="DocSidebarCount">35</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -616,6 +616,12 @@
                                                         <a href="/vfx-js/docs/effects/FluidEffect/">
                                                             <span class="DocSidebarLabel">
                                                                 FluidEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassEffect
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -773,7 +779,7 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">60</span>
+                                                <span class="DocSidebarCount">67</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -870,6 +876,48 @@
                                                         <a href="/vfx-js/docs/effects/FluidParams/">
                                                             <span class="DocSidebarLabel">
                                                                 FluidParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassBevelShape/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassBevelShape
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassDebugView/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassDebugView
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassEffectOptions/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassEffectOptions
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassImageSource/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassImageSource
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPaletteName/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPaletteName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPatternName/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPatternName
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1141,13 +1189,19 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Variables</span>
-                                                <span class="DocSidebarCount">3</span>
+                                                <span class="DocSidebarCount">4</span>
                                             </summary>
                                             <ul>
                                                 <li>
                                                         <a href="/vfx-js/docs/effects/ASCII_PRESETS/">
                                                             <span class="DocSidebarLabel">
                                                                 ASCII_PRESETS
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GLASS_PALETTES/">
+                                                            <span class="DocSidebarLabel">
+                                                                GLASS_PALETTES
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1579,6 +1633,11 @@
                                     </a>
                                     <span>Stable Fluid as a single Effect. Mutate <code>params</code> directly for runtime tweaks; tracked sim state is owned by the effect and reset on dispose.</span>
                                 </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassEffect/">
+                                        <code>GlassEffect</code>
+                                    </a>
+                                    <span>Turns the element's silhouette into a block of dispersive glass: the alpha is extruded into 3D and ray-traced with refraction, internal reflections and a rainbow split of the light.</span>
+                                </li><li>
                                     <a href="/vfx-js/docs/effects/GlitchEffect/">
                                         <code>GlitchEffect</code>
                                     </a>
@@ -1788,6 +1847,41 @@
                                         <code>FluidParams</code>
                                     </a>
                                     <span></span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassBevelShape/">
+                                        <code>GlassBevelShape</code>
+                                    </a>
+                                    <span>Profile of the <a href="/vfx-js/docs/effects/GlassParams/#bevel"><code>GlassParams.bevel</code></a>: a quarter circle, or a flat 45° cut with hard edges.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassDebugView/">
+                                        <code>GlassDebugView</code>
+                                    </a>
+                                    <span>A <a href="/vfx-js/docs/effects/GlassParams/#debug"><code>GlassParams.debug</code></a> view: the SDF lookups spent per pixel on finding the surface (<code>&quot;outer&quot;</code>), on tracing inside the glass (<code>&quot;inner&quot;</code>), or both (<code>&quot;total&quot;</code>).</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassEffectOptions/">
+                                        <code>GlassEffectOptions</code>
+                                    </a>
+                                    <span></span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassImageSource/">
+                                        <code>GlassImageSource</code>
+                                    </a>
+                                    <span>An image for <a href="/vfx-js/docs/effects/GlassParams/#backdrop"><code>GlassParams.backdrop</code></a>. Strings other than a <a href="/vfx-js/docs/effects/GlassPatternName/"><code>GlassPatternName</code></a> are treated as URLs.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassPaletteName/">
+                                        <code>GlassPaletteName</code>
+                                    </a>
+                                    <span>A preset for <a href="/vfx-js/docs/effects/GlassParams/#backdropColors"><code>GlassParams.backdropColors</code></a>, see <a href="/vfx-js/docs/effects/GLASS_PALETTES/"><code>GLASS_PALETTES</code></a>.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassParams/">
+                                        <code>GlassParams</code>
+                                    </a>
+                                    <span></span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassPatternName/">
+                                        <code>GlassPatternName</code>
+                                    </a>
+                                    <span>A procedural <a href="/vfx-js/docs/effects/GlassParams/#backdrop"><code>GlassParams.backdrop</code></a>, coloured through the <a href="/vfx-js/docs/effects/GlassParams/#backdropColors"><code>GlassParams.backdropColors</code></a> palette. <code>&quot;none&quot;</code> is black. <code>&quot;marble&quot;</code> is the contour bands of a slow noise field, like zebra marble. <code>&quot;flow&quot;</code> runs through the palette diagonally, bent by a slow noise field into wavering ribbons.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlitchParams/">
                                         <code>GlitchParams</code>
@@ -2018,6 +2112,11 @@
                                         <code>ASCII_PRESETS</code>
                                     </a>
                                     <span>Built-in character ramps, ordered dark → light. Suited for light-on-dark output (more &quot;ink&quot; = brighter); flip with <code>invert: true</code> for dark-on-light.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GLASS_PALETTES/">
+                                        <code>GLASS_PALETTES</code>
+                                    </a>
+                                    <span>The colours of each <a href="/vfx-js/docs/effects/GlassPaletteName/"><code>GlassPaletteName</code></a>, <code>#rrggbb</code>, in order.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/MATRIX_GLYPHS/">
                                         <code>MATRIX_GLYPHS</code>
