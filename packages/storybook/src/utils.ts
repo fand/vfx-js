@@ -1049,6 +1049,10 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     motion.addBinding(p, "speed", range(0, 5, 0.01));
     motion.addBinding(p, "flicker", range(0, 1, 0.01));
 
+    const reveal = pane.addFolder({ title: "Reveal" });
+    reveal.addBinding(p, "start", range(0, 1, 0.001));
+    reveal.addBinding(p, "end", range(0, 1, 0.001));
+
     const glow = pane.addFolder({ title: "Glow" });
     glow.addBinding(p, "glow", range(0, 5, 0.01));
     glow.addBinding(p, "glowFalloff", range(0, 1, 0.01));

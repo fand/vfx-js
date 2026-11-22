@@ -1,9 +1,11 @@
 // Finds the outline once and caches it: distance and normal to the nearest contour point.
 // Each frame, pushes the outline along its normal by noise to draw thin lines, then blurs them into the glow.
+// For the reveal, a traced copy of the outline gives each contour point its position along its loop, and the core pass cuts the lines by it.
 import type {
     Effect,
     EffectContext,
     EffectDims,
+    EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
 import {
@@ -13,6 +15,7 @@ import {
     FRAG_BLOOM_DOWNSAMPLE,
     upsampleBloomPyramid,
 } from "./_bloom-common.js";
+import { type Contour, traceContours } from "./_contour.js";
 import { parseHexColor } from "./_figma-common.js";
 import { SNOISE3D } from "./_noise.js";
 import { padOutputRect } from "./_pad.js";
@@ -47,11 +50,42 @@ float maskAt(vec2 p) {
 
 // Marks texels next to a threshold crossing.
 // Stores the px offset from the texel centre to the contour point.
+// With the reveal on, it also stores the arc position from the nearest traced point.
 const FRAG_SEED = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
+uniform sampler2D payload;
+uniform int payloadOn;
 ${GLSL_MASK}
+
+// Arc position and 1 + loop length of the nearest traced point within 4 texels.
+// The wide search also catches points traced a few frames ago on a moving source.
+// Without one, the length part is 1, which reads as a miss.
+vec2 nearestPayload() {
+    vec2 best = vec2(0.0, 1.0);
+    if (payloadOn == 0) {
+        return best;
+    }
+    ivec2 p = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(payload, 0);
+    int bestDist = 100;
+    for (int y = -4; y <= 4; y++) {
+        for (int x = -4; x <= 4; x++) {
+            ivec2 q = p + ivec2(x, y);
+            if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, size))) {
+                continue;
+            }
+            vec4 s = texelFetch(payload, q, 0);
+            int dist = x * x + y * y;
+            if (s.a > 0.0 && dist < bestDist) {
+                bestDist = dist;
+                best = vec2(s.r, 1.0 + s.g);
+            }
+        }
+    }
+    return best;
+}
 
 // Signed offset to the crossing towards each neighbour; 2 when there is none.
 float crossing(float m, float a, float b) {
@@ -76,7 +110,7 @@ void main() {
     vec2 o = vec2(ox, oy);
     o = sign(o + 1e-9) * max(abs(o), vec2(1e-4));
     vec2 inv = vec2(hasX ? 1.0 / o.x : 0.0, hasY ? 1.0 / o.y : 0.0);
-    outColor = vec4(inv / dot(inv, inv), 0.0, 1.0);
+    outColor = vec4(inv / dot(inv, inv), nearestPayload());
 }
 `;
 
@@ -107,7 +141,7 @@ void main() {
             float len = dot(candidate, candidate);
             if (len < bestLen) {
                 bestLen = len;
-                best = vec4(candidate, 0.0, 1.0);
+                best = vec4(candidate, s.ba);
             }
         }
     }
@@ -146,6 +180,54 @@ void main() {
         n = len > 0.0 ? -grad / len : vec2(0.0);
     }
     outColor = vec4(side * d, n, 1.0);
+}
+`;
+
+// Arc position and loop length of the nearest contour point, for the reveal.
+const FRAG_ARC = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform sampler2D seed;
+
+void main() {
+    vec4 s = texelFetch(seed, ivec2(gl_FragCoord.xy), 0);
+    outColor = vec4(s.b, max(s.a - 1.0, 0.0), 0.0, 1.0);
+}
+`;
+
+// Traced contour points, splatted as single texels into the payload target.
+const VERT_SPLAT = `#version 300 es
+precision highp float;
+in vec4 position;
+uniform vec2 size;
+out vec2 arc;
+
+void main() {
+    arc = position.zw;
+    gl_Position = vec4(position.xy / size * 2.0 - 1.0, 0.0, 1.0);
+    gl_PointSize = 1.0;
+}
+`;
+
+const FRAG_SPLAT = `#version 300 es
+precision highp float;
+in vec2 arc;
+out vec4 outColor;
+
+void main() {
+    outColor = vec4(arc, 0.0, 1.0);
+}
+`;
+
+// Edge mask for the contour tracer, from the same edge value as the seed pass.
+const FRAG_TRACE_MASK = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+${GLSL_MASK}
+
+void main() {
+    outColor = vec4(maskAt(uvSrc) >= 0.0 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
 }
 `;
 
@@ -286,6 +368,10 @@ uniform float burst;
 uniform float flicker;
 uniform float pixelRatio;
 uniform int lines;
+uniform sampler2D arcTex;
+uniform int reveal;
+uniform float revealStart;
+uniform float revealEnd;
 ${GLSL_JAG}
 
 const float MAIN_SHARE = 0.45;
@@ -293,6 +379,10 @@ const float ARC_LEAN = 0.25;
 const float ARC_WIDTH = 0.6;
 const float TOWARDS_PIXEL = 0.6;
 const float SNAPS_PER_SECOND = 16.0;
+// Length of the soft cut at each end of the reveal, and of the bright head, in CSS px.
+const float CUT_SOFTNESS = 3.0;
+const float HEAD_LENGTH = 12.0;
+const float HEAD_GAIN = 1.5;
 // Noise time per second at speed 1.
 const float PACE = 2.5;
 
@@ -374,6 +464,21 @@ void main() {
         float dist = abs(g) / max(min(screenGrad, slopeGrad), 1e-3);
         float halfWidth = width * 0.5;
         light += weight * (1.0 - smoothstep(halfWidth - 0.75, halfWidth + 0.75, dist));
+    }
+    if (reveal == 1) {
+        // Keep the lines whose contour point lies between start and end along its loop.
+        vec2 arc = texelFetch(arcTex, ivec2(q), 0).rg;
+        float soft = CUT_SOFTNESS * pixelRatio;
+        float fromStart = (arc.x - revealStart) * arc.y;
+        float toEnd = (revealEnd - arc.x) * arc.y;
+        float shown = smoothstep(0.0, soft, fromStart) * smoothstep(0.0, soft, toEnd);
+        // A loop the tracer missed has no length; hide it rather than show it whole.
+        shown *= step(0.5, arc.y);
+        // A bright head at the growing end, which fades out as the loop closes.
+        float headLength = HEAD_LENGTH * pixelRatio;
+        float head = exp(-max(toEnd, 0.0) / headLength);
+        head *= clamp((1.0 - revealEnd) * arc.y / headLength, 0.0, 1.0);
+        light *= shown * (1.0 + HEAD_GAIN * head);
     }
     outColor = vec4(vec3(light), 1.0);
 }
@@ -481,6 +586,16 @@ export type SaberParams = {
     /** Rebuild the outline every frame, for video and canvas. */
     dynamic: boolean;
     /**
+     * Where the lines start along each outline loop, 0..1.
+     * Animate it from 0 to 1 to wipe the outline out.
+     */
+    start: number;
+    /**
+     * Where the lines end along each outline loop, 0..1.
+     * Animate it from 0 to 1 to draw the outline on.
+     */
+    end: number;
+    /**
      * Room for the lines and glow around the element, in CSS px.
      * `"fullscreen"` fills the canvas.
      */
@@ -516,6 +631,8 @@ const DEFAULT_PARAMS: SaberParams = {
     edgeThreshold: 0.5,
     source: true,
     dynamic: false,
+    start: 0,
+    end: 1,
     pad: 80,
 };
 
@@ -532,6 +649,9 @@ const DEFAULT_PARAMS: SaberParams = {
  * It is computed again when the element's size, `edge` or `edgeThreshold` changes.
  * After `vfx.update()` changes the content but not the size, call {@link SaberEffect.invalidate}.
  * For video, set `dynamic: true` to follow the outline every frame.
+ *
+ * Animate `end` from 0 to 1 to draw the outline on along each loop, and `start` from 0 to 1 to wipe it out.
+ * The reveal traces the outline on the CPU once, so the lines show a few frames after it is first used.
  *
  * The lines and glow draw outside the element, within `pad` CSS px.
  * Over a white element the lines inside its edge are hard to see; use `source: false` to draw the light only.
@@ -553,6 +673,19 @@ export class SaberEffect implements Effect {
     #builtEdge: SaberParams["edge"] | null = null;
     #builtThreshold = Number.NaN;
 
+    // Reveal: traced contours give each contour point its arc position.
+    #traceMask: EffectRenderTarget | null = null;
+    #payload: EffectRenderTarget | null = null;
+    #arc: EffectRenderTarget | null = null;
+    #splat: EffectGeometry | null = null;
+    #landed: Contour[] | null = null;
+    #sourceVersion = 0;
+    #traceInFlight = false;
+    #traceStale = true;
+    #payloadReady = false;
+    #fieldHasPayload = false;
+    #disposed = false;
+
     constructor(initial: Partial<SaberParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
     }
@@ -567,6 +700,7 @@ export class SaberEffect implements Effect {
     }
 
     init(ctx: EffectContext): void {
+        this.#disposed = false;
         const seedOpts = { float: true, filter: "nearest" } as const;
         this.#seedA = ctx.createRenderTarget(seedOpts);
         this.#seedB = ctx.createRenderTarget(seedOpts);
@@ -589,16 +723,34 @@ export class SaberEffect implements Effect {
         if (!field || !core || !room) {
             return;
         }
-        const { edge, edgeThreshold, dynamic } = this.params;
-        if (
+        const { edge, edgeThreshold, dynamic, start, end } = this.params;
+        const sourceChanged =
             this.#dirty ||
-            dynamic ||
             field.width !== this.#builtW ||
             field.height !== this.#builtH ||
             edge !== this.#builtEdge ||
-            edgeThreshold !== this.#builtThreshold
+            edgeThreshold !== this.#builtThreshold;
+        if (sourceChanged) {
+            // The traced contours no longer match the element.
+            this.#sourceVersion++;
+            this.#payloadReady = false;
+            this.#traceStale = true;
+        } else if (dynamic) {
+            this.#traceStale = true;
+        }
+
+        const reveal = start > 0 || end < 1;
+        let usePayload = false;
+        if (reveal) {
+            this.#updatePayload(ctx);
+            usePayload = this.#payloadReady;
+        }
+        if (
+            sourceChanged ||
+            dynamic ||
+            (usePayload && !this.#fieldHasPayload)
         ) {
-            this.#buildField(ctx);
+            this.#buildField(ctx, usePayload);
         }
 
         const { pixelRatio } = ctx.dims;
@@ -627,6 +779,11 @@ export class SaberEffect implements Effect {
                 flicker,
                 lines: Math.round(Math.min(Math.max(lines, 1), 4)),
                 time: ctx.time * speed,
+                arcTex: usePayload && this.#arc ? this.#arc : field,
+                reveal: reveal ? 1 : 0,
+                // Until the traced contours land, show nothing rather than the whole outline.
+                revealStart: usePayload ? start : 1,
+                revealEnd: usePayload ? end : 0,
             },
             target: core,
         });
@@ -659,6 +816,16 @@ export class SaberEffect implements Effect {
     }
 
     dispose(): void {
+        this.#disposed = true;
+        this.#traceMask = null;
+        this.#payload = null;
+        this.#arc = null;
+        this.#splat = null;
+        this.#landed = null;
+        this.#traceInFlight = false;
+        this.#traceStale = true;
+        this.#payloadReady = false;
+        this.#fieldHasPayload = false;
         this.#seedA = null;
         this.#seedB = null;
         this.#field = null;
@@ -751,7 +918,66 @@ export class SaberEffect implements Effect {
         });
     }
 
-    #buildField(ctx: EffectContext): void {
+    // Start a trace when the contours are stale, and turn landed contours into splat points.
+    // One readback at a time; a trace that lands after the element changed is dropped.
+    #updatePayload(ctx: EffectContext): void {
+        if (!this.#traceMask) {
+            const nearest = { float: true, filter: "nearest" } as const;
+            this.#traceMask = ctx.createRenderTarget({ filter: "nearest" });
+            this.#payload = ctx.createRenderTarget(nearest);
+            this.#arc = ctx.createRenderTarget(nearest);
+        }
+        const landed = this.#landed;
+        if (landed) {
+            this.#landed = null;
+            if (this.#splat) {
+                ctx.releaseGeometry(this.#splat);
+                this.#splat = null;
+            }
+            this.#splat = splatGeometry(landed);
+            this.#payloadReady = true;
+            this.#fieldHasPayload = false;
+        }
+        if (!this.#traceStale || this.#traceInFlight) {
+            return;
+        }
+        const mask = this.#traceMask;
+        const { edge, edgeThreshold } = this.params;
+        ctx.draw({
+            frag: FRAG_TRACE_MASK,
+            uniforms: {
+                src: ctx.src,
+                edgeMode: edge === "luminance" ? 1 : 0,
+                edgeThreshold,
+            },
+            target: mask,
+        });
+        const width = mask.width;
+        const height = mask.height;
+        const version = this.#sourceVersion;
+        this.#traceStale = false;
+        this.#traceInFlight = true;
+        ctx.readPixels(mask).then(
+            (pixels) => {
+                this.#traceInFlight = false;
+                if (this.#disposed || version !== this.#sourceVersion) {
+                    return;
+                }
+                const contours = traceContours(
+                    pixels as Uint8Array,
+                    width,
+                    height,
+                );
+                this.#landed = contours;
+            },
+            () => {
+                this.#traceInFlight = false;
+                this.#traceStale = true;
+            },
+        );
+    }
+
+    #buildField(ctx: EffectContext, usePayload: boolean): void {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
         const field = this.#field;
@@ -766,7 +992,28 @@ export class SaberEffect implements Effect {
             edgeThreshold,
         };
 
-        ctx.draw({ frag: FRAG_SEED, uniforms: maskUniforms, target: seedA });
+        const payload = this.#payload;
+        const splat = this.#splat;
+        const withPayload = usePayload && payload !== null && splat !== null;
+        if (withPayload) {
+            ctx.clear(payload);
+            ctx.draw({
+                frag: FRAG_SPLAT,
+                vert: VERT_SPLAT,
+                geometry: splat,
+                uniforms: { size: [payload.width, payload.height] },
+                target: payload,
+            });
+        }
+        ctx.draw({
+            frag: FRAG_SEED,
+            uniforms: {
+                ...maskUniforms,
+                payload: withPayload ? payload : seedB,
+                payloadOn: withPayload ? 1 : 0,
+            },
+            target: seedA,
+        });
 
         let read = seedA;
         let write = seedB;
@@ -797,6 +1044,14 @@ export class SaberEffect implements Effect {
             uniforms: { ...maskUniforms, seed: read },
             target: field,
         });
+        if (withPayload && this.#arc) {
+            ctx.draw({
+                frag: FRAG_ARC,
+                uniforms: { seed: read },
+                target: this.#arc,
+            });
+        }
+        this.#fieldHasPayload = withPayload;
 
         ctx.draw({
             frag: FRAG_ROOM,
@@ -820,4 +1075,30 @@ export class SaberEffect implements Effect {
         this.#builtEdge = edge;
         this.#builtThreshold = edgeThreshold;
     }
+}
+
+// One point per traced vertex: position in buffer px, arc position and loop length.
+// Tracer coordinates put texel centres on integers, so add half a texel.
+function splatGeometry(contours: Contour[]): EffectGeometry | null {
+    let count = 0;
+    for (const c of contours) {
+        count += c.t.length;
+    }
+    if (count === 0) {
+        return null;
+    }
+    const position = new Float32Array(count * 4);
+    let o = 0;
+    for (const c of contours) {
+        for (let i = 0; i < c.t.length; i++) {
+            position[o++] = c.points[i * 2] + 0.5;
+            position[o++] = c.points[i * 2 + 1] + 0.5;
+            position[o++] = c.t[i];
+            position[o++] = c.length;
+        }
+    }
+    return {
+        mode: "points",
+        attributes: { position: { data: position, itemSize: 4 } },
+    };
 }

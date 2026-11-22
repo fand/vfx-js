@@ -57,7 +57,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `RainbowEffect` | Moving rainbow gradient. |
 | `RgbGlitchEffect` | Block glitch with RGB split. |
 | `RgbShiftEffect` | RGB channel shift. |
-| `SaberEffect` | Electric lines and glow along the outline: a jagged main line plus arcs (`lines`, 1 to 4) that jump out and back. `amplitude` / `scale` / `thickness` in CSS px, `sharpness` (straight runs with kinks), `burst`, `flicker`, `speed`, `color`, `glow`, `glowFalloff`. Outline from alpha, or `edge: "luminance"` with `edgeThreshold` for photos. Draws outside the element (`pad` in CSS px, default 80, or `"fullscreen"`); `source: false` draws the light only. The outline is cached: call `effect.invalidate()` after `await vfx.update(el)` changes the content but not the size, or set `dynamic: true` for video. |
+| `SaberEffect` | Electric lines and glow along the outline: a jagged main line plus arcs (`lines`, 1 to 4) that jump out and back. `amplitude` / `scale` / `thickness` in CSS px, `sharpness` (straight runs with kinks), `burst`, `flicker`, `speed`, `color`, `glow`, `glowFalloff`. Outline from alpha, or `edge: "luminance"` with `edgeThreshold` for photos. Draws outside the element (`pad` in CSS px, default 80, or `"fullscreen"`); `source: false` draws the light only. `start` / `end` (0..1 along each outline loop) draw the outline on (animate `end` 0→1) or wipe it out (animate `start` 0→1). The outline is cached: call `effect.invalidate()` after `await vfx.update(el)` changes the content but not the size, or set `dynamic: true` for video. |
 | `ScanlineEffect` | CRT scanlines. |
 | `SinewaveEffect` | Sine wave distortion. |
 | `SliceShiftEffect` | Split into strips and shift each toward the center. |

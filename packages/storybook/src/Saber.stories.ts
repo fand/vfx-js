@@ -30,6 +30,8 @@ type Args = {
     | "edge"
     | "edgeThreshold"
     | "dynamic"
+    | "start"
+    | "end"
 >;
 
 const DEFAULTS = new SaberEffect().params;
@@ -57,6 +59,8 @@ export default {
         edge: DEFAULTS.edge,
         edgeThreshold: DEFAULTS.edgeThreshold,
         dynamic: DEFAULTS.dynamic,
+        start: DEFAULTS.start,
+        end: DEFAULTS.end,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
@@ -82,10 +86,16 @@ export default {
             control: { type: "range", min: 0, max: 1, step: 0.01 },
         },
         dynamic: { control: { type: "boolean" } },
+        start: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
+        end: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
     },
 } satisfies Meta<Args>;
 
-async function mount(el: HTMLElement, args: Args): Promise<void> {
+async function mount(
+    el: HTMLElement,
+    args: Args,
+    animate?: (effect: SaberEffect, time: number) => void,
+): Promise<void> {
     const vfx = initVFX(
         args.pixelRatio > 0 ? { pixelRatio: args.pixelRatio } : undefined,
     );
@@ -96,6 +106,27 @@ async function mount(el: HTMLElement, args: Args): Promise<void> {
     const effect = new SaberEffect(params);
     await vfx.add(el, { effect });
     attachSaberPane("Saber", effect);
+    if (animate) {
+        // Follow the VFX clock, so the loop also holds when the clock is paused or set.
+        // Stops once a newer story replaced this VFX.
+        const tick = () => {
+            if ((window as { vfx?: unknown }).vfx !== vfx) {
+                return;
+            }
+            animate(effect, vfx.time);
+            requestAnimationFrame(tick);
+        };
+        tick();
+    }
+}
+
+const easeInOut = (x: number) => x * x * (3 - 2 * x);
+
+// Draw the outline on, hold, wipe it out, pause, repeat.
+function revealLoop(effect: SaberEffect, time: number): void {
+    const t = time % 5.5;
+    effect.params.end = easeInOut(Math.min(t / 2, 1));
+    effect.params.start = easeInOut(Math.min(Math.max((t - 4) / 1, 0), 1));
 }
 
 export const logo: StoryObj<Args> = {
@@ -116,6 +147,25 @@ export const logo: StoryObj<Args> = {
     },
 };
 
+export const reveal: StoryObj<Args> = {
+    args: { source: false },
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        img.style.width = "min(70vw, 800px)";
+        return img;
+    },
+    play: async ({ canvasElement, args }) => {
+        const img = canvasElement.querySelector("img") as HTMLImageElement;
+        if (!img.complete) {
+            await new Promise((o) => {
+                img.onload = o;
+            });
+        }
+        await mount(img, args, revealLoop);
+    },
+};
+
 function renderText(text: string, args: Args): HTMLElement {
     const h1 = document.createElement("h1");
     h1.textContent = text;
@@ -126,15 +176,26 @@ function renderText(text: string, args: Args): HTMLElement {
     return h1;
 }
 
-async function playText(canvasElement: HTMLElement, args: Args) {
+async function playText(
+    canvasElement: HTMLElement,
+    args: Args,
+    animate?: (effect: SaberEffect, time: number) => void,
+) {
     const h1 = canvasElement.querySelector("h1") as HTMLElement;
     await document.fonts?.ready;
-    await mount(h1, args);
+    await mount(h1, args, animate);
 }
 
 export const text: StoryObj<Args> = {
     render: (args) => renderText("Saber", args),
     play: ({ canvasElement, args }) => playText(canvasElement, args),
+};
+
+export const revealText: StoryObj<Args> = {
+    args: { source: false },
+    render: (args) => renderText("Saber", args),
+    play: ({ canvasElement, args }) =>
+        playText(canvasElement, args, revealLoop),
 };
 
 export const smallText: StoryObj<Args> = {
