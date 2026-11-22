@@ -224,7 +224,7 @@ export const effectDemos: EffectDemo[] = [
         name: "HoloEffect",
         text: "Holographic foil from holo.spot. Move the pointer over it to tilt.",
         media: "logo",
-        create: () => new HoloEffect(HoloEffect.looks.card),
+        create: () => new HoloEffect({ holo: HoloEffect.looks.card }),
     },
     {
         name: "HueShiftEffect",
