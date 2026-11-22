@@ -186,8 +186,12 @@ export const logo: StoryObj<Args> = {
     args: { source: "VFX-JS logo" },
 };
 
-export const flow: StoryObj<Args> = {
+export const amagi: StoryObj<Args> = {
     args: { source: "amagi", params: { depth: 0.3 } },
+};
+
+export const photo: StoryObj<Args> = {
+    args: { source: "jellyfish", params: { sourceColor: 1 } },
 };
 
 const ARTICLE_TEXT = [
@@ -198,13 +202,11 @@ const ARTICLE_TEXT = [
 ];
 
 /**
- * Text and a button in an article page: the `<h1>` and a `<button>` each
- * get their own swirl, with the library defaults (numeric `pad`, 65k
- * particles) plus a drop shadow on the page and the cursor repelling the
- * particles. The button keeps its own colours. The pane edits both.
+ * A heading in an article page: the `<h1>` becomes the swirl, with the
+ * library defaults (numeric `pad`, 65k particles) plus a drop shadow on
+ * the page and the cursor repelling the particles.
  */
-export const htmlText: StoryObj<Args> = {
-    name: "HTML Text",
+export const heading: StoryObj<Args> = {
     args: { source: "VFX-JS logo" },
     render: () => {
         const page = document.createElement("div");
@@ -225,12 +227,6 @@ export const htmlText: StoryObj<Args> = {
         h1.style.cssText =
             "margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
 
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = "Get started";
-        button.style.cssText =
-            "display: block; margin: 8px 0 56px; padding: 18px 40px; border: 0; border-radius: 999px; background: #2b3a8f; color: #fff; font: 700 28px/1 system-ui, 'Helvetica Neue', Arial, sans-serif; cursor: pointer";
-
         article.append(kicker, h1);
         for (let i = 0; i < 3; i++) {
             for (const text of ARTICLE_TEXT) {
@@ -239,17 +235,8 @@ export const htmlText: StoryObj<Args> = {
                 p.style.cssText = "margin: 0 0 1.2em";
                 article.appendChild(p);
             }
-            if (i === 0) {
-                article.appendChild(button);
-            }
         }
         page.appendChild(article);
-        // The button keeps its own colours (blue pill, white label), so the
-        // label stays readable in the swirl.
-        const targets: [HTMLElement, Partial<SwirlParticlesParams>][] = [
-            [h1, {}],
-            [button, { sourceColor: 1 }],
-        ];
 
         const vfx = initVFX();
         const still = isChromatic();
@@ -260,26 +247,18 @@ export const htmlText: StoryObj<Args> = {
                 mouse: "repel",
             }).params,
         };
-        let effects: SwirlParticlesEffect[] = [];
+        let effect: SwirlParticlesEffect | null = null;
 
         const mount = async (): Promise<void> => {
-            if (effects.length > 0) {
-                for (const [el] of targets) {
-                    vfx.remove(el);
-                }
-                effects = [];
+            if (effect) {
+                vfx.remove(h1);
             }
             // Wait for the web font fallback and for Storybook to attach
-            // the page before VFX measures the elements.
+            // the page before VFX measures the heading.
             await document.fonts?.ready;
             await new Promise((r) => requestAnimationFrame(r));
-            effects = targets.map(
-                ([, own]) =>
-                    new SwirlParticlesEffect({ ...params, ...own }, { still }),
-            );
-            await Promise.all(
-                targets.map(([el], i) => vfx.add(el, { effect: effects[i] })),
-            );
+            effect = new SwirlParticlesEffect(params, { still });
+            await vfx.add(h1, { effect });
         };
 
         void mount().then(() => {
@@ -290,9 +269,9 @@ export const htmlText: StoryObj<Args> = {
                 "Swirl Particles",
                 params,
                 () => {
-                    effects.forEach((e, i) => {
-                        Object.assign(e.params, params, targets[i][1]);
-                    });
+                    if (effect) {
+                        Object.assign(effect.params, params);
+                    }
                 },
                 undefined,
                 () => void mount(),
