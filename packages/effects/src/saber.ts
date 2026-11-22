@@ -215,24 +215,35 @@ ${SNOISE3D}
 uniform float sharpness;
 uniform float minCell;
 
+// Finer octaves move only a little faster than coarse ones.
+const float OCTAVE_PACE = 1.2;
+const vec2 DRIFT = vec2(0.3, 0.12);
+
 float hash(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
     return fract((p.x + p.y) * p.z) * 2.0 - 1.0;
 }
 
+// One lattice corner, moving through time at a steady pace.
+// Two random values are crossfaded with cos and sin weights, so the spread stays the same mid-way.
+// Each corner has its own phase, so the corners never change in step.
+float corner(vec2 i, float t) {
+    float z = t + hash(vec3(i, 7.7)) * 0.5 + 0.5;
+    float zi = floor(z);
+    float angle = (z - zi) * 1.5707963;
+    return hash(vec3(i, zi)) * cos(angle) + hash(vec3(i, zi + 1.0)) * sin(angle);
+}
+
 float lattice(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = p - i;
-    vec2 smoothF = f.xy * f.xy * (3.0 - 2.0 * f.xy);
-    vec2 w = mix(smoothF, f.xy, sharpness);
-    float wt = f.z * f.z * (3.0 - 2.0 * f.z);
+    vec2 i = floor(p.xy);
+    vec2 f = p.xy - i;
+    vec2 smoothF = f * f * (3.0 - 2.0 * f);
+    vec2 w = mix(smoothF, f, sharpness);
     vec2 e = vec2(1.0, 0.0);
-    float a0 = mix(hash(i), hash(i + e.xyy), w.x);
-    float b0 = mix(hash(i + e.yxy), hash(i + e.xxy), w.x);
-    float a1 = mix(hash(i + e.yyx), hash(i + e.xyx), w.x);
-    float b1 = mix(hash(i + e.yxx), hash(i + e.xxx), w.x);
-    return mix(mix(a0, b0, w.y), mix(a1, b1, w.y), wt);
+    float a = mix(corner(i, p.z), corner(i + e.xy, p.z), w.x);
+    float b = mix(corner(i + e.yx, p.z), corner(i + e.xx, p.z), w.x);
+    return mix(a, b, w.y);
 }
 
 // Octaves halve both the cell and the amplitude, so the slope is the same at every scale.
@@ -248,13 +259,14 @@ float jag(vec2 x, float t, float cell) {
         if (fade <= 0.0) {
             break;
         }
-        sum += lattice(vec3(p, t)) * amp * fade;
+        // A slow slide on top of the morph, so kinks crawl along the outline.
+        sum += lattice(vec3(p + DRIFT * t, t)) * amp * fade;
         p = turn * p * 2.0 + 17.1;
-        t = t * 1.5 + 3.7;
+        t = t * OCTAVE_PACE + 3.7;
         cell *= 0.5;
         amp *= 0.5;
     }
-    return clamp(sum * 0.8, -1.0, 1.0);
+    return clamp(sum * 0.7, -1.0, 1.0);
 }
 `;
 
@@ -281,6 +293,8 @@ const float ARC_LEAN = 0.25;
 const float ARC_WIDTH = 0.6;
 const float TOWARDS_PIXEL = 0.6;
 const float SNAPS_PER_SECOND = 16.0;
+// Noise time per second at speed 1.
+const float PACE = 2.5;
 
 // Keep the displacement inside the room on each side of the contour.
 // Past the limit the line folds back, so it bounces off with a kink instead of running flat.
@@ -310,7 +324,7 @@ void main() {
     // Mix smooth time with time that snaps to new shapes.
     float snap = floor(time * SNAPS_PER_SECOND);
     float snapped = snap / SNAPS_PER_SECOND + hash(vec3(snap, 1.7, 9.1)) * 0.5;
-    float t = mix(time, snapped, flicker);
+    float t = mix(time, snapped, flicker) * PACE;
 
     // Sample the noise part of the way from q towards the pixel.
     // Round a convex corner q stays put, so this keeps kinks there.
@@ -494,7 +508,7 @@ const DEFAULT_PARAMS: SaberParams = {
     sharpness: 0.8,
     burst: 0.6,
     speed: 1,
-    flicker: 0.3,
+    flicker: 0,
     lines: 2,
     glow: 1,
     glowFalloff: 0.6,
