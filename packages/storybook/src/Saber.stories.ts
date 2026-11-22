@@ -15,6 +15,7 @@ type Args = {
 } & Pick<
     SaberParams,
     | "amplitude"
+    | "mainAmplitude"
     | "scale"
     | "sharpness"
     | "speed"
@@ -45,6 +46,7 @@ export default {
         background: "dark",
         fontSize: 0,
         amplitude: DEFAULTS.amplitude,
+        mainAmplitude: DEFAULTS.mainAmplitude,
         scale: DEFAULTS.scale,
         sharpness: DEFAULTS.sharpness,
         speed: DEFAULTS.speed,
@@ -67,6 +69,9 @@ export default {
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
         amplitude: { control: { type: "range", min: 0, max: 60, step: 0.5 } },
+        mainAmplitude: {
+            control: { type: "range", min: 0, max: 30, step: 0.5 },
+        },
         scale: { control: { type: "range", min: 5, max: 300, step: 1 } },
         sharpness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.01 } },

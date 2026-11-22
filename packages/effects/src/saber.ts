@@ -317,11 +317,11 @@ float corner(vec2 i, float t) {
     return hash(vec3(i, zi)) * cos(angle) + hash(vec3(i, zi + 1.0)) * sin(angle);
 }
 
-float lattice(vec3 p) {
+float lattice(vec3 p, float sharp) {
     vec2 i = floor(p.xy);
     vec2 f = p.xy - i;
     vec2 smoothF = f * f * (3.0 - 2.0 * f);
-    vec2 w = mix(smoothF, f, sharpness);
+    vec2 w = mix(smoothF, f, sharp);
     vec2 e = vec2(1.0, 0.0);
     float a = mix(corner(i, p.z), corner(i + e.xy, p.z), w.x);
     float b = mix(corner(i + e.yx, p.z), corner(i + e.xx, p.z), w.x);
@@ -331,7 +331,7 @@ float lattice(vec3 p) {
 // Octaves halve both the cell and the amplitude, so the slope is the same at every scale.
 // That gives straight runs with sharp kinks, like midpoint displacement.
 // Octaves finer than minCell fade out, so the line does not turn to fur.
-float jag(vec2 x, float t, float cell) {
+float jag(vec2 x, float t, float cell, float sharp) {
     const mat2 turn = mat2(0.8, 0.6, -0.6, 0.8);
     vec2 p = x / cell;
     float sum = 0.0;
@@ -342,7 +342,7 @@ float jag(vec2 x, float t, float cell) {
             break;
         }
         // A slow slide on top of the morph, so kinks crawl along the outline.
-        sum += lattice(vec3(p + DRIFT * t, t)) * amp * fade;
+        sum += lattice(vec3(p + DRIFT * t, t), sharp) * amp * fade;
         p = turn * p * 2.0 + 17.1;
         t = t * OCTAVE_PACE + 3.7;
         cell *= 0.5;
@@ -361,6 +361,7 @@ out vec4 outColor;
 uniform sampler2D field;
 uniform sampler2D roomTex;
 uniform float amplitude;
+uniform float mainAmplitude;
 uniform float scale;
 uniform float thickness;
 uniform float time;
@@ -375,10 +376,18 @@ uniform float revealEnd;
 uniform float segments;
 ${GLSL_JAG}
 
-const float MAIN_SHARE = 0.25;
+// Main line noise cell, as a share of scale.
+const float MAIN_CELL = 0.3;
 const float ARC_LEAN = 0.25;
-const float ARC_WIDTH = 0.6;
-const float ARC_WEIGHT = 0.6;
+// Per line: reach as a share of amplitude, width as a share of thickness, and brightness.
+const float TIER_REACH[4] = float[4](0.0, 0.4, 0.7, 1.0);
+const float TIER_WIDTH[4] = float[4](1.0, 0.6, 0.45, 0.35);
+const float TIER_WEIGHT[4] = float[4](1.0, 0.5, 0.35, 0.2);
+// Reach of the companion line outside the active spots, as a share of its reach.
+const float COMPANION_CALM = 0.3;
+// Each tier's noise cell is this many times finer than the one before.
+const float TIER_CELL_STEP = 1.8;
+const float CURL_SHARPNESS = 0.4;
 // Size of the active spots, in units of scale.
 const float ACTIVITY_SIZE = 3.0;
 const float TOWARDS_PIXEL = 0.6;
@@ -413,7 +422,7 @@ float fit(float disp, float lineAmp, vec2 room) {
 void main() {
     // Decide per 2x2 quad, so derivatives stay valid in drawn quads.
     vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
-    if (quad.a < 0.5 || abs(quad.r) > amplitude + thickness + 4.0) {
+    if (quad.a < 0.5 || abs(quad.r) > max(amplitude, mainAmplitude) + thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -436,13 +445,12 @@ void main() {
     // It also halves the jitter that per-pixel normal errors put into q.
     vec2 x = q + n * d * TOWARDS_PIXEL;
 
-    // The main line, which the arcs leave from and return to.
-    // It kinks only in active spots; elsewhere it lies straight on the outline.
+    // The main line stays on the outline; it kinks by mainAmplitude only in active spots.
     float mainOn = activity(q, t, 0.0);
-    float mainAmp = amplitude * MAIN_SHARE * mainOn;
-    float mainCell = scale * MAIN_SHARE;
-    float mainDisp = fit(mainAmp * jag(x, t, mainCell), mainAmp, room);
-    float mainNext = fit(mainAmp * jag(x + tangent, t, mainCell), mainAmp, roomNext);
+    float mainAmp = mainAmplitude * mainOn;
+    float mainCell = scale * MAIN_CELL;
+    float mainDisp = fit(mainAmp * jag(x, t, mainCell, sharpness), mainAmp, room);
+    float mainNext = fit(mainAmp * jag(x + tangent, t, mainCell, sharpness), mainAmp, roomNext);
 
     float light = 0.0;
     for (int i = 0; i < 4; i++) {
@@ -455,21 +463,31 @@ void main() {
         float weight = 1.0;
         if (i > 0) {
             float fi = float(i);
-            // Arcs lift off in short stretches inside the main line's active spots.
-            // They need room outside the element to jump into.
+            // Each tier reaches further, with finer noise, and is thinner and dimmer.
+            float reach = amplitude * TIER_REACH[i];
+            // The companion line stays close outside the active spots, so the motion stays local.
+            reach *= i == 1 ? mix(COMPANION_CALM, 1.0, mainOn) : 1.0;
+            float cell = scale * pow(TIER_CELL_STEP, -(fi - 1.0));
+            // The finest tier bends smoothly, so it curls rather than kinks.
+            float sharp = i == 3 ? sharpness * CURL_SHARPNESS : sharpness;
+            // The companion line runs almost all the way round; the wisps only in active spots.
             float own = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
-            float on = mainOn * smoothstep(0.35, 0.6, own);
-            vec2 xArc = x + fi * vec2(311.7, 173.3);
-            float tArc = t * (1.0 + fi * 0.15);
-            float arc = fit(amplitude * mix(jag(xArc, tArc, scale), 1.0, ARC_LEAN), amplitude, room);
-            float arcNext = fit(amplitude * mix(jag(xArc + tangent, tArc, scale), 1.0, ARC_LEAN), amplitude, roomNext);
-            disp = mix(mainDisp, arc, on);
-            dispNext = mix(mainNext, arcNext, on);
-            width = thickness * ARC_WIDTH;
-            // Fade out where the arc lies on the main line, so it does not double it.
-            weight = ARC_WEIGHT * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
+            float on = i == 1 ? smoothstep(0.1, 0.3, own) : mainOn * smoothstep(0.35, 0.6, own);
+            vec2 xTier = x + fi * vec2(311.7, 173.3);
+            float tTier = t * (1.0 + fi * 0.15);
+            float tier = fit(reach * mix(jag(xTier, tTier, cell, sharp), 1.0, ARC_LEAN), reach, room);
+            float tierNext = fit(reach * mix(jag(xTier + tangent, tTier, cell, sharp), 1.0, ARC_LEAN), reach, roomNext);
+            // Tiers leave from the main line and return to it.
+            disp = mix(mainDisp, tier, on);
+            dispNext = mix(mainNext, tierNext, on);
+            width = thickness * TIER_WIDTH[i];
+            // Fade out where the line lies on the main line, so it does not double it.
+            weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
             weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
         }
+        // Lines thinner than a pixel get dimmer instead of breaking up.
+        weight *= min(width, 1.0);
+        width = max(width, 1.0);
         float g = d - disp;
         // Slope of the line along the contour, from one step along the tangent.
         float slope = dispNext - disp;
@@ -574,24 +592,29 @@ export type SaberParams = {
     color: string;
     /** Overall brightness of the lines and glow. */
     intensity: number;
-    /** Width of the main line in CSS px. Arcs are thinner. */
+    /** Width of the main line in CSS px. The other lines are thinner. */
     thickness: number;
-    /** How far the arcs reach from the outline, in CSS px. The main line moves less. */
+    /** How far the furthest wisps reach from the outline, in CSS px. */
     amplitude: number;
+    /** How far the main line moves off the outline, in CSS px. 0 keeps it straight. */
+    mainAmplitude: number;
     /** Size of the largest jags, in CSS px. Smaller values give more kinks. */
     scale: number;
     /** 0 = smooth bends, 1 = straight runs with sharp kinks. */
     sharpness: number;
     /**
-     * 0 = the lines kink and arc all along the outline.
-     * 1 = only in a few spots that wander, with the line straight and still elsewhere.
+     * 0 = the main line kinks and the wisps lift off all along the outline.
+     * 1 = only in a few spots that wander, with the outline calm elsewhere.
      */
     burst: number;
     /** Animation rate. 0 freezes the lines. */
     speed: number;
     /** 0 = lines flow smoothly, 1 = lines snap to new shapes many times a second. */
     flicker: number;
-    /** Number of lines, 1..4: one main line plus arcs. */
+    /**
+     * Number of lines, 1..4: the main line, then a faint companion line, then two tiers of wisps.
+     * Each extra line is fainter, thinner and reaches further.
+     */
     lines: number;
     /** Glow brightness against the lines. */
     glow: number;
@@ -638,21 +661,22 @@ const MAX_ROOM = 96;
 
 // Light gain of the core line and the glow, before `intensity`.
 const CORE_GAIN = 10;
-const GLOW_GAIN = 2;
+const GLOW_GAIN = 1.6;
 // Share of white in the light tint; higher burns the core whiter.
 const WHITE_MIX = 0.15;
 
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
-    thickness: 1.5,
+    thickness: 2,
     amplitude: 24,
+    mainAmplitude: 1,
     scale: 24,
     sharpness: 0.8,
     burst: 0.5,
     speed: 1,
     flicker: 0,
-    lines: 3,
+    lines: 4,
     glow: 1,
     glowFalloff: 0.6,
     edge: "alpha",
@@ -667,7 +691,8 @@ const DEFAULT_PARAMS: SaberParams = {
 
 /**
  * Electric lines along the outline of an element, with a glow.
- * A main line hugs the outline; in spots that come and go it kinks, and thin arcs lift off it and fall back.
+ * A bright main line sits on the outline, with a faint companion line beside it.
+ * In spots that come and go, thin wisps lift off it and fall back.
  *
  * ```ts
  * vfx.add(img, { effect: new SaberEffect({ color: "#ff7a1a" }) });
@@ -800,6 +825,8 @@ export class SaberEffect implements Effect {
                 field,
                 roomTex: room,
                 amplitude: amplitude * pixelRatio,
+                mainAmplitude:
+                    Math.max(this.params.mainAmplitude, 0) * pixelRatio,
                 scale: Math.max(scale, 1e-3) * pixelRatio,
                 thickness: thickness * pixelRatio,
                 minCell: MIN_CELL * pixelRatio,

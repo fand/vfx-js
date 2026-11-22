@@ -1040,6 +1040,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     line.addBinding(p, "intensity", range(0, 5, 0.01));
     line.addBinding(p, "thickness", range(0.5, 10, 0.1));
     line.addBinding(p, "amplitude", range(0, 60, 0.5));
+    line.addBinding(p, "mainAmplitude", range(0, 30, 0.5));
     line.addBinding(p, "scale", range(5, 300, 1));
     line.addBinding(p, "sharpness", range(0, 1, 0.01));
     line.addBinding(p, "burst", range(0, 1, 0.01));
