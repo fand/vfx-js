@@ -10,6 +10,7 @@ import {
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
+    type SourceChannel,
     SWIRL_PARTICLE_PALETTES,
     type SwirlParticleColorStop,
     type SwirlParticlePaletteName,
@@ -813,6 +814,13 @@ export function attachClockPane(
     return pane;
 }
 
+// Options for a `sourceChannel` dropdown (GlassEffect, SwirlParticleEffect).
+const SOURCE_CHANNEL_OPTIONS = {
+    alpha: "alpha",
+    luminance: "luminance",
+    none: "none",
+} satisfies Record<SourceChannel, SourceChannel>;
+
 /** Source picker for {@link attachSwirlParticlePane}. */
 export type SwirlSourceSelector = {
     keys: readonly string[];
@@ -884,6 +892,7 @@ export function attachSwirlParticlePane(
     bind(particles, "streak", range(0, 1.5, 0.01));
 
     const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
     bind(shape, "depth", range(0.02, 1, 0.01));
 
     const flow = pane.addFolder({ title: "Flow" });
@@ -1088,6 +1097,7 @@ export function attachGlassPane(
     pick(pane, "source", pickers.source);
 
     const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
     bind(shape, "depth", range(0.02, 1.5, 0.01));
     bind(shape, "bevel", range(0, 0.4, 0.005));
     bind(shape, "bevelShape", {

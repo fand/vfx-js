@@ -1,5 +1,6 @@
 export type { HoloSettingId } from "./_holo/data/params.js";
 export type { HoloStartingPointNames } from "./_holo/data/starting-points.js";
+export type { SourceChannel } from "./_source.js";
 export {
     ASCII_PRESETS,
     type AsciiCharRamp,

@@ -1,10 +1,11 @@
 // Particles that crawl and curl over an extruded silhouette.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
-// 1. The silhouette is read back from the element (`ctx.src` alpha), and a
-//    2D signed distance field is built on the CPU. The 3D shape is the
-//    analytic extrusion of that field, so its SDF and normal are cheap to
-//    evaluate anywhere in the shaders.
+// 1. The silhouette is read back from the element (`ctx.src` alpha, or
+//    the channel `sourceChannel` picks), and a 2D signed distance field
+//    is built on the CPU. The 3D shape is the analytic extrusion of that
+//    field, so its SDF and normal are cheap to evaluate anywhere in the
+//    shaders.
 // 2. Spawn points are scattered over the extruded surface (both caps and
 //    the side walls), weighted by area.
 // 3. A fragment-shader simulation (MRT: position + age, velocity +
@@ -32,7 +33,6 @@ import {
     GLSL_BLOOM_KNEE,
     upsampleBloomPyramid,
 } from "./_bloom-common.js";
-import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
 import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
@@ -44,6 +44,11 @@ import {
     SPAWN_SIZE,
     viewMatrix,
 } from "./_silhouette.js";
+import {
+    SourceCapture,
+    type SourceChannel,
+    sourceChannelOf,
+} from "./_source.js";
 
 /**
  * One stop of a {@link SwirlParticleParams.palette} gradient, like a
@@ -187,6 +192,14 @@ export type SwirlParticleParams = {
      * each particle's spawn point (1). Lighting still applies on top.
      */
     sourceColor: number;
+    /**
+     * Which channel of the element is read as the silhouette: `"alpha"`
+     * (where it is opaque; default), `"luminance"` (where it is bright,
+     * so the text or the light parts of an opaque image) or `"none"` (the
+     * whole element rect). A change reads the element back again, like
+     * {@link SwirlParticleEffect.refresh | refresh()}.
+     */
+    sourceChannel: SourceChannel;
     /**
      * Direction towards the light, in view space: +x right, +y up, +z
      * towards the viewer. It stays fixed to the screen while the camera
@@ -334,6 +347,7 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     bloom: 0.9,
     palette: "nebula",
     sourceColor: 0,
+    sourceChannel: "alpha",
     lightDirection: [-0.45, 0.75, 0.55],
     lightColor: "#ffffff",
     lightIntensity: 1,
@@ -360,15 +374,6 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
 
 // Largest `count`: 2^20, a 1024² state texture.
 const MAX_COUNT = 1 << 20;
-// Frames to wait before reading the silhouette back, and the most frames
-// between retries while it is empty (the gap doubles from the first).
-const CAPTURE_DELAY = 3;
-const CAPTURE_RETRY_MAX = 120;
-// Recapture when the element's aspect ratio drifts this far (relative)
-// from the one the shape was built with, once the size has held still
-// for RESIZE_SETTLE frames.
-const ASPECT_TOLERANCE = 0.01;
-const RESIZE_SETTLE = 5;
 const BLOOM_LEVELS = 6;
 // How much of each coarser bloom level adds into the next finer one.
 const BLOOM_SCATTER = 0.85;
@@ -1480,7 +1485,6 @@ function smoothstep(e0: number, e1: number, x: number): number {
 // Silhouette capture: waiting to capture, a readback in flight, or
 // nothing to do. Drawing only needs a shape, so a recapture keeps the
 // current one on screen.
-type Phase = "capture" | "reading" | "idle";
 
 type ShadowLevel = {
     a: EffectRenderTarget;
@@ -1515,8 +1519,10 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
  * vfx.add(img, { effect: new SwirlParticleEffect({ palette: "ember" }) });
  * ```
  *
- * The silhouette is the element's alpha, read back when the effect starts
- * and again when the element's aspect ratio changes. Call
+ * The silhouette is the element's alpha (or the channel
+ * {@link SwirlParticleParams.sourceChannel | sourceChannel} picks), read
+ * back when the effect starts and again when the element's aspect ratio
+ * changes. Call
  * {@link SwirlParticleEffect.refresh | refresh()} after its content
  * changes. An opaque photo becomes an extruded slab. The particles are
  * born over the first {@link SwirlParticleParams.intro | intro} seconds
@@ -1538,17 +1544,14 @@ export class SwirlParticleEffect implements Effect {
     // This frame's params, checked (see resolveParams).
     readonly #r: Resolved;
 
-    // Bumped by dispose and context restore, so a silhouette readback
-    // started before them is dropped.
-    #token = 0;
-    #phase: Phase = "capture";
-    #srcFrames = 0;
-    // Frames to wait before the next capture; doubles while it's empty.
-    #captureGap = CAPTURE_DELAY;
-    // Element size last frame, and frames it has held still: a changed
-    // aspect is recaptured once it settles.
-    #lastSize: [number, number] = [0, 0];
-    #settled = 0;
+    // Reads the silhouette back: when the effect starts, on refresh(),
+    // and when the element's aspect ratio changes.
+    readonly #source = new SourceCapture({
+        longSide: MASK_LONG,
+        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+    });
+    // `sourceChannel` of the last shape read; a change reads it again.
+    #channel: SourceChannel | null = null;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
     #needsReset = true;
@@ -1666,7 +1669,7 @@ export class SwirlParticleEffect implements Effect {
         this.#unsubRestored = ctx.onContextRestored(() => {
             // Raw textures are gone; upload them again. A readback in
             // flight was rejected; start over if it was the first.
-            this.#token++;
+            this.#source.contextRestored();
             this.#gl = ctx.gl;
             this.#halfState = !ctx.gl.getExtension("OES_texture_float_linear");
             this.#sdfRaw = null;
@@ -1677,10 +1680,6 @@ export class SwirlParticleEffect implements Effect {
             this.#paletteTex = null;
             this.#paletteSrc = null;
             this.#pending = this.#pending ?? this.#shape;
-            if (this.#phase === "reading") {
-                this.#phase = "capture";
-                this.#srcFrames = 0;
-            }
             // The state and trail history targets come back empty:
             // respawn and mark every history slot stale.
             this.#needsReset = true;
@@ -1788,11 +1787,16 @@ export class SwirlParticleEffect implements Effect {
                 ? this.#scene
                 : this.#createScene(ctx);
 
-        if (this.#phase === "idle" && !this.#pending) {
-            this.#watchAspect(ctx);
+        if (
+            this.#source.phase === "idle" &&
+            this.#channel !== null &&
+            sourceChannelOf(this.params.sourceChannel) !== this.#channel
+        ) {
+            this.#source.refresh();
         }
-        if (this.#phase === "capture") {
-            this.#capture(ctx);
+        // The aspect watch waits while a shape read back waits to upload.
+        if (this.#source.phase !== "idle" || !this.#pending) {
+            this.#source.update(ctx);
         }
         if (this.#pending && this.#upload(ctx, this.#pending)) {
             // The first shape spawns every particle. A new one takes over
@@ -1985,105 +1989,32 @@ export class SwirlParticleEffect implements Effect {
      * capture is pending restarts it, so the latest content wins.
      */
     refresh(): void {
-        this.#recapture();
+        this.#source.refresh();
     }
 
-    // Start a new capture in CAPTURE_DELAY frames, dropping a readback in
-    // flight.
-    #recapture(): void {
-        if (this.#phase === "reading") {
-            this.#token++;
-        }
-        this.#phase = "capture";
-        this.#srcFrames = 0;
-        this.#captureGap = CAPTURE_DELAY;
-    }
-
-    // Recapture once the element's aspect ratio has drifted from the
-    // shape's and its size has held still for RESIZE_SETTLE frames, so a
-    // resize animation reads back once, at the end. The shape is in units
-    // of the element's long side, so a change of scale alone keeps it.
-    #watchAspect(ctx: EffectContext): void {
-        const shape = this.#shape;
-        const [ew, eh] = ctx.dims.elementPixel;
-        if (!shape || !(ew >= 1 && eh >= 1)) {
-            return;
-        }
-        const moved = ew !== this.#lastSize[0] || eh !== this.#lastSize[1];
-        this.#lastSize[0] = ew;
-        this.#lastSize[1] = eh;
-        this.#settled = moved ? 0 : this.#settled + 1;
-        if (
-            this.#settled >= RESIZE_SETTLE &&
-            Math.abs(ew / eh / shape.aspect - 1) > ASPECT_TOLERANCE
-        ) {
-            this.#recapture();
-        }
-    }
-
-    // Read the element's alpha back to build the shape.
-    #capture(ctx: EffectContext): void {
-        const [ew, eh] = ctx.dims.elementPixel;
-        if (
-            ctx.src.width === 0 ||
-            ctx.src.height === 0 ||
-            !(ew >= 1 && eh >= 1)
-        ) {
-            return;
-        }
-        // Give the source a few frames to upload.
-        if (++this.#srcFrames < this.#captureGap) {
-            return;
-        }
-        const aspect = ew / eh;
-        const mw = Math.max(
-            1,
-            aspect >= 1 ? MASK_LONG : Math.round(MASK_LONG * aspect),
+    // Build the shape from the element read back. False when the
+    // silhouette is empty, to try again later.
+    #onRead(
+        px: Uint8Array | Float32Array,
+        mw: number,
+        mh: number,
+        aspect: number,
+    ): boolean {
+        const channel = sourceChannelOf(this.params.sourceChannel);
+        const shape = buildShape(
+            px,
+            mw,
+            mh,
+            channel,
+            this.#r.depth / 2,
+            aspect,
         );
-        const mh = Math.max(
-            1,
-            aspect >= 1 ? Math.round(MASK_LONG / aspect) : MASK_LONG,
-        );
-        const mask = ctx.createRenderTarget({ size: [mw, mh] });
-        captureContent(ctx, mask);
-        this.#phase = "reading";
-        const token = this.#token;
-        const halfDepth = this.#r.depth / 2;
-        // The read copies the pixels now, so the mask can go.
-        const read = ctx.readPixels(mask);
-        mask.dispose();
-        const retry = (backoff: boolean) => {
-            this.#srcFrames = 0;
-            if (backoff) {
-                this.#captureGap = Math.min(
-                    this.#captureGap * 2,
-                    CAPTURE_RETRY_MAX,
-                );
-            }
-            this.#phase = "capture";
-        };
-        read.then(
-            (px) => {
-                if (token !== this.#token) {
-                    return;
-                }
-                const shape = buildShape(px, mw, mh, halfDepth, aspect);
-                if (shape) {
-                    this.#pending = shape;
-                    this.#phase = "idle";
-                } else {
-                    // Nothing drawn yet: try again later, less often, in
-                    // case it's a late-loading image.
-                    retry(true);
-                }
-            },
-            () => {
-                // Disposed or context lost.
-                if (token === this.#token) {
-                    retry(false);
-                }
-            },
-        );
+        if (!shape) {
+            return false;
+        }
+        this.#pending = shape;
+        this.#channel = channel;
+        return true;
     }
 
     // Upload the SDF and spawn textures, replacing the current ones.
@@ -2971,12 +2902,8 @@ export class SwirlParticleEffect implements Effect {
         this.#nFire = -1;
 
         // Start over like a new instance if it is added again.
-        this.#token++;
-        this.#phase = "capture";
-        this.#srcFrames = 0;
-        this.#captureGap = CAPTURE_DELAY;
-        this.#lastSize.fill(0);
-        this.#settled = 0;
+        this.#source.reset();
+        this.#channel = null;
         this.#pending = null;
         this.#shape = null;
         this.#needsReset = true;

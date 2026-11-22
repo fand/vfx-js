@@ -89,6 +89,7 @@ import {
     type TierConfig,
     type Vec3,
 } from "./_holo/types.js";
+import type { SourceChannel } from "./_source.js";
 
 /** Foil materials of holo.spot. */
 export type HoloMaterial =
@@ -125,7 +126,7 @@ export type HoloQuality = "auto" | "low" | "medium" | "high";
  * Which channel of a source is read as a shape: its alpha, its luminance, or none (the whole rect). The source is the
  * element (where the foil is), or for `emboss` the logo image (where it is pressed).
  */
-export type HoloSourceChannel = "alpha" | "luminance" | "none";
+export type HoloSourceChannel = SourceChannel;
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
 export type HoloVec2 = { x: number; y: number };
 /**

@@ -1,9 +1,10 @@
 // Dispersive glass in the shape of an extruded silhouette.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
-// 1. The silhouette is read back from the element (`ctx.src` alpha) and
-//    turned into a 2D signed distance field; the 3D shape is its analytic
-//    extrusion (see `_silhouette.ts`).
+// 1. The silhouette is read back from the element (`ctx.src` alpha, or
+//    the channel `sourceChannel` picks) and turned into a 2D signed
+//    distance field; the 3D shape is its analytic extrusion (see
+//    `_silhouette.ts`).
 // 2. One fragment shader sphere-traces the shape from the camera, then
 //    follows the refracted ray inside it: total internal reflections
 //    bounce, and the ray leaves where it can refract out.
@@ -21,7 +22,6 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
-import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
 import {
@@ -32,6 +32,11 @@ import {
     viewMatrix,
 } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
+import {
+    SourceCapture,
+    type SourceChannel,
+    sourceChannelOf,
+} from "./_source.js";
 
 /**
  * A procedural {@link GlassParams.backdrop}, coloured through the
@@ -79,6 +84,14 @@ export type GlassDebugView = "off" | "outer" | "inner" | "total";
 export type GlassBevelShape = "round" | "chamfer";
 
 export type GlassParams = {
+    /**
+     * Which channel of the element is read as the silhouette: `"alpha"`
+     * (where it is opaque; default), `"luminance"` (where it is bright,
+     * so the text or the light parts of an opaque image) or `"none"` (the
+     * whole element rect). A change reads the element back again, like
+     * {@link GlassEffect.refresh | refresh()}.
+     */
+    sourceChannel: SourceChannel;
     /** Extrusion depth, relative to the long side of the element (= 2). */
     depth: number;
     /**
@@ -104,7 +117,8 @@ export type GlassParams = {
      * from the element's luminance: positive raises the bright parts,
      * negative the dark ones (by sinking the bright ones). It makes a
      * button's label or a photo's content show as shape. 0 is off. Read
-     * once with the silhouette, so a video gives a still relief.
+     * back with the silhouette (see {@link GlassEffect.refresh | refresh()}),
+     * so a video gives a still relief.
      */
     relief: number;
     /**
@@ -249,6 +263,7 @@ export type GlassEffectOptions = {
 };
 
 const DEFAULT_PARAMS: GlassParams = {
+    sourceChannel: "alpha",
     depth: 0.2,
     bevel: 0.03,
     bevelShape: "round",
@@ -1290,8 +1305,6 @@ function clampInt(v: number, lo: number, hi: number, fallback: number): number {
         : fallback;
 }
 
-type Phase = "capture" | "reading" | "ready";
-
 /**
  * Turns the element's silhouette into a block of dispersive glass: the
  * alpha is extruded into 3D and ray-traced with refraction, internal
@@ -1301,10 +1314,14 @@ type Phase = "capture" | "reading" | "ready";
  * vfx.add(img, { effect: new GlassEffect({ backdrop: "grid" }) });
  * ```
  *
- * The silhouette is read once when the effect starts. An opaque photo
- * becomes a slab. The glass shows a `backdrop` behind it, a procedural
- * pattern or an image, not the page: the output is opaque where the
- * backdrop is seen and premultiplied over transparency elsewhere.
+ * The silhouette is the element's alpha (or the channel
+ * {@link GlassParams.sourceChannel | sourceChannel} picks), read back
+ * when the effect starts and again when the element's aspect ratio
+ * changes. Call {@link GlassEffect.refresh | refresh()} after its
+ * content changes. An opaque photo becomes a slab. The glass shows a
+ * `backdrop` behind it, a procedural pattern or an image, not the page:
+ * the output is opaque where the backdrop is seen and premultiplied over
+ * transparency elsewhere.
  *
  * All params are read every frame, so you can mutate `params` live.
  */
@@ -1312,11 +1329,16 @@ export class GlassEffect implements Effect {
     params: GlassParams;
     readonly #still: boolean;
 
-    #phase: Phase = "capture";
-    #srcFrames = 0;
+    // Reads the silhouette back: when the effect starts, on refresh(),
+    // and when the element's aspect ratio changes.
+    readonly #source = new SourceCapture({
+        longSide: GLASS_MASK_LONG,
+        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+    });
+    // `sourceChannel` of the last shape read; a change reads it again.
+    #channel: SourceChannel | null = null;
     #pending: GlassShape | null = null;
     #shape: GlassShape | null = null;
-    #mask: EffectRenderTarget | null = null;
     #scene: EffectRenderTarget | null = null;
     #ldr: EffectRenderTarget | null = null;
 
@@ -1370,7 +1392,9 @@ export class GlassEffect implements Effect {
         this.#gl = ctx.gl;
         this.#disposed = false;
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // The raw SDF texture is gone; upload it again.
+            // The raw SDF texture is gone; upload it again. A readback in
+            // flight was rejected; start it over.
+            this.#source.contextRestored();
             this.#gl = ctx.gl;
             this.#sdfRaw = null;
             this.#sdfTex = null;
@@ -1380,7 +1404,7 @@ export class GlassEffect implements Effect {
             this.#paletteTex = null;
             this.#paletteClampTex = null;
             this.#paletteKey = null;
-            this.#pending = this.#shape;
+            this.#pending = this.#pending ?? this.#shape;
             this.#backdropDirty = true;
         });
 
@@ -1426,14 +1450,19 @@ export class GlassEffect implements Effect {
     }
 
     render(ctx: EffectContext): void {
-        if (this.#phase === "capture") {
-            this.#capture(ctx);
+        if (
+            this.#source.phase === "idle" &&
+            this.#channel !== null &&
+            sourceChannelOf(this.params.sourceChannel) !== this.#channel
+        ) {
+            this.#source.refresh();
         }
+        this.#source.update(ctx);
+        // A new shape replaces the current one once it has been read back.
         if (this.#pending) {
             this.#upload(ctx, this.#pending);
             this.#shape = this.#pending;
             this.#pending = null;
-            this.#phase = "ready";
         }
         this.#updateRelief(ctx);
         this.#updatePalette(ctx);
@@ -1487,7 +1516,7 @@ export class GlassEffect implements Effect {
     #drawGlass(ctx: EffectContext): EffectRenderTarget | null {
         const shape = this.#shape;
         const sdfTex = this.#sdfTex;
-        if (this.#phase !== "ready" || !shape || !sdfTex) {
+        if (!shape || !sdfTex) {
             return null;
         }
         const p = this.params;
@@ -1621,63 +1650,55 @@ export class GlassEffect implements Effect {
         return scene;
     }
 
-    // Read the element's alpha back once to build the shape.
-    #capture(ctx: EffectContext): void {
-        if (ctx.src.width === 0 || ctx.src.height === 0) {
-            return;
-        }
-        // Give the source a couple of frames to upload.
-        if (++this.#srcFrames < 3) {
-            return;
-        }
-        const [ew, eh] = ctx.dims.elementPixel;
-        const aspect = ew / Math.max(eh, 1);
-        const mw =
-            aspect >= 1
-                ? GLASS_MASK_LONG
-                : Math.round(GLASS_MASK_LONG * aspect);
-        const mh =
-            aspect >= 1
-                ? Math.round(GLASS_MASK_LONG / aspect)
-                : GLASS_MASK_LONG;
-        if (
-            !this.#mask ||
-            this.#mask.width !== mw ||
-            this.#mask.height !== mh
-        ) {
-            this.#mask?.dispose();
-            this.#mask = ctx.createRenderTarget({ size: [mw, mh] });
-        }
-        captureContent(ctx, this.#mask);
-        this.#phase = "reading";
-        ctx.readPixels(this.#mask).then(
-            (px) => {
-                const shape = buildShape(
-                    px,
-                    mw,
-                    mh,
-                    this.params.depth / 2,
-                    aspect,
-                    SMOOTH_RADIUS,
-                    SMOOTH_PASSES,
-                );
-                if (shape) {
-                    const lum = reliefLuminance(px, mw, mh, shape);
-                    const radius = reliefRadius(this.params.reliefBlur, shape);
-                    this.#pending = {
-                        ...shape,
-                        reliefLum: lum,
-                        reliefRadius: radius,
-                        ...buildRelief(lum, shape, radius),
-                    };
-                } else {
-                    // Nothing drawn yet: try again on a later frame.
-                    this.#srcFrames = 0;
-                    this.#phase = "capture";
-                }
-            },
-            () => {},
+    /**
+     * Capture the element's silhouette again, for when its content
+     * changed: an image's `src` swapped, a text edit. For an `<img>`,
+     * call it after `vfx.update(img)` has reloaded the image.
+     *
+     * The glass keeps the current shape until the new one has been read
+     * back (a few frames later), then switches to it. A change of the
+     * element's aspect ratio is recaptured automatically once its size
+     * settles; a change of size alone needs none.
+     *
+     * Safe to call at any time and any number of times; a call while a
+     * capture is pending restarts it, so the latest content wins.
+     */
+    refresh(): void {
+        this.#source.refresh();
+    }
+
+    // Build the shape and the relief's luminance from the element read
+    // back. False when the silhouette is empty, to try again later.
+    #onRead(
+        px: Uint8Array | Float32Array,
+        mw: number,
+        mh: number,
+        aspect: number,
+    ): boolean {
+        const channel = sourceChannelOf(this.params.sourceChannel);
+        const shape = buildShape(
+            px,
+            mw,
+            mh,
+            channel,
+            this.params.depth / 2,
+            aspect,
+            SMOOTH_RADIUS,
+            SMOOTH_PASSES,
         );
+        if (!shape) {
+            return false;
+        }
+        const lum = reliefLuminance(px, mw, mh, shape);
+        const radius = reliefRadius(this.params.reliefBlur, shape);
+        this.#pending = {
+            ...shape,
+            reliefLum: lum,
+            reliefRadius: radius,
+            ...buildRelief(lum, shape, radius),
+        };
+        this.#channel = channel;
+        return true;
     }
 
     #upload(ctx: EffectContext, shape: GlassShape): void {
@@ -1922,15 +1943,14 @@ export class GlassEffect implements Effect {
         this.#imageKey = null;
         this.#backdropMip?.dispose();
         this.#backdropMip = null;
-        this.#mask?.dispose();
-        this.#mask = null;
         this.#scene?.dispose();
         this.#scene = null;
         this.#ldr?.dispose();
         this.#ldr = null;
         this.#shape = null;
         this.#pending = null;
-        this.#phase = "capture";
-        this.#srcFrames = 0;
+        // Start over like a new instance if it is added again.
+        this.#source.reset();
+        this.#channel = null;
     }
 }
