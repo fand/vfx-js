@@ -1034,6 +1034,7 @@ export function attachGlassPane(
     pickers: {
         source: SwirlSourceSelector;
         backdrop: SwirlSourceSelector;
+        palette: SwirlSourceSelector;
         colors: { a: string; b: string };
     },
 ): Pane {
@@ -1101,6 +1102,7 @@ export function attachGlassPane(
 
     const backdrop = pane.addFolder({ title: "Backdrop" });
     pick(backdrop, "backdrop", pickers.backdrop);
+    pick(backdrop, "palette", pickers.palette);
     bind(backdrop, "backdropVisible");
     bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
     bind(backdrop, "backdropDistance", range(0, 3, 0.01));

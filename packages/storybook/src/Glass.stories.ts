@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import {
+    GLASS_PALETTES,
     GlassEffect,
+    type GlassPaletteName,
     type GlassParams,
     type GlassPatternName,
 } from "@vfx-js/effects";
@@ -44,9 +46,12 @@ const PATTERNS: readonly GlassPatternName[] = [
     "grid",
     "checker",
     "marble",
-    "rainbow",
+    "flow",
     "none",
 ];
+// The palette presets, then "custom": the two colour pickers, or the
+// story's own colours until they are edited.
+const PALETTE_KEYS = [...Object.keys(GLASS_PALETTES), "custom"];
 const IMAGES: Record<string, string> = {
     "image: jellyfish": Jellyfish,
     "image: pigeon": Pigeon,
@@ -114,12 +119,28 @@ export default {
         }).params;
         // Tweakpane edits these; they are copied into the effect.
         const { backdrop: _b, backdropColors, ...params } = defaults;
-        const colors = { a: backdropColors[0], b: backdropColors[1] };
+        const storyColors =
+            typeof backdropColors === "string" ? null : backdropColors;
+        const initial =
+            storyColors ?? GLASS_PALETTES[backdropColors as GlassPaletteName];
+        const colors = { a: initial[0], b: initial[initial.length - 1] };
+        let paletteKey =
+            typeof backdropColors === "string" ? backdropColors : "custom";
+        const palette = (): GlassParams["backdropColors"] => {
+            if (paletteKey !== "custom") {
+                return paletteKey as GlassPaletteName;
+            }
+            const untouched =
+                storyColors &&
+                colors.a === storyColors[0] &&
+                colors.b === storyColors[storyColors.length - 1];
+            return untouched ? storyColors : [colors.a, colors.b];
+        };
         let backdropKey = args.backdrop;
         const current = (): GlassParams => ({
             ...params,
             backdrop: resolveBackdrop(backdropKey),
-            backdropColors: [colors.a, colors.b],
+            backdropColors: palette(),
         });
 
         let sourceKey: SourceKey = args.source;
@@ -182,6 +203,14 @@ export default {
                     value: backdropKey,
                     onChange: (key) => {
                         backdropKey = key;
+                        apply();
+                    },
+                },
+                palette: {
+                    keys: PALETTE_KEYS,
+                    value: paletteKey,
+                    onChange: (key) => {
+                        paletteKey = key;
                         apply();
                     },
                 },
@@ -273,17 +302,33 @@ export const marble: StoryObj<Args> = {
     args: { source: "VFX-JS logo", backdrop: "marble" },
 };
 
-// A bright hue field through dispersive, faceted glass.
-export const rainbow: StoryObj<Args> = {
+// A soft holographic sheet: the pastel palette along the direction of a
+// noise field, through dispersive, faceted glass.
+export const flow: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",
-        backdrop: "rainbow",
+        backdrop: "flow",
         params: {
+            backdropColors: "pastel",
+            backdropSoftness: 0.6,
             depth: 0.3,
             bevel: 0.06,
             bevelShape: "chamfer",
             dispersion: 0.25,
             paths: 3,
+        },
+    },
+};
+
+// Marble through a four-colour palette: the bands go through the colours
+// and back.
+export const marblePalette: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        backdrop: "marble",
+        params: {
+            backdropColors: ["#14142b", "#2f5bd3", "#f4efe4", "#e8553a"],
+            backdropSoftness: 0.1,
         },
     },
 };

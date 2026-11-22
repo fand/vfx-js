@@ -34,10 +34,11 @@ import {
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 
 /**
- * A procedural {@link GlassParams.backdrop}. `"none"` is black.
+ * A procedural {@link GlassParams.backdrop}, coloured through the
+ * {@link GlassParams.backdropColors} palette. `"none"` is black.
  * `"marble"` is the contour bands of a slow noise field, like zebra
- * marble. `"rainbow"` is pale, bright colours drifting through all hues; it
- * ignores {@link GlassParams.backdropColors}.
+ * marble. `"flow"` follows the direction of a slow noise vector, so every
+ * colour of the palette shows in smooth, swirling patches.
  */
 export type GlassPatternName =
     | "none"
@@ -45,7 +46,19 @@ export type GlassPatternName =
     | "grid"
     | "checker"
     | "marble"
-    | "rainbow";
+    | "flow";
+
+/** A preset for {@link GlassParams.backdropColors}, see {@link GLASS_PALETTES}. */
+export type GlassPaletteName = "mono" | "pastel" | "redblue";
+
+/** The colours of each {@link GlassPaletteName}, `#rrggbb`, in order. */
+export const GLASS_PALETTES: Readonly<
+    Record<GlassPaletteName, readonly string[]>
+> = {
+    mono: ["#000000", "#ffffff"],
+    pastel: ["#ffc4dc", "#ffd9b8", "#fff3b0", "#c4f2d4", "#bfe4ff", "#d8ccff"],
+    redblue: ["#e8102a", "#1a3fe0"],
+};
 
 /**
  * An image for {@link GlassParams.backdrop}. Strings other than a
@@ -170,24 +183,28 @@ export type GlassParams = {
     backdropDistance: number;
     /**
      * Speed of the pattern, in pattern periods per second. The patterns
-     * scroll, except `"marble"` and `"rainbow"`, which morph
-     * in place.
+     * scroll, except `"marble"` and `"flow"`, which morph in place.
      */
     backdropSpeed: number;
     /**
-     * The two colours of a procedural pattern, `#rrggbb`. `"rainbow"`
-     * has its own.
+     * The palette of a procedural pattern: a {@link GlassPaletteName} or
+     * two or more `#rrggbb` colours in order, each with an equal share of
+     * the area. One colour is a flat fill. Stripes and marble bands go
+     * through the colours and back; the checker and the grid nest them
+     * as concentric squares.
      */
-    backdropColors: readonly [string, string];
+    backdropColors: GlassPaletteName | readonly string[];
     /**
-     * Share of the area that the second colour covers in a two-colour
-     * pattern, 0 to 1: the width of the stripes and marble bands, of the
-     * grid's lines, the size of the checker's squares.
+     * Share of the area that the second colour covers when the palette
+     * has two colours, 0 to 1: the width of the stripes and marble bands,
+     * of the grid's lines, the size of the checker's squares. Ignored for
+     * three or more colours.
      */
     backdropRatio: number;
     /**
-     * Softness of the edge between the two colours, 0 to 1, relative to
-     * the pattern's period. Near 1 the bands become smooth gradients.
+     * Softness of the edges between the palette's colours, 0 to 1. 0 is
+     * hard bands; near 1 the pattern is a continuous gradient through
+     * the colours.
      */
     backdropSoftness: number;
 
@@ -263,7 +280,7 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropScale: 0.25,
     backdropDistance: 0.6,
     backdropSpeed: 0.15,
-    backdropColors: ["#000000", "#ffffff"],
+    backdropColors: "mono",
     backdropRatio: 0.5,
     backdropSoftness: 0.06,
     lightIntensity: 1.5,
@@ -286,9 +303,14 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
     grid: 2,
     checker: 3,
     marble: 4,
-    rainbow: 5,
+    flow: 5,
 };
 const IMAGE_MODE = 6;
+// The palette texture is at least this wide, so a hard edge stays sharp
+// when the pattern is magnified.
+const PALETTE_MIN_TEXELS = 4096;
+// Noise frequency of "flow", per pattern unit.
+const FLOW_FREQ = "0.3";
 // Contour bands of "marble" per unit of its noise field.
 const MARBLE_BANDS = "3.0";
 // Size of the "marble" noise field, in pattern units.
@@ -455,8 +477,10 @@ uniform float backdropVisible;
 uniform float backdropScale;
 uniform float backdropDistance;
 uniform float backdropOffset;
-uniform vec3 backdropA;
-uniform vec3 backdropB;
+// The palette, baked along x with its own mip chain (the top level is
+// its mean), and its number of colours.
+uniform sampler2D paletteTex;
+uniform int paletteSize;
 uniform float backdropRatio;
 uniform float backdropSoftness;
 
@@ -480,24 +504,13 @@ float hash12(vec2 p) {
 ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
 
-// "rainbow": pale, bright colours whose hue drifts in space and time.
-// q and fw are in pattern units.
-vec3 rainbow(vec2 q, float fw) {
-    // The hue is the direction of a 2D noise vector. A single noise
-    // value sits near its middle most of the time, which would show two
-    // or three hues only; a direction covers the whole circle evenly.
-    vec3 n = vec3(q * 0.3, backdropOffset);
-    vec2 v = vec2(snoise(n), snoise(n + vec3(17.3, 5.1, 9.7)));
-    float r = length(v);
-    float hue = atan(v.y, v.x) / 6.2832 + backdropOffset * 0.05;
-    vec3 c = 0.5 + 0.5 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
-    // Pastel: mostly white, tinted. All hues meet where the vector
-    // vanishes, so the colour fades out there. A wide footprint averages
-    // the hues, which is white too.
-    float k = 1.0 - smoothstep(0.35, 2.0, fw);
-    float sat = 0.5 * smoothstep(0.0, 0.35, r) * k;
-    // A little above 1 on the strong parts, so highlights bloom.
-    return mix(vec3(1.0), c, sat) * (1.0 + 0.2 * smoothstep(0.3, 0.8, r) * k);
+// The palette at u (0 first colour, 1 last), blurred over a width w of u.
+// A mip level averages 2^lod texels, so the level follows w; the palette
+// is laid out so that its colours start on texel boundaries of every
+// level that is narrower than a colour.
+vec3 palette(float u, float w) {
+    float lod = log2(max(w * float(textureSize(paletteTex, 0).x), 1e-4));
+    return textureLod(paletteTex, vec2(u, 0.5), lod).rgb;
 }
 
 // The backdrop plane, at view-space xy. fw is the footprint of the pixel
@@ -522,55 +535,88 @@ vec3 backdrop(vec2 p, float fw) {
     }
     vec2 q = p / max(backdropScale, 1e-3);
     fw = clamp(fw / max(backdropScale, 1e-3), 1e-4, 4.0);
-    if (backdropMode == 5) {
-        return rainbow(q, fw);
-    }
-    // The two-colour patterns share one finish. Each gives e, a signed
-    // distance to the edge between its colours (positive in the second),
-    // placed so that the second colour covers backdropRatio of the area.
-    // e and fw are in units where a band at an even split is 0.5 wide.
-    float r = clamp(backdropRatio, 0.0, 1.0);
-    float e = 0.0;
+    // Each pattern gives u, 0 at the middle of the palette's first colour
+    // and 1 at the middle of its last, before any threshold, and gu, the
+    // length of its gradient in pattern units. u is area-equalised: equal
+    // slices of it cover equal areas, so equal shares of the palette get
+    // equal areas and the pattern's mean is the palette's. k scales the
+    // softness: the bands keep it along u; the checker and the grid,
+    // whose u is not proportional to distance, keep it as a distance (k
+    // follows gu), so all their edges are equally soft at any ratio.
+    float u;
+    float gu;
+    float k = 1.0;
     if (backdropMode == 1) {
+        // Triangle wave across the stripes.
         float s = fract((q.x - q.y) * 0.7071 + backdropOffset);
-        e = 0.5 * r - abs(s - 0.5);
+        u = 1.0 - 2.0 * abs(s - 0.5);
+        gu = 2.0;
     } else if (backdropMode == 2) {
-        // Lines of the second colour: their share of the area sets
-        // their half width.
+        // Distance t from the lines' centre, 0..0.5. The area within t of
+        // a line is 1 - (1 - 2t)^2.
         vec2 g = abs(fract(q + vec2(backdropOffset, 0.0)) - 0.5);
-        e = 0.5 * (1.0 - sqrt(1.0 - r)) - min(g.x, g.y);
+        float a = 1.0 - 2.0 * min(g.x, g.y);
+        u = a * a;
+        gu = 4.0 * a;
+        k = 0.5 * gu;
     } else if (backdropMode == 3) {
-        // Squares centred in every other cell. Away from an even split
-        // the squares of one colour shrink and the other joins up.
+        // Signed Chebyshev distance v from the cells' edges, -0.5 at the
+        // middle of the first colour's cells, 0.5 at the other's. Within
+        // a cell, the area further than |v| from its edge is (1 - 2|v|)^2.
         vec2 x = q + vec2(backdropOffset + 0.5, 0.5);
         vec2 cell = floor(x);
-        vec2 u = abs(fract(x) - 0.5);
+        vec2 c = abs(fract(x) - 0.5);
         float sgn = mod(cell.x + cell.y, 2.0) < 0.5 ? -1.0 : 1.0;
-        float c = r <= 0.5
-            ? 0.5 * (1.0 - sqrt(2.0 * r))
-            : -0.5 * (1.0 - sqrt(2.0 * (1.0 - r)));
-        e = 0.5 * (sgn * (0.5 - max(u.x, u.y)) - c);
-        fw *= 0.5;
-    } else {
+        float a = 2.0 * max(c.x, c.y);
+        u = 0.5 + sgn * (0.5 - 0.5 * a * a);
+        gu = 2.0 * a;
+        k = gu;
+    } else if (backdropMode == 4) {
         // "marble": contour bands of a slow noise field: closed loops
         // round its peaks, bands crowding where it is steep. A weaker
-        // second octave makes the widths irregular.
+        // second octave makes the widths irregular. u is a triangle wave
+        // of the contour phase.
         vec3 n = vec3(q * ${MARBLE_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
         vec4 b = snoiseD(n * vec3(2.3, 2.3, 1.5) + vec3(5.2, 1.3, 7.7));
         float s = (a.w + 0.2 * b.w) * ${MARBLE_BANDS};
-        e = 0.5 * r - abs(fract(s) - 0.5);
-        // The band width varies: the footprint in band periods follows
-        // the field's gradient (in pattern units).
+        u = 1.0 - 2.0 * abs(fract(s) - 0.5);
         vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
-        fw = max(fw * ${MARBLE_BANDS} * length(g), 1e-4);
+        gu = 2.0 * ${MARBLE_BANDS} * length(g);
+    } else {
+        // "flow": the direction of a 2D noise vector, as a triangle wave
+        // so there is no seam. Its gradient blows up where the vector
+        // vanishes, which blurs to the palette's mean there.
+        vec3 n = vec3(q * ${FLOW_FREQ}, backdropOffset);
+        vec4 a = snoiseD(n);
+        vec4 b = snoiseD(n + vec3(17.3, 5.1, 9.7));
+        vec2 v = vec2(a.w, b.w);
+        float h = atan(v.y, v.x) / 6.2832 + backdropOffset * 0.05;
+        u = abs(fract(h) * 2.0 - 1.0);
+        vec2 ga = (v.x * b.xy - v.y * a.xy) / max(dot(v, v), 1e-8);
+        gu = length(ga) * ${FLOW_FREQ} / 3.1416;
     }
-    float w = max(fw, 0.5 * backdropSoftness);
-    float m = smoothstep(-w, w, e);
-    // A footprint that covers whole periods would only alias: fade to
-    // the mean, which is the ratio.
-    m = mix(m, r, smoothstep(0.35, 1.0, fw));
-    return mix(backdropA, backdropB, m);
+    // Two colours: move the boundary so the second covers backdropRatio
+    // of the area, by a piecewise-linear warp of u.
+    float slope = 1.0;
+    if (paletteSize == 2) {
+        float r = clamp(backdropRatio, 1e-4, 1.0 - 1e-4);
+        if (u < 1.0 - r) {
+            slope = 0.5 / (1.0 - r);
+            u *= slope;
+        } else {
+            slope = 0.5 / r;
+            u = 0.5 + (u - (1.0 - r)) * slope;
+        }
+    }
+    // Softness and filtering are one blur along u: the pixel's footprint
+    // in u, or the softness in shares of a colour. Low softness matches
+    // the smoothstep edges the patterns had (3 shares per unit); it
+    // saturates at one share, which is a gradient through the colours.
+    float sf = clamp(backdropSoftness, 0.0, 1.0);
+    float shares = 3.0 * sf / (1.0 + 2.0 * sf * sqrt(sf));
+    float soft = k * shares / float(max(paletteSize, 2));
+    return palette(u, slope * max(fw * gu, soft));
 }
 
 // A rectangular light seen in direction d: centre c, half size in
@@ -1178,6 +1224,62 @@ function sourceSize(el: BackdropElement): [number, number] {
     return [el.width, el.height];
 }
 
+// The colours of a `backdropColors` value, at least two: one colour is a
+// flat fill. Unknown names fall back to "mono".
+function resolvePalette(v: GlassParams["backdropColors"]): string[] {
+    const list =
+        typeof v === "string"
+            ? (GLASS_PALETTES[v as GlassPaletteName] ?? GLASS_PALETTES.mono)
+            : v;
+    const colors = list.length > 0 ? [...list] : [...GLASS_PALETTES.mono];
+    return colors.length === 1 ? [colors[0], colors[0]] : colors;
+}
+
+/**
+ * The palette as a row of texels, every colour an equal run, and its
+ * whole mip chain averaged exactly on the CPU, so the top level is the
+ * palette's mean. The width is the number of colours times a power of
+ * two, so each colour starts on a texel of every level narrower than it.
+ */
+function bakePalette(colors: readonly string[]): Float32Array[] {
+    const n = colors.length;
+    const rgb = colors.map(hexToRgb);
+    const w =
+        n * 2 ** Math.max(0, Math.ceil(Math.log2(PALETTE_MIN_TEXELS / n)));
+    // Prefix sums per channel, to average any range of texels.
+    const sum = new Float64Array((w + 1) * 3);
+    for (let i = 0; i < w; i++) {
+        const c = rgb[Math.floor((i * n) / w)];
+        for (let k = 0; k < 3; k++) {
+            sum[(i + 1) * 3 + k] = sum[i * 3 + k] + c[k];
+        }
+    }
+    // The sum up to a fractional texel x.
+    const at = (x: number, k: number) => {
+        const i = Math.min(Math.floor(x), w - 1);
+        return (
+            sum[i * 3 + k] + (x - i) * (sum[(i + 1) * 3 + k] - sum[i * 3 + k])
+        );
+    };
+    const levels: Float32Array[] = [];
+    for (let lw = w; ; lw = Math.max(1, Math.floor(lw / 2))) {
+        const data = new Float32Array(lw * 4);
+        const span = w / lw;
+        for (let j = 0; j < lw; j++) {
+            for (let k = 0; k < 3; k++) {
+                data[j * 4 + k] =
+                    (at((j + 1) * span, k) - at(j * span, k)) / span;
+            }
+            data[j * 4 + 3] = 1;
+        }
+        levels.push(data);
+        if (lw === 1) {
+            break;
+        }
+    }
+    return levels;
+}
+
 function isPattern(v: GlassParams["backdrop"]): v is GlassPatternName {
     return typeof v === "string" && v in PATTERN_MODES;
 }
@@ -1237,6 +1339,11 @@ export class GlassEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
+    // The baked palette, and the colours it was baked from.
+    #paletteRaw: WebGLTexture | null = null;
+    #paletteTex: EffectTexture | null = null;
+    #paletteKey: string | null = null;
+    #paletteSize = 2;
 
     // The backdrop image, and the param value it was loaded from.
     #image: EffectTexture | null = null;
@@ -1281,6 +1388,9 @@ export class GlassEffect implements Effect {
             this.#sdfTex = null;
             this.#reliefRaw = null;
             this.#reliefTex = null;
+            this.#paletteRaw = null;
+            this.#paletteTex = null;
+            this.#paletteKey = null;
             this.#pending = this.#shape;
             this.#backdropDirty = true;
         });
@@ -1337,6 +1447,7 @@ export class GlassEffect implements Effect {
             this.#phase = "ready";
         }
         this.#updateRelief(ctx);
+        this.#updatePalette(ctx);
         this.#updateImage(ctx);
         this.#updateBackdropMip(ctx);
         if (!this.#still) {
@@ -1502,8 +1613,8 @@ export class GlassEffect implements Effect {
                     halfDepth + bulge + Math.max(relief, 0),
                 ),
                 backdropOffset: t * p.backdropSpeed,
-                backdropA: hexToRgb(p.backdropColors[0]),
-                backdropB: hexToRgb(p.backdropColors[1]),
+                paletteTex: this.#paletteTex ?? sdfTex,
+                paletteSize: this.#paletteSize,
                 backdropRatio: Math.min(Math.max(p.backdropRatio, 0), 1),
                 backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
                 lightIntensity: Math.max(p.lightIntensity, 0),
@@ -1635,6 +1746,62 @@ export class GlassEffect implements Effect {
         }
     }
 
+    // Bake the palette into its texture when the colours change.
+    #updatePalette(ctx: EffectContext): void {
+        const colors = resolvePalette(this.params.backdropColors);
+        const key = colors.join(",");
+        if (key === this.#paletteKey) {
+            return;
+        }
+        this.#paletteKey = key;
+        this.#paletteSize = colors.length;
+        const gl = ctx.gl;
+        if (this.#paletteRaw) {
+            gl.deleteTexture(this.#paletteRaw);
+        }
+        this.#paletteRaw = null;
+        this.#paletteTex = null;
+        const levels = bakePalette(colors);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        levels.forEach((data, level) => {
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                level,
+                gl.RGBA16F,
+                data.length / 4,
+                1,
+                0,
+                gl.RGBA,
+                gl.FLOAT,
+                data,
+            );
+        });
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MIN_FILTER,
+            gl.LINEAR_MIPMAP_LINEAR,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        ctx.resetState();
+        if (!tex) {
+            return;
+        }
+        this.#paletteRaw = tex;
+        // A wrapped handle keeps the mip filter set here.
+        this.#paletteTex = ctx.wrapTexture(tex, {
+            size: [levels[0].length / 4, 1],
+            filter: "linear",
+            wrap: "clamp",
+        });
+    }
+
     // Load the backdrop image when `backdrop` changes to a new one.
     #updateImage(ctx: EffectContext): void {
         const src = this.params.backdrop;
@@ -1721,6 +1888,12 @@ export class GlassEffect implements Effect {
         if (this.#gl && this.#reliefRaw) {
             this.#gl.deleteTexture(this.#reliefRaw);
         }
+        if (this.#gl && this.#paletteRaw) {
+            this.#gl.deleteTexture(this.#paletteRaw);
+        }
+        this.#paletteRaw = null;
+        this.#paletteTex = null;
+        this.#paletteKey = null;
         this.#reliefRaw = null;
         this.#reliefTex = null;
         this.#gl = null;
