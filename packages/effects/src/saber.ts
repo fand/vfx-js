@@ -196,6 +196,7 @@ const GLSL_JAG = `
 ${SNOISE3D}
 
 uniform float sharpness;
+uniform float minCell;
 
 float hash(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -217,19 +218,26 @@ float lattice(vec3 p) {
     return mix(mix(a0, b0, w.y), mix(a1, b1, w.y), wt);
 }
 
-// Three octaves, each rotated so their kinks do not line up.
-float jag(vec2 x, float t) {
+// Octaves halve both the cell and the amplitude, so the slope is the same at every scale.
+// That gives straight runs with sharp kinks, like midpoint displacement.
+// Octaves finer than minCell fade out, so the line does not turn to fur.
+float jag(vec2 x, float t, float cell) {
     const mat2 turn = mat2(0.8, 0.6, -0.6, 0.8);
+    vec2 p = x / cell;
     float sum = 0.0;
     float amp = 1.0;
-    for (int i = 0; i < 3; i++) {
-        sum += lattice(vec3(x, t)) * amp;
-        x = turn * x * 2.2 + 17.1;
-        t = t * 1.6 + 3.7;
-        amp *= 0.55;
+    for (int i = 0; i < 6; i++) {
+        float fade = clamp(log2(cell / minCell) + 1.0, 0.0, 1.0);
+        if (fade <= 0.0) {
+            break;
+        }
+        sum += lattice(vec3(p, t)) * amp * fade;
+        p = turn * p * 2.0 + 17.1;
+        t = t * 1.5 + 3.7;
+        cell *= 0.5;
+        amp *= 0.5;
     }
-    // Soft limit to -1..1, so the line never leaves the band the early out keeps.
-    return tanh(sum * 1.1);
+    return clamp(sum * 0.8, -1.0, 1.0);
 }
 `;
 
@@ -247,18 +255,23 @@ uniform float thickness;
 uniform float time;
 uniform float burst;
 uniform float flicker;
+uniform float pixelRatio;
 uniform int lines;
 ${GLSL_JAG}
 
-const float MAIN_SHARE = 0.3;
-const float ARC_LEAN = 0.1;
-const float ARC_SCALE = 0.7;
+const float MAIN_SHARE = 0.45;
+const float ARC_LEAN = 0.25;
+const float ARC_WIDTH = 0.6;
+const float TOWARDS_PIXEL = 0.6;
 const float SNAPS_PER_SECOND = 16.0;
 
-// Soft clamp of the displacement to the room on each side of the contour.
+// Clamp the displacement to the room on each side of the contour.
+// A smooth min with a 2 px knee, so it only bends the line near the limit.
 float fit(float disp, vec2 room) {
-    float limit = min(disp > 0.0 ? room.x : room.y, amplitude) * 0.9 + 1e-3;
-    return limit * tanh(disp / limit);
+    float limit = min((disp > 0.0 ? room.x : room.y) * 0.9, amplitude);
+    float a = abs(disp);
+    float h = clamp(0.5 + 0.25 * (limit - a), 0.0, 1.0);
+    return sign(disp) * max(mix(limit, a, h) - 2.0 * h * (1.0 - h), 0.0);
 }
 
 void main() {
@@ -288,27 +301,33 @@ void main() {
             break;
         }
         float fi = float(i);
-        float lineScale = i > 0 ? scale * ARC_SCALE : scale;
-        vec2 x = q / lineScale + fi * vec2(31.7, 17.3);
         float lineAmp = amplitude * MAIN_SHARE;
+        float cell = scale * MAIN_SHARE;
+        float lean = 0.0;
         float width = thickness;
         float weight = 1.0;
         if (i > 0) {
-            // Arcs fade in and out along the contour; burst makes them rarer.
-            float env = snoise(vec3(q / (scale * 4.0) + fi * 7.3, t * 0.25)) * 0.5 + 0.5;
-            float low = burst * 0.7;
+            // Arcs switch on in short stretches along the contour; burst makes them rarer.
+            // They need room outside the element to jump into.
+            float env = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
+            float low = burst * 0.75;
             lineAmp = amplitude * smoothstep(low, low + 0.25, env);
-            width = thickness * 0.75;
-            weight = 0.85 * (1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5));
+            cell = scale;
+            lean = ARC_LEAN;
+            width = thickness * ARC_WIDTH;
+            weight = smoothstep(2.0, 8.0, room.x / pixelRatio);
+            weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
         }
+        // Sample the noise part of the way from q towards the pixel.
+        // Round a convex corner q stays put, so this keeps kinks there.
+        // It also halves the jitter that per-pixel normal errors put into q.
+        vec2 x = q + n * d * TOWARDS_PIXEL + fi * vec2(311.7, 173.3);
         float tLine = t * (1.0 + fi * 0.15);
-        // Arcs lean outwards, away from the element.
-        float lean = i > 0 ? ARC_LEAN : 0.0;
-        float jagHere = jag(x, tLine);
+        float jagHere = jag(x, tLine, cell);
         float disp = fit(lineAmp * mix(jagHere, 1.0, lean), room);
         float g = d - disp;
         // Slope of the line along the contour, from one step along the tangent.
-        float jagNext = jag(x + tangent / lineScale, tLine);
+        float jagNext = jag(x + tangent, tLine, cell);
         float dispNext = fit(lineAmp * mix(jagNext, 1.0, lean), roomNext);
         float slope = dispNext - disp;
         float slopeGrad = sqrt(1.0 + slope * slope);
@@ -428,6 +447,9 @@ export type SaberParams = {
     pad: number | "fullscreen";
 };
 
+// Smallest kink spacing of the lines, in CSS px.
+const MIN_CELL = 5;
+
 // Largest room for the line that the field build measures, in CSS px.
 const MAX_ROOM = 96;
 
@@ -440,14 +462,14 @@ const WHITE_MIX = 0.15;
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
-    thickness: 2,
-    amplitude: 24,
-    scale: 60,
+    thickness: 1.5,
+    amplitude: 28,
+    scale: 28,
     sharpness: 0.8,
     burst: 0.6,
     speed: 1,
     flicker: 0.3,
-    lines: 3,
+    lines: 2,
     glow: 1,
     glowFalloff: 0.6,
     edge: "alpha",
@@ -543,6 +565,8 @@ export class SaberEffect implements Effect {
                 amplitude: amplitude * pixelRatio,
                 scale: Math.max(scale, 1e-3) * pixelRatio,
                 thickness: thickness * pixelRatio,
+                minCell: MIN_CELL * pixelRatio,
+                pixelRatio,
                 sharpness,
                 burst,
                 flicker,

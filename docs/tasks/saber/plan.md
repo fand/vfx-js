@@ -37,34 +37,39 @@ Rebuild only when the buffer size, `edge` or `edgeThreshold` changes, when `inva
 3. **Resolve pass** → `field` (float, linear).
    - `r` = signed distance in px (negative inside: `m >= threshold`), `gb` = outward unit normal, `a` = valid flag.
 
+4. **Room pass** → `room` (float, linear), blurred with a 9-tap box on each axis.
+   - For each texel, march from its contour point along `+n` and `-n` until the field reports a nearer contour. `rg` = room outside and inside, in px, capped at 96 CSS px.
+   - The core pass clamps the displacement to it, so lines from two sides do not cross.
+
 Check that a render target with `persistent: false` keeps its content between frames when the effect does not draw to it. If the host clears it, use `persistent: true` for `field`.
 
 ### Per frame
 
-4. **Core pass** → `core` (float, linear, full buffer size).
+5. **Core pass** → `core` (float, linear, full buffer size).
    - Read `d` and the normal `n` from `field`. Foot point `q = p - d * n` (continuous in `p`, in px).
-   - Early out per 2×2 quad when `abs(d) > amplitude * 1.2 + thickness + 4.0`, so derivatives stay valid in drawn quads.
+   - Early out per 2×2 quad when `abs(d) > amplitude + thickness + 4.0`, so derivatives stay valid in drawn quads.
+   - Sample the noise at `q + n * d * 0.6`, not at `q`. At a convex corner `q` is fixed, and the line would be a round blob.
    - For each line `i < lines` (max 4):
-     - `disp = amplitude * envelope(q, t) * jag(q / scale + seed_i, t)`.
+     - `disp = fit(lineAmp * jag(x, t), room)`. `fit` is a smooth min against the room on that side.
      - `f = d - disp`. Line distance `dist = abs(f) / min(screenGrad, slopeGrad)`. This keeps the line width even on steep spikes.
        - `screenGrad = length(vec2(dFdx(f), dFdy(f)))`.
        - `slopeGrad = sqrt(1 + slope^2)`, with `slope` from one more `jag` call one px along the tangent.
        - `screenGrad` alone jumps on the medial axis and draws false lines there.
-     - `core += weight_i * smoothstep(thickness * 0.5 + 0.75, thickness * 0.5 - 0.75, dist)`.
-   - `jag`: 4 octaves of 3D simplex noise (`xy` = contour point, `z` = time), lacunarity 2, gain ~0.55. Blend plain fbm with ridged fbm by `sharpness`, so 1 gives sharp V corners. The ridged term is `0.9 - 2 * abs(n)` (zero mean), and its sign flips every other octave so kinks point both ways.
-   - `envelope`: low-frequency noise raised to a power, so some parts of the contour burst out and others stay calm. `burst` 0 gives envelope 1 everywhere.
-   - Time: `t = time * speed`. `flicker` mixes smooth time with stepped time (`floor(t * 16) / 16` plus a hash jump per step) so the bolts snap between shapes.
-   - Line 0 is the main line with full weight and a smaller amplitude (`amplitude * 0.35`). The other lines are thinner arcs with the full amplitude, their own seed and envelope.
+   - `jag`: value noise on a 3D lattice (`xy` = contour point, `z` = time), built like midpoint displacement: each octave halves the cell and the amplitude, so the slope is the same at every scale. `sharpness` blends smooth and linear interpolation; linear gives straight runs with kinks. Octaves finer than 5 CSS px fade out. Hard clamp to -1..1.
+   - Line 0 is the main line: smaller amplitude, finer cell, full weight, no envelope.
+   - The other lines are arcs: full amplitude, thinner, own seed. An envelope (low-frequency simplex) switches them on in short stretches; `burst` makes the stretches rarer. Arcs lean outward and only show where there is room outside.
+   - Time: `t = time * speed`. `flicker` mixes smooth time with time that snaps 16 times per second, and varies the arc brightness per snap.
    - Output is one HDR intensity channel (write it to `rgb`, `a = 1`).
-5. **Glow pyramid**: `createBloomPyramid(ctx, w, h, 8)` from `_bloom-common.ts`.
+6. **Glow pyramid**: `createBloomPyramid(ctx, w, h, 8)` from `_bloom-common.ts`.
    - Move the 13-tap downsample (`karis` uniform) from `bloom.ts` to `_bloom-common.ts` as `FRAG_BLOOM_DOWNSAMPLE` and use it in both effects. Use `karis: 1` on the first level to stop thin bright lines from flickering.
    - Upsample with `upsampleBloomPyramid`. Level weight `w_i = glowFalloff^i`, normalised so the weights sum to 1. `glowFalloff` near 1 gives a long tail, near 0 a tight halo.
    - Each level also gets a gain of `2^(i+1)`, so a thin line keeps its brightness as it blurs.
    - The level count follows `pad`, so the widest blur stays inside the buffer. The glow also fades out over the outer half of the pad.
    - The halo must look the same at every pixel ratio.
-6. **Composite pass** → `ctx.target`.
+7. **Composite pass** → `ctx.target`.
    - `light = core * coreIntensity + glow * glowIntensity`, both times `intensity`.
    - `rgb = 1 - exp(-light * mix(color, vec3(1), 0.08))`: the tinted halo burns to white at the core with no extra branch.
+   - Subtract one 8-bit step after the tonemap, so the tail ends along the glow and not at the pad edge.
    - Dither with interleaved gradient noise before output (same as `bloom.ts`).
    - `source: true` draws the element under the light (`src + light * (1 - ...)`, premultiplied, as in `bloom.ts`). `source: false` draws the light only.
    - Output premultiplied: `a = clamp(max(srcAlpha, max(rgb.r, rgb.g, rgb.b)), 0, 1)`.
@@ -79,25 +84,25 @@ export type SaberParams = {
     color: string;
     /** Overall brightness. Default 1. */
     intensity: number;
-    /** Core line width in CSS px. Default 2. */
+    /** Core line width in CSS px. Default 1.5. */
     thickness: number;
-    /** How far the line jumps off the contour, in CSS px. Default 12. */
+    /** How far the line jumps off the contour, in CSS px. Default 28. */
     amplitude: number;
-    /** Size of the largest jags, in CSS px. Default 60. */
+    /** Size of the largest jags, in CSS px. Default 28. */
     scale: number;
     /** 0 = smooth wobble, 1 = sharp spikes. Default 0.8. */
     sharpness: number;
-    /** 0 = even along the contour, 1 = bursts in places. Default 0.5. */
+    /** 0 = even along the contour, 1 = bursts in places. Default 0.6. */
     burst: number;
     /** Animation rate. 0 = frozen. Default 1. */
     speed: number;
-    /** 0 = smooth flow, 1 = bolts snap between shapes. Default 0.5. */
+    /** 0 = smooth flow, 1 = bolts snap between shapes. Default 0.3. */
     flicker: number;
-    /** Number of lines, 1..4. Default 3. */
+    /** Number of lines, 1..4. Default 2. */
     lines: number;
     /** Glow brightness against the core. Default 1. */
     glow: number;
-    /** Glow reach, 0..1. Default 0.7. */
+    /** Glow reach, 0..1. Default 0.6. */
     glowFalloff: number;
     /** What the contour is taken from. Default "alpha". */
     edge: "alpha" | "luminance";
