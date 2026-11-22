@@ -319,8 +319,7 @@ export const flow: StoryObj<Args> = {
     },
 };
 
-// Marble through a four-colour palette: the bands go through the colours
-// and back.
+// Marble through a four-colour palette: the bands go round the colours.
 export const marblePalette: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",

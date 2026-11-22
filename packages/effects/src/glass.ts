@@ -183,9 +183,9 @@ export type GlassParams = {
     /**
      * The palette of a procedural pattern: a {@link GlassPaletteName} or
      * two or more `#rrggbb` colours in order, each with an equal share of
-     * the area. One colour is a flat fill. Stripes and marble bands go
-     * through the colours and back; the grid nests them as concentric
-     * squares.
+     * the area. One colour is a flat fill. Stripes, marble bands and
+     * the flow go round the colours, the last running into the first;
+     * the grid nests them as concentric squares.
      */
     backdropColors: GlassPaletteName | readonly string[];
     /**
@@ -275,7 +275,7 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropSpeed: 0.15,
     backdropColors: "mono",
     backdropRatio: 0.5,
-    backdropSoftness: 0.06,
+    backdropSoftness: 0.03,
     lightIntensity: 1.5,
     lightSoftness: 0.15,
     yaw: 0.5,
@@ -472,6 +472,9 @@ uniform float backdropOffset;
 // The palette, baked along x with its own mip chain (the top level is
 // its mean), and its number of colours.
 uniform sampler2D paletteTex;
+// Turn of the palette that keeps the bands of two colours centred where
+// they are at an even split, whatever the ratio.
+uniform float paletteShift;
 uniform int paletteSize;
 uniform float backdropSoftness;
 
@@ -496,6 +499,8 @@ ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
 
 // The palette at u (0 first colour, 1 last), blurred over a width w of u.
+// Its texture repeats, so the last colour runs into the first, except for
+// the grid, whose u does not go round.
 // A mip level averages 2^lod texels, so the level follows w; the palette
 // is laid out so that its colours start on texel boundaries of every
 // level that is narrower than a colour.
@@ -538,10 +543,9 @@ vec3 backdrop(vec2 p, float fw) {
     float gu;
     float k = 1.0;
     if (backdropMode == 1) {
-        // Triangle wave across the stripes.
-        float s = fract((q.x - q.y) * 0.7071 + backdropOffset);
-        u = 1.0 - 2.0 * abs(s - 0.5);
-        gu = 2.0;
+        // Once round the palette per stripe period.
+        u = fract((q.x - q.y) * 0.7071 + backdropOffset + paletteShift);
+        gu = 1.0;
     } else if (backdropMode == 2) {
         // Distance t from the lines' centre, 0..0.5. The area within t of
         // a line is 1 - (1 - 2t)^2.
@@ -549,31 +553,31 @@ vec3 backdrop(vec2 p, float fw) {
         float a = 1.0 - 2.0 * min(g.x, g.y);
         u = a * a;
         gu = 4.0 * a;
-        k = 0.5 * gu;
+        k = gu;
     } else if (backdropMode == 3) {
         // "marble": contour bands of a slow noise field: closed loops
         // round its peaks, bands crowding where it is steep. A weaker
-        // second octave makes the widths irregular. u is a triangle wave
-        // of the contour phase.
+        // second octave makes the widths irregular. u goes once round the
+        // palette per contour.
         vec3 n = vec3(q * ${MARBLE_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
         vec4 b = snoiseD(n * vec3(2.3, 2.3, 1.5) + vec3(5.2, 1.3, 7.7));
         float s = (a.w + 0.2 * b.w) * ${MARBLE_BANDS};
-        u = 1.0 - 2.0 * abs(fract(s) - 0.5);
+        u = fract(s + paletteShift);
         vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
-        gu = 2.0 * ${MARBLE_BANDS} * length(g);
+        gu = ${MARBLE_BANDS} * length(g);
     } else {
-        // "flow": the direction of a 2D noise vector, as a triangle wave
-        // so there is no seam. Its gradient blows up where the vector
+        // "flow": the direction of a 2D noise vector, once round the
+        // palette per turn. Its gradient blows up where the vector
         // vanishes, which blurs to the palette's mean there.
         vec3 n = vec3(q * ${FLOW_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
         vec4 b = snoiseD(n + vec3(17.3, 5.1, 9.7));
         vec2 v = vec2(a.w, b.w);
         float h = atan(v.y, v.x) / 6.2832 + backdropOffset * 0.05;
-        u = abs(fract(h) * 2.0 - 1.0);
+        u = fract(h);
         vec2 ga = (v.x * b.xy - v.y * a.xy) / max(dot(v, v), 1e-8);
-        gu = length(ga) * ${FLOW_FREQ} / 3.1416;
+        gu = length(ga) * ${FLOW_FREQ} / 6.2832;
     }
     // Softness and filtering are one blur along u: the pixel's footprint
     // in u, or the softness in shares of a colour. Low softness matches
@@ -1322,8 +1326,10 @@ export class GlassEffect implements Effect {
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
     // The baked palette, and the colours it was baked from.
-    #paletteRaw: WebGLTexture | null = null;
+    // The palette twice: repeating, and clamped for the grid.
+    #paletteRaw: WebGLTexture[] = [];
     #paletteTex: EffectTexture | null = null;
+    #paletteClampTex: EffectTexture | null = null;
     #paletteKey: string | null = null;
     #paletteSize = 2;
 
@@ -1370,8 +1376,9 @@ export class GlassEffect implements Effect {
             this.#sdfTex = null;
             this.#reliefRaw = null;
             this.#reliefTex = null;
-            this.#paletteRaw = null;
+            this.#paletteRaw = [];
             this.#paletteTex = null;
+            this.#paletteClampTex = null;
             this.#paletteKey = null;
             this.#pending = this.#shape;
             this.#backdropDirty = true;
@@ -1595,8 +1602,15 @@ export class GlassEffect implements Effect {
                     halfDepth + bulge + Math.max(relief, 0),
                 ),
                 backdropOffset: t * p.backdropSpeed,
-                paletteTex: this.#paletteTex ?? sdfTex,
+                paletteTex:
+                    (mode === PATTERN_MODES.grid
+                        ? this.#paletteClampTex
+                        : this.#paletteTex) ?? sdfTex,
                 paletteSize: this.#paletteSize,
+                paletteShift:
+                    this.#paletteSize === 2
+                        ? 0.5 - Math.min(Math.max(p.backdropRatio, 0), 1) / 2
+                        : 0,
                 backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
                 lightIntensity: Math.max(p.lightIntensity, 0),
                 lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
@@ -1743,50 +1757,63 @@ export class GlassEffect implements Effect {
         this.#paletteKey = key;
         this.#paletteSize = colors.length;
         const gl = ctx.gl;
-        if (this.#paletteRaw) {
-            gl.deleteTexture(this.#paletteRaw);
+        for (const tex of this.#paletteRaw) {
+            gl.deleteTexture(tex);
         }
-        this.#paletteRaw = null;
+        this.#paletteRaw = [];
         this.#paletteTex = null;
+        this.#paletteClampTex = null;
         const levels = bakePalette(colors, ratio);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-        const tex = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        levels.forEach((data, level) => {
-            gl.texImage2D(
+        const upload = (repeat: boolean): EffectTexture | null => {
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            levels.forEach((data, level) => {
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    level,
+                    gl.RGBA16F,
+                    data.length / 4,
+                    1,
+                    0,
+                    gl.RGBA,
+                    gl.FLOAT,
+                    data,
+                );
+            });
+            gl.texParameteri(
                 gl.TEXTURE_2D,
-                level,
-                gl.RGBA16F,
-                data.length / 4,
-                1,
-                0,
-                gl.RGBA,
-                gl.FLOAT,
-                data,
+                gl.TEXTURE_MIN_FILTER,
+                gl.LINEAR_MIPMAP_LINEAR,
             );
-        });
-        gl.texParameteri(
-            gl.TEXTURE_2D,
-            gl.TEXTURE_MIN_FILTER,
-            gl.LINEAR_MIPMAP_LINEAR,
-        );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(
+                gl.TEXTURE_2D,
+                gl.TEXTURE_WRAP_S,
+                repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE,
+            );
+            gl.texParameteri(
+                gl.TEXTURE_2D,
+                gl.TEXTURE_WRAP_T,
+                gl.CLAMP_TO_EDGE,
+            );
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            if (!tex) {
+                return null;
+            }
+            this.#paletteRaw.push(tex);
+            // A wrapped handle keeps the mip filter set here.
+            return ctx.wrapTexture(tex, {
+                size: [levels[0].length / 4, 1],
+                filter: "linear",
+                wrap: [repeat ? "repeat" : "clamp", "clamp"],
+            });
+        };
+        this.#paletteTex = upload(true);
+        this.#paletteClampTex = upload(false);
         ctx.resetState();
-        if (!tex) {
-            return;
-        }
-        this.#paletteRaw = tex;
-        // A wrapped handle keeps the mip filter set here.
-        this.#paletteTex = ctx.wrapTexture(tex, {
-            size: [levels[0].length / 4, 1],
-            filter: "linear",
-            wrap: "clamp",
-        });
     }
 
     // Load the backdrop image when `backdrop` changes to a new one.
@@ -1875,11 +1902,14 @@ export class GlassEffect implements Effect {
         if (this.#gl && this.#reliefRaw) {
             this.#gl.deleteTexture(this.#reliefRaw);
         }
-        if (this.#gl && this.#paletteRaw) {
-            this.#gl.deleteTexture(this.#paletteRaw);
+        if (this.#gl) {
+            for (const tex of this.#paletteRaw) {
+                this.#gl.deleteTexture(tex);
+            }
         }
-        this.#paletteRaw = null;
+        this.#paletteRaw = [];
         this.#paletteTex = null;
+        this.#paletteClampTex = null;
         this.#paletteKey = null;
         this.#reliefRaw = null;
         this.#reliefTex = null;
