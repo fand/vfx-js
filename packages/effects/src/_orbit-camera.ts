@@ -20,6 +20,12 @@
 // principalPx = centerPx + eye.xy * unitPx and focalPx = eye.z * unitPx,
 // the z = 0 plane lands on centerPx + q.xy * unitPx wherever the eye is:
 // moving the eye sideways only moves the vanishing point.
+//
+// Hit area: the DOM element stays flat where it was, so the browser hit
+// tests its untransformed box. With `hitArea` set, every update writes a
+// CSS `matrix3d()` to that element that lays its box over where the
+// shape's front face is drawn (see `hitAreaMatrix`), so clicks, `:hover`
+// and the cursor follow the picture.
 
 import type { EffectDims } from "@vfx-js/core";
 
@@ -66,7 +72,9 @@ export type OrbitCameraParams = {
      * pointer events on `window`, and a drag that orbits keeps the
      * browser from dragging the element (an image, a link) or selecting
      * its text; UI on top of the element that should not orbit can stop
-     * `pointerdown` propagation.
+     * `pointerdown` propagation. A drag that moved more than a few px
+     * swallows the `click` that ends it, so dragging a button or a link
+     * does not activate it; a press that barely moved still clicks.
      */
     drag: boolean;
     /**
@@ -98,6 +106,32 @@ export type OrbitCameraParams = {
      * `pointer` modes say what it does for them.
      */
     pointerStrength: number;
+    /**
+     * An element that follows the drawn shape, so the browser's hit
+     * testing (clicks, `:hover`, the cursor) matches the picture instead
+     * of the element's flat box. `null` (default) touches no DOM.
+     *
+     * Each frame the effect sets its inline `transform` (and
+     * `transform-origin` to its centre) to a `matrix3d()` that lays its
+     * box over where the front face of the shape is drawn: the flat cap
+     * at `depth / 2` in front of the mid-plane (a `bulge` or `relief` is
+     * not followed). Its own untransformed box must cover the source
+     * element's border box exactly, and must not be the source element
+     * itself (its rect would move with the transform). While the front
+     * face points away from the camera, it is `scale(0)`, so it catches
+     * nothing. Its inline `transform` and `transform-origin` are put back
+     * when the param changes and when the effect is removed.
+     *
+     * For a `<button>`: a transparent child with
+     * `position: absolute; inset: calc(-1 * <border width>)` and
+     * `pointer-events: auto`, and `pointer-events: none` with
+     * `position: relative` on the button. Clicks on the child activate
+     * the button and `button:hover` follows it. For an element without
+     * children (`<img>`), an overlay sibling over its box.
+     *
+     * With {@link drag}, a drag also starts on this element.
+     */
+    hitArea: HTMLElement | null;
 };
 
 type NumKey =
@@ -143,6 +177,11 @@ export const TILT_DEG = 20;
 export const TILT_MAX_DEG = 90;
 // Degrees to radians: the camera angles in params are degrees.
 const DEG = Math.PI / 180;
+// A drag that moved further than this (CSS px) from where it started
+// swallows the click that ends it.
+export const CLICK_SLOP_PX = 4;
+// The hit area's transform while the front face points away.
+export const HIT_AREA_HIDDEN = "scale(0)";
 
 /** Params checked: finite and in range, or the default. */
 export function resolveOrbitCamera(
@@ -163,7 +202,17 @@ export function resolveOrbitCamera(
         p.cameraOrigin === "viewport" || p.cameraOrigin === "element"
             ? p.cameraOrigin
             : defaults.cameraOrigin;
+    out.hitArea = hitAreaOf(p.hitArea);
     return out;
+}
+
+/** `v` if it is an element whose style can be set, else null. */
+export function hitAreaOf(v: unknown): HTMLElement | null {
+    return typeof v === "object" &&
+        v !== null &&
+        typeof (v as HTMLElement).style?.setProperty === "function"
+        ? (v as HTMLElement)
+        : null;
 }
 
 /** What the camera needs from a frame. */
@@ -199,6 +248,11 @@ export type OrbitCameraInput = {
      * off, for an effect's own pointer interaction.
      */
     trackPointer?: boolean;
+    /**
+     * z of the shape's front face in world units (half its depth): the
+     * plane the params' `hitArea` follows. 0 when not finite.
+     */
+    faceZ?: number;
 };
 
 /** The camera of a frame. Positions are output px, bottom-left origin. */
@@ -254,6 +308,81 @@ function viewportCenter(
 }
 
 /**
+ * The CSS transform that lays an element's box over the shape's plane
+ * z = `faceZ` as drawn, for hit testing: 16 numbers for `matrix3d()`
+ * (column-major), with `transform-origin` at the element's centre.
+ *
+ * The element's box is the source element's (`elementPx`, physical px):
+ * its CSS point (x, y) from the centre, y down, is the shape point
+ * ((x, -y) * pixelRatio / (long side / 2), faceZ), which the camera
+ * projects as in the header comment. That is a homography in (x, y, 1);
+ * the matrix is it in rows x, y and w, with z passed through so it stays
+ * invertible, scaled so w = 1 at the centre when the centre is in front
+ * of the eye.
+ *
+ * Null when the plane faces away from the eye or passes through it, or
+ * when a number is not finite.
+ */
+export function hitAreaMatrix(
+    view: OrbitCameraView,
+    elementPx: readonly [number, number],
+    pixelRatio: number,
+    faceZ: number,
+): number[] | null {
+    const half = Math.max(elementPx[0], elementPx[1]) / 2;
+    const pr = pixelRatio;
+    if (!(half > 0) || !(pr > 0)) {
+        return null;
+    }
+    const R = view.viewRot;
+    const [ex, ey, ez] = view.eye;
+    // The face's normal in view space is R's third column; its centre is
+    // faceZ along it. It faces the eye if the eye is on its front side.
+    const facing = ex * R[6] + ey * R[7] + ez * R[8] - faceZ;
+    if (!(facing > 1e-6)) {
+        return null;
+    }
+    // Shape units per CSS px, and the face's axes per CSS px (y down).
+    const k = pr / half;
+    const ax = [k * R[0], k * R[1], k * R[2]];
+    const ay = [-k * R[3], -k * R[4], -k * R[5]];
+    // The face's centre relative to the eye's xy (z as is).
+    const c = [faceZ * R[6] - ex, faceZ * R[7] - ey, faceZ * R[8]];
+    // Depth: w = eye.z - q.z, affine in (x, y).
+    const w = [-ax[2], -ay[2], ez - c[2]];
+    // Output px from the drawn centre, y up, times w:
+    //   (principalPx - centerPx) * w + (q.xy - eye.xy) * focalPx
+    // then CSS px, y down.
+    const f = view.focalPx;
+    const dx = view.principalPx[0] - view.centerPx[0];
+    const dy = view.principalPx[1] - view.centerPx[1];
+    const X = [
+        (dx * w[0] + f * ax[0]) / pr,
+        (dx * w[1] + f * ay[0]) / pr,
+        (dx * w[2] + f * c[0]) / pr,
+    ];
+    const Y = [
+        -(dy * w[0] + f * ax[1]) / pr,
+        -(dy * w[1] + f * ay[1]) / pr,
+        -(dy * w[2] + f * c[1]) / pr,
+    ];
+    const s = 1 / (w[2] > 1e-6 ? w[2] : ez);
+    // biome-ignore format: a 4 × 4 matrix, one column per row
+    const m = [
+        X[0] * s, Y[0] * s, 0, w[0] * s,
+        X[1] * s, Y[1] * s, 0, w[1] * s,
+        0, 0, s, 0,
+        X[2] * s, Y[2] * s, 0, w[2] * s,
+    ];
+    return m.every(Number.isFinite) ? m : null;
+}
+
+/** `matrix3d()` of 16 numbers, column-major. */
+export function cssMatrix3d(m: readonly number[]): string {
+    return `matrix3d(${m.join(",")})`;
+}
+
+/**
  * The orbit camera: params and a frame's inputs in, the camera out. Owns
  * the pointer drag, the hover tilt and whether the pointer is in the
  * page, and the window listeners for them, which are there only while
@@ -268,7 +397,21 @@ export class OrbitCamera {
     #dragPitch = 0;
     #dragging = false;
     #lastPointer: [number, number] = [0, 0];
+    // Where the drag started (client px), and whether it went further
+    // than CLICK_SLOP_PX from there.
+    #dragStart: [number, number] = [0, 0];
+    #dragMoved = false;
     #unlistenDrag: (() => void) | null = null;
+    // Removes the listener that swallows the click after a drag.
+    #unswallow: (() => void) | null = null;
+    // The hit area being transformed, its inline styles from before, and
+    // the transform last written.
+    #hit: {
+        el: HTMLElement;
+        transform: [string, string];
+        origin: [string, string];
+        css: string;
+    } | null = null;
     // As of the last update: the map from viewport to element-local px
     // (add to (clientX, innerHeight - clientY) × pr), for where drags
     // start.
@@ -408,7 +551,7 @@ export class OrbitCamera {
             ex = (px - cx) / unitPx;
             ey = (py - cy) / unitPx;
         }
-        return {
+        const view: OrbitCameraView = {
             viewRot: viewMatrix(yaw, pitch),
             camDist,
             unitPx,
@@ -418,11 +561,66 @@ export class OrbitCamera {
             principalPx: [px - ox, py - oy],
             origin: [ox, oy],
         };
+        this.#syncHitArea(p.hitArea, view, input);
+        return view;
+    }
+
+    // Restore the old hit area when it changed, then transform the
+    // current one onto the drawn front face.
+    #syncHitArea(
+        el: HTMLElement | null,
+        view: OrbitCameraView,
+        input: OrbitCameraInput,
+    ): void {
+        if (this.#hit && this.#hit.el !== el) {
+            this.#restoreHitArea();
+        }
+        if (!el) {
+            return;
+        }
+        const st = el.style;
+        if (!this.#hit) {
+            const saved = (k: string): [string, string] => [
+                st.getPropertyValue(k),
+                st.getPropertyPriority(k),
+            ];
+            this.#hit = {
+                el,
+                transform: saved("transform"),
+                origin: saved("transform-origin"),
+                css: "",
+            };
+            st.setProperty("transform-origin", "50% 50%");
+        }
+        const z = input.faceZ;
+        const m = hitAreaMatrix(
+            view,
+            input.dims.elementPixel,
+            input.pixelRatio,
+            typeof z === "number" && Number.isFinite(z) ? z : 0,
+        );
+        const css = m ? cssMatrix3d(m) : HIT_AREA_HIDDEN;
+        if (css !== this.#hit.css) {
+            this.#hit.css = css;
+            st.setProperty("transform", css);
+        }
+    }
+
+    #restoreHitArea(): void {
+        const hit = this.#hit;
+        if (!hit) {
+            return;
+        }
+        this.#hit = null;
+        const st = hit.el.style;
+        st.setProperty("transform", ...hit.transform);
+        st.setProperty("transform-origin", ...hit.origin);
     }
 
     /** Remove the listeners and forget the pointer state. */
     dispose(): void {
         this.#syncListeners(false, false);
+        this.#restoreHitArea();
         this.#dragYaw = 0;
         this.#dragPitch = 0;
         this.#tiltYaw = 0;
@@ -440,6 +638,7 @@ export class OrbitCamera {
             this.#unlistenDrag();
             this.#unlistenDrag = null;
             this.#dragging = false;
+            this.#unswallow?.();
         }
         if (hover) {
             this.#listenHover();
@@ -455,15 +654,26 @@ export class OrbitCamera {
             return;
         }
         const down = (e: PointerEvent) => {
-            if (!this.#onElement(e.clientX, e.clientY)) {
+            this.#unswallow?.();
+            if (!this.#onElement(e.clientX, e.clientY) && !this.#onHitArea(e)) {
                 return;
             }
             this.#dragging = true;
+            this.#dragMoved = false;
             this.#lastPointer = [e.clientX, e.clientY];
+            this.#dragStart = [e.clientX, e.clientY];
         };
         const move = (e: PointerEvent) => {
             if (!this.#dragging) {
                 return;
+            }
+            if (
+                Math.hypot(
+                    e.clientX - this.#dragStart[0],
+                    e.clientY - this.#dragStart[1],
+                ) > CLICK_SLOP_PX
+            ) {
+                this.#dragMoved = true;
             }
             const dx = e.clientX - this.#lastPointer[0];
             const dy = e.clientY - this.#lastPointer[1];
@@ -475,7 +685,10 @@ export class OrbitCamera {
                 DRAG_PITCH_MAX,
             );
         };
-        const up = () => {
+        const up = (e: PointerEvent) => {
+            if (this.#dragging && this.#dragMoved && e.type === "pointerup") {
+                this.#swallowClick();
+            }
             this.#dragging = false;
         };
         // The browser's own drag (of an image, a link, selected text) and
@@ -499,6 +712,37 @@ export class OrbitCamera {
             window.removeEventListener("pointerup", up);
             window.removeEventListener("pointercancel", up);
         };
+    }
+
+    // A drag that orbited ends with a click on whatever is under the
+    // pointer (the element, a button): swallow that one click, in the
+    // capture phase on window, before anything sees it. The click comes
+    // in the same task as the pointerup, so the listener goes after it.
+    #swallowClick(): void {
+        this.#unswallow?.();
+        const swallow = (e: Event) => {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            this.#unswallow?.();
+        };
+        window.addEventListener("click", swallow, { capture: true });
+        const timer = setTimeout(() => this.#unswallow?.(), 0);
+        this.#unswallow = () => {
+            window.removeEventListener("click", swallow, { capture: true });
+            clearTimeout(timer);
+            this.#unswallow = null;
+        };
+    }
+
+    // Whether the event is on the hit area (see `hitArea`).
+    #onHitArea(e: Event): boolean {
+        const el = this.#hit?.el;
+        if (!el) {
+            return false;
+        }
+        return typeof e.composedPath === "function"
+            ? e.composedPath().includes(el)
+            : false;
     }
 
     // Whether a client point is on the element's box, as of the last

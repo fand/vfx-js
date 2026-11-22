@@ -35,6 +35,7 @@ import {
 } from "./_bloom-common.js";
 import { parseHexColor } from "./_figma-common.js";
 import {
+    hitAreaOf,
     ORBIT_CAMERA_RANGE,
     OrbitCamera,
     type OrbitCameraParams,
@@ -349,6 +350,7 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     zoom: 1.0,
     drag: false,
     cameraOrigin: "element",
+    hitArea: null,
     pointer: "none",
     pointerRadius: 120,
     pointerStrength: 1,
@@ -1301,6 +1303,7 @@ type Resolved = Record<NumKey, number> & {
     shadow: boolean;
     drag: boolean;
     cameraOrigin: SwirlParticleParams["cameraOrigin"];
+    hitArea: HTMLElement | null;
     antialias: boolean;
     pointer: SwirlParticlePointer;
     /** Unit vector towards the light. */
@@ -1374,6 +1377,7 @@ function resolveParams(p: SwirlParticleParams, out?: Resolved): Resolved {
     r.shadow = !!p.shadow;
     r.drag = !!p.drag;
     r.cameraOrigin = p.cameraOrigin === "viewport" ? "viewport" : "element";
+    r.hitArea = hitAreaOf(p.hitArea);
     r.antialias = !!p.antialias;
     r.pointer =
         p.pointer === "repel" || p.pointer === "tilt" ? p.pointer : "none";
@@ -1858,6 +1862,8 @@ export class SwirlParticleEffect implements Effect {
         put(oy);
         // "viewport": the camera follows the element's place in it.
         put(r.cameraOrigin);
+        // A new hit area is placed when the camera updates.
+        put(r.hitArea);
         if (r.cameraOrigin === "viewport") {
             put(dims.canvasRect[0] + dims.canvasRect[2] / 2);
             put(dims.canvasRect[1] + dims.canvasRect[3] / 2);
@@ -2177,6 +2183,7 @@ export class SwirlParticleEffect implements Effect {
             live: !this.#still,
             tilt: r.pointer === "tilt",
             trackPointer: r.pointer !== "none",
+            faceZ: r.depth / 2,
         });
     }
 

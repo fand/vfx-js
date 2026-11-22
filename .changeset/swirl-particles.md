@@ -20,3 +20,5 @@ Add `SwirlParticleEffect`: particles flow over the element's silhouette, extrude
 - `antialias: true` smooths the fibres' edges with 4× MSAA, at about 5× the memory of the particle buffer (10× with its depth). Off by default.
 - `new SwirlParticleEffect(params, { still: true })` renders one still frame, drawn again only when params or the element's size change (or, with `cameraOrigin: "viewport"`, its position in the viewport).
 - New types: `SwirlParticleParams`, `SwirlParticleColorStop`, `SwirlParticlePaletteName`, `SwirlParticleEffectOptions`, `SwirlParticlePointer`.
+- `hitArea`: an element the effect keeps over where the shape's front face is drawn, through an inline `transform: matrix3d(...)`, so clicks, `:hover` and the cursor follow the turned shape instead of the element's flat box. Off (`null`) by default, with no DOM writes. Part of `OrbitCameraParams`, shared with `GlassEffect`.
+- `drag`: a drag that moved more than a few px swallows the `click` that ends it.

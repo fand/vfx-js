@@ -315,6 +315,7 @@ const DEFAULT_PARAMS: GlassParams = {
     zoom: 0.7,
     drag: false,
     cameraOrigin: "element",
+    hitArea: null,
     pointer: "none",
     pointerStrength: 1,
     resolution: 1,
@@ -1473,6 +1474,8 @@ export class GlassEffect implements Effect {
             pixelRatio: ctx.pixelRatio,
             live: !this.#still,
             tilt: this.params.pointer === "tilt",
+            // The front cap, as #drawGlass places it.
+            faceZ: Math.max(this.params.depth / 2, 0.005),
         });
         const scene = this.#drawGlass(ctx, cam);
         const debug = this.#debugView() !== 0;

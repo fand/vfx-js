@@ -86,12 +86,30 @@ await vfx.add(logo, {
 ```
 
 - `sourceChannel` (`SourceChannel`): what the silhouette is: `"alpha"` (where the element is opaque; default), `"luminance"` (where it is bright, e.g. the text of an opaque button) or `"none"` (the whole element rect). An opaque photo with `"alpha"` becomes a slab.
-- Camera: `yaw` / `pitch` (the rest pose; positive turns the front to the right / down), `orbitAnimation` (amplitude of a slow back-and-forth camera swing; 0 = still), `orbitSpeed` (speed multiplier of `orbitAnimation`; 0 stops it), `fov` (across the element's long side; only changes the strength of the perspective), `zoom` (1 = the shape's mid-plane matches the element's size), `drag: true` to orbit by dragging (a drag starts on the element and can then leave it), `cameraOrigin: "viewport"` to put the camera in front of the viewport's centre instead of the element's (off-centre elements are seen from the side and change as the page scrolls; may need a bigger `pad`).
+- Camera: `yaw` / `pitch` (the rest pose; positive turns the front to the right / down), `orbitAnimation` (amplitude of a slow back-and-forth camera swing; 0 = still), `orbitSpeed` (speed multiplier of `orbitAnimation`; 0 stops it), `fov` (across the element's long side; only changes the strength of the perspective), `zoom` (1 = the shape's mid-plane matches the element's size), `drag: true` to orbit by dragging (a drag starts on the element, or on `hitArea`, and can then leave it; a drag that moved more than a few px swallows the `click` that ends it), `cameraOrigin: "viewport"` to put the camera in front of the viewport's centre instead of the element's (off-centre elements are seen from the side and change as the page scrolls; may need a bigger `pad`).
 - `pointer: "tilt"`: hover parallax. The shape turns to face the pointer, up to 20° × `pointerStrength` (capped at 90°) when the pointer is half a viewport from the element's centre, and back when it leaves the page. `HoloEffect`'s `tiltRange` differs: it is reached at the element's edge, and only while the pointer is over the element. Default `pointer: "none"`.
 - `pointerStrength` (0 to 100, default 1): strength of the pointer interaction, one param for every `pointer` mode: the tilt angle with `"tilt"`, the push with `SwirlParticleEffect`'s `"repel"`. 0 turns it off.
 - `antialias`: smooth the edges. `GlassEffect`: FXAA on the final image, on by default (the glass is ray-marched, so multisampling would not help; `resolution: 2` is the thorough fix). `SwirlParticleEffect`: 4× MSAA of the fibres, off by default (memory-heavy with a large `pad` at high DPR).
 - `pad`: room to draw around the element, in CSS px, or `"fullscreen"`.
-- `{ still: true }` (constructor's second argument) renders a still frame, for visual tests and `prefers-reduced-motion`; it ignores `pointer` and `drag`.
+- `hitArea` (`HTMLElement | null`, default `null`): make clicks, `:hover` and the cursor follow the drawn shape. The element itself stays flat and invisible where it was, so the browser hit tests its box; with `hitArea`, the effect sets that element's inline `transform` (a `matrix3d()`) and `transform-origin` every frame so its box lies over the drawn front face (the flat cap at `depth / 2`; a `bulge` or `relief` is not followed, side walls are not included). Its untransformed box must be exactly the source element's border box, and it must not be the source element itself. While the front face points away from the camera it is `scale(0)` and catches nothing. The inline styles are put back when the param changes and when the effect is removed. Still frames place it too. Recipe for a button: a transparent child carries the hit area and the button's own box does not; a click on the child activates the button, `button:hover` follows it, and Tab / Enter / Space work as usual:
+
+  ```html
+  <button id="buy">Buy<span class="hit"></span></button>
+  <style>
+    #buy { position: relative; pointer-events: none; border: 2px solid; }
+    /* inset: 0 is the padding box; reach out over the border */
+    #buy .hit { position: absolute; inset: -2px; pointer-events: auto; }
+  </style>
+  <script type="module">
+    const buy = document.getElementById("buy");
+    await vfx.add(buy, {
+      effect: new GlassEffect({ pointer: "tilt", hitArea: buy.querySelector(".hit") }),
+    });
+  </script>
+  ```
+
+  An element that cannot have children (`<img>`, `<video>`, `<input>`) gets a sibling overlay instead: wrap both in a `position: relative` box and put an absolutely positioned element over it with the same size (listen for clicks on the overlay). The transformed hit area counts towards scrollable overflow like any transformed element, so one near the right or bottom edge of a scroll container can add scroll; clip with `overflow: clip` on an ancestor if that matters. In React, set it after mount: `effect.params.hitArea = ref.current`.
+- `{ still: true }` (constructor's second argument) renders a still frame, for visual tests and `prefers-reduced-motion`; it ignores `pointer` and `drag` (not `hitArea`).
 - The silhouette is read back at start and when the element's aspect ratio changes, or when `sourceChannel` changes. After changing the element's content (e.g. `img.src`, then `await vfx.update(img)`), call `effect.refresh()`.
 - All params are read every frame, so `effect.params.pointer = "tilt"` works live.
 

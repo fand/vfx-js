@@ -69,6 +69,11 @@ type Args = {
     backdrop: string;
     /** Overrides of the effect defaults for this story. */
     params?: Partial<Omit<GlassParams, "backdrop">>;
+    /**
+     * Make clicks and hover follow the glass: HTML sources get a
+     * transparent child as `hitArea`, and a click counter shows.
+     */
+    hitArea?: boolean;
 };
 
 function createSource(key: SourceKey): HTMLElement {
@@ -83,6 +88,23 @@ function createSource(key: SourceKey): HTMLElement {
     el.style.cssText = source.style;
     el.textContent = source.text;
     return el;
+}
+
+// The hit area recipe: the element's own box lets the pointer through,
+// a transparent child over its border box catches it, and the effect
+// moves the child onto the glass's front face. The sources' `border: 0`
+// makes the padding box (`inset: 0`) the border box. An `<img>` can't
+// have children; it gets none here.
+function addHitArea(el: HTMLElement): HTMLElement | null {
+    if (el instanceof HTMLImageElement) {
+        return null;
+    }
+    el.style.position = "relative";
+    el.style.pointerEvents = "none";
+    const hit = document.createElement("span");
+    hit.style.cssText = "position: absolute; inset: 0; pointer-events: auto";
+    el.appendChild(hit);
+    return hit;
 }
 
 function whenLoaded(el: HTMLElement): Promise<void> {
@@ -136,10 +158,13 @@ export default {
             return untouched ? storyColors : [colors.a, colors.b];
         };
         let backdropKey = args.backdrop;
+        // The current source's hit area, when the story has one.
+        let hit: HTMLElement | null = null;
         const current = (): GlassParams => ({
             ...params,
             backdrop: resolveBackdrop(backdropKey),
             backdropColors: palette(),
+            hitArea: hit,
         });
 
         let sourceKey: SourceKey = args.source;
@@ -149,6 +174,23 @@ export default {
         let token = 0;
         // `remove` must wait for a pending `add` on the same element.
         let adding: Promise<void> = Promise.resolve();
+
+        // Clicks on the source, and whether it is hovered.
+        let clicks = 0;
+        const status = document.createElement("div");
+        status.style.cssText =
+            "position: fixed; left: 16px; bottom: 16px; color: #fff; font: 14px/1.4 system-ui, sans-serif; pointer-events: none";
+        const showStatus = () => {
+            const hovered = el?.matches(":hover") ?? false;
+            status.textContent = `clicks: ${clicks} · hover: ${hovered ? "yes" : "no"}`;
+            status.style.color = hovered ? "#7fffb0" : "#fff";
+        };
+        if (args.hitArea) {
+            root.appendChild(status);
+            root.addEventListener("pointerover", showStatus);
+            root.addEventListener("pointerout", showStatus);
+            showStatus();
+        }
 
         const apply = () => {
             if (effect) {
@@ -161,6 +203,13 @@ export default {
             const prev = el;
             const next = createSource(sourceKey);
             el = next;
+            hit = args.hitArea ? addHitArea(next) : null;
+            if (args.hitArea) {
+                next.addEventListener("click", () => {
+                    clicks++;
+                    showStatus();
+                });
+            }
             if (prev) {
                 prev.replaceWith(next);
                 await adding.catch(() => {});
@@ -249,5 +298,24 @@ export const htmlButton: StoryObj<Args> = {
         source: "HTML button",
         backdrop: "grid",
         params: { relief: -0.05 },
+    },
+};
+
+// Clicks, hover and the cursor follow the turned glass, not the button's
+// flat box: a transparent child is the `hitArea`. Drag to orbit; the
+// click that ends a drag is swallowed, a plain click counts.
+export const hitArea: StoryObj<Args> = {
+    args: {
+        source: "HTML button",
+        backdrop: "grid",
+        hitArea: true,
+        params: {
+            relief: -0.05,
+            yaw: 35,
+            orbitAnimation: 0,
+            fov: 50,
+            pointer: "tilt",
+            pointerStrength: 1.5,
+        },
     },
 };

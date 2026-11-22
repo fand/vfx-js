@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
+    CLICK_SLOP_PX,
+    cssMatrix3d,
     DRAG_PITCH_MAX,
     DRAG_RAD_PER_PX,
+    HIT_AREA_HIDDEN,
+    hitAreaMatrix,
+    hitAreaOf,
     OrbitCamera,
     type OrbitCameraInput,
     type OrbitCameraParams,
@@ -25,6 +30,7 @@ const PARAMS: OrbitCameraParams = {
     drag: false,
     cameraOrigin: "element",
     pointerStrength: 1,
+    hitArea: null,
 };
 
 // The matrix as it was built before the camera moved here, radians.
@@ -355,9 +361,9 @@ function fakeWindow(width = 1000, height = 800) {
             added.push(type);
             target.addEventListener(type, fn, opts as AddEventListenerOptions);
         },
-        removeEventListener(type: string, fn: Listener) {
+        removeEventListener(type: string, fn: Listener, opts?: unknown) {
             added.splice(added.indexOf(type), 1);
-            target.removeEventListener(type, fn);
+            target.removeEventListener(type, fn, opts as EventListenerOptions);
         },
     };
     const fire = (type: string, props: Record<string, unknown> = {}) => {
@@ -524,5 +530,406 @@ describe("OrbitCamera, pointer", () => {
         c.update(PARAMS, at(100, { live: false }));
         expect(c.offsets.tiltPitch).toBeCloseTo(0, 12);
         expect(w.added).toEqual([]);
+    });
+});
+
+/**
+ * Where CSS point (x, y) of a box of w × h CSS px lands under a
+ * `matrix3d` with `transform-origin` at its centre, as the browser does
+ * it: from the centre, through the matrix, divided by w.
+ */
+function applyCss(
+    m: readonly number[],
+    size: readonly [number, number],
+    p: readonly [number, number],
+): [number, number] {
+    const x = p[0] - size[0] / 2;
+    const y = p[1] - size[1] / 2;
+    const X = m[0] * x + m[4] * y + m[12];
+    const Y = m[1] * x + m[5] * y + m[13];
+    const W = m[3] * x + m[7] * y + m[15];
+    return [X / W + size[0] / 2, Y / W + size[1] / 2];
+}
+
+/**
+ * Where the shape point under CSS point (x, y) of the element (CSS px,
+ * top-left origin) is drawn on its plane z = faceZ, in CSS px of the
+ * element's box (top-left origin): the projection of the header comment,
+ * then output px (bottom-left, physical) to CSS.
+ */
+function drawnCss(
+    cam: OrbitCameraView,
+    at: OrbitCameraInput,
+    faceZ: number,
+    p: readonly [number, number],
+): [number, number] {
+    const pr = at.pixelRatio;
+    const [ew, eh] = at.dims.elementPixel;
+    const half = Math.max(ew, eh) / 2;
+    const shape = [
+        (p[0] * pr - ew / 2) / half,
+        (eh / 2 - p[1] * pr) / half,
+        faceZ,
+    ];
+    const out = project(cam, shape);
+    const lx = out[0] + cam.origin[0];
+    const ly = out[1] + cam.origin[1];
+    return [lx / pr, eh / pr - ly / pr];
+}
+
+describe("hitAreaMatrix", () => {
+    // 400 × 200 physical px at pixel ratio 2: a 200 × 100 CSS box.
+    const SIZE: [number, number] = [200, 100];
+    const POINTS: [number, number][] = [
+        [0, 0],
+        [200, 0],
+        [200, 100],
+        [0, 100],
+        [100, 50],
+        [30, 80],
+    ];
+    const cases: [string, Partial<OrbitCameraParams>, number, number][] = [
+        ["element", { yaw: 33, pitch: -12, zoom: 0.7, fov: 60 }, 300, 300],
+        ["element, front cap far", { yaw: -50, pitch: 25, fov: 90 }, 300, 300],
+        [
+            "viewport, off-centre",
+            {
+                yaw: 25,
+                pitch: 18,
+                zoom: 1.3,
+                fov: 75,
+                cameraOrigin: "viewport",
+            },
+            20,
+            30,
+        ],
+        [
+            "viewport, other corner",
+            {
+                yaw: -40,
+                pitch: -8,
+                zoom: 0.8,
+                fov: 50,
+                cameraOrigin: "viewport",
+            },
+            580,
+            560,
+        ],
+    ];
+    for (const [name, over, x, y] of cases) {
+        test(`maps the box onto the drawn face: ${name}`, () => {
+            const at = input({ pixelRatio: 2 }, x, y, 50);
+            const cam = new OrbitCamera(PARAMS).update(
+                { ...PARAMS, ...over },
+                at,
+            );
+            for (const faceZ of [0, 0.1, 0.35]) {
+                const m = hitAreaMatrix(
+                    cam,
+                    at.dims.elementPixel,
+                    at.pixelRatio,
+                    faceZ,
+                );
+                expect(m).not.toBeNull();
+                for (const p of POINTS) {
+                    expectClose(
+                        applyCss(m as number[], SIZE, p),
+                        drawnCss(cam, at, faceZ, p),
+                        6,
+                    );
+                }
+            }
+        });
+    }
+
+    test("front-on, the z = 0 plane is the identity in both modes", () => {
+        for (const cameraOrigin of ["element", "viewport"] as const) {
+            const at = input({ pixelRatio: 2 }, 20, 30);
+            const cam = new OrbitCamera(PARAMS).update(
+                { ...PARAMS, cameraOrigin, fov: 70 },
+                at,
+            );
+            const m = hitAreaMatrix(cam, at.dims.elementPixel, 2, 0);
+            // biome-ignore format: a 4 × 4 matrix
+            expectClose(m as number[], [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1 / cam.camDist, 0,
+                0, 0, 0, 1,
+            ]);
+        }
+    });
+
+    test("front-on, the front cap is the box scaled about its centre by zoom × camDist / (camDist - faceZ)", () => {
+        // In front of the z = 0 plane, the cap is nearer, so a little
+        // larger than the element (times zoom).
+        const at = input({ pixelRatio: 2 });
+        const cam = new OrbitCamera(PARAMS).update(
+            { ...PARAMS, zoom: 0.7 },
+            at,
+        );
+        const h = 0.1;
+        const m = hitAreaMatrix(cam, at.dims.elementPixel, 2, h) as number[];
+        const k = (0.7 * cam.camDist) / (cam.camDist - h);
+        expect(k).toBeGreaterThan(0.7);
+        expectClose(
+            [m[0], m[1], m[4], m[5], m[12], m[13], m[3], m[7], m[15]],
+            [k, 0, 0, k, 0, 0, 0, 0, 1],
+        );
+        expect(cssMatrix3d(m)).toMatch(
+            /^matrix3d\((-?[\d.e-]+,){15}-?[\d.e-]+\)$/,
+        );
+    });
+
+    test("none while the face points away from the eye or is edge-on", () => {
+        const at = input();
+        const el = new OrbitCamera(PARAMS);
+        const get = (over: Partial<OrbitCameraParams>, faceZ = 0.1) =>
+            hitAreaMatrix(
+                el.update({ ...PARAMS, ...over }, at),
+                at.dims.elementPixel,
+                1,
+                faceZ,
+            );
+        expect(get({ yaw: 120 })).toBeNull();
+        expect(get({ yaw: 180 })).toBeNull();
+        expect(get({ pitch: -100 })).toBeNull();
+        expect(get({ yaw: 90 }, 0)).toBeNull();
+        const m = get({ yaw: 85 });
+        expect(m).not.toBeNull();
+        expect((m as number[]).every(Number.isFinite)).toBe(true);
+        // A degenerate box.
+        const cam = el.update(PARAMS, at);
+        expect(hitAreaMatrix(cam, [0, 0], 1, 0)).toBeNull();
+        expect(hitAreaMatrix(cam, [400, 200], 0, 0)).toBeNull();
+        expect(hitAreaMatrix(cam, [400, 200], 1, Number.NaN)).toBeNull();
+    });
+
+    test("faces away from the eye, not from the screen: an eye off to the side still sees a face turned past 90°", () => {
+        // The viewport's centre is up and to the right of the element.
+        const at = input({}, 20, 30);
+        const p = { ...PARAMS, yaw: 95, fov: 75 };
+        const el = new OrbitCamera(PARAMS).update(p, at);
+        expect(hitAreaMatrix(el, at.dims.elementPixel, 1, 0.1)).toBeNull();
+        const vp = new OrbitCamera(PARAMS).update(
+            { ...p, cameraOrigin: "viewport" },
+            at,
+        );
+        const m = hitAreaMatrix(vp, at.dims.elementPixel, 1, 0.1);
+        expect(m).not.toBeNull();
+        for (const q of [
+            [0, 0],
+            [400, 200],
+        ] as [number, number][]) {
+            expectClose(
+                applyCss(m as number[], [400, 200], q),
+                drawnCss(vp, at, 0.1, q),
+                6,
+            );
+        }
+    });
+});
+
+// The inline style of an element: what the camera reads and writes.
+function fakeElement(init: Record<string, [string, string]> = {}) {
+    const props = new Map<string, [string, string]>(Object.entries(init));
+    const writes: string[] = [];
+    const style = {
+        getPropertyValue: (k: string) => props.get(k)?.[0] ?? "",
+        getPropertyPriority: (k: string) => props.get(k)?.[1] ?? "",
+        setProperty(k: string, v: string, prio = "") {
+            writes.push(k);
+            if (v === "") {
+                props.delete(k);
+            } else {
+                props.set(k, [v, prio]);
+            }
+        },
+    };
+    const el = { style } as unknown as HTMLElement;
+    return { el, props, writes };
+}
+
+describe("OrbitCamera, hit area", () => {
+    const p = { ...PARAMS, yaw: 30, pitch: 10 };
+
+    test("only elements are hit areas", () => {
+        expect(hitAreaOf(null)).toBeNull();
+        expect(hitAreaOf({})).toBeNull();
+        expect(hitAreaOf("#b")).toBeNull();
+        const { el } = fakeElement();
+        expect(hitAreaOf(el)).toBe(el);
+        expect(
+            resolveOrbitCamera(
+                { ...PARAMS, hitArea: {} as HTMLElement },
+                PARAMS,
+            ).hitArea,
+        ).toBeNull();
+    });
+
+    test("transforms the hit area onto the front face every update", () => {
+        const h = fakeElement();
+        const c = new OrbitCamera(PARAMS);
+        const at = { ...input({ pixelRatio: 2 }), faceZ: 0.1 };
+        const cam = c.update({ ...p, hitArea: h.el }, at);
+        const m = hitAreaMatrix(cam, at.dims.elementPixel, 2, 0.1);
+        expect(h.props.get("transform")).toEqual([
+            cssMatrix3d(m as number[]),
+            "",
+        ]);
+        expect(h.props.get("transform-origin")).toEqual(["50% 50%", ""]);
+        // Unchanged: not written again.
+        h.writes.length = 0;
+        c.update({ ...p, hitArea: h.el }, at);
+        expect(h.writes).toEqual([]);
+        // Turned away: it catches nothing.
+        c.update({ ...p, yaw: 150, hitArea: h.el }, at);
+        expect(h.props.get("transform")?.[0]).toBe(HIT_AREA_HIDDEN);
+        // A broken faceZ counts as 0.
+        const cam0 = c.update(
+            { ...p, hitArea: h.el },
+            { ...at, faceZ: Number.NaN },
+        );
+        expect(h.props.get("transform")?.[0]).toBe(
+            cssMatrix3d(
+                hitAreaMatrix(cam0, at.dims.elementPixel, 2, 0) as number[],
+            ),
+        );
+    });
+
+    test("puts the inline styles back when the param changes and on dispose", () => {
+        const before = {
+            transform: ["translateX(1px)", "important"] as [string, string],
+        };
+        const a = fakeElement(before);
+        const b = fakeElement({ "transform-origin": ["0 0", ""] });
+        const c = new OrbitCamera(PARAMS);
+        c.update({ ...p, hitArea: a.el }, input());
+        expect(a.props.get("transform")?.[0]).toMatch(/^matrix3d/);
+        // Another element: a is restored, b is transformed.
+        c.update({ ...p, hitArea: b.el }, input());
+        expect(Object.fromEntries(a.props)).toEqual(before);
+        expect(b.props.get("transform")?.[0]).toMatch(/^matrix3d/);
+        // null: b is restored, nothing else is written.
+        c.update({ ...p, hitArea: null }, input());
+        expect(Object.fromEntries(b.props)).toEqual({
+            "transform-origin": ["0 0", ""],
+        });
+        b.writes.length = 0;
+        c.update({ ...p, hitArea: null }, input());
+        expect(b.writes).toEqual([]);
+        // dispose restores.
+        c.update({ ...p, hitArea: a.el }, input());
+        c.dispose();
+        expect(Object.fromEntries(a.props)).toEqual(before);
+    });
+
+    test("still frames place it too", () => {
+        const h = fakeElement();
+        new OrbitCamera(PARAMS).update(
+            { ...p, hitArea: h.el },
+            input({ live: false }),
+        );
+        expect(h.props.get("transform")?.[0]).toMatch(/^matrix3d/);
+    });
+});
+
+describe("OrbitCamera, clicks after a drag", () => {
+    let w: ReturnType<typeof fakeWindow>;
+    beforeEach(() => {
+        w = fakeWindow();
+        vi.stubGlobal("window", w.win);
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+    });
+    const drag = { ...PARAMS, drag: true };
+    // Element: client x 300..700, y 300..500 (see the pointer tests).
+    const press = (dx: number, dy: number, end = "pointerup") => {
+        w.fire("pointerdown", { clientX: 400, clientY: 400 });
+        w.fire("pointermove", { clientX: 400 + dx / 2, clientY: 400 + dy / 2 });
+        w.fire("pointermove", { clientX: 400 + dx, clientY: 400 + dy });
+        w.fire(end, { clientX: 400 + dx, clientY: 400 + dy });
+    };
+    const click = () => {
+        const e = w.fire("click");
+        return { prevented: e.defaultPrevented, stopped: e.cancelBubble };
+    };
+
+    test("the click that ends a drag is swallowed, once", () => {
+        const c = new OrbitCamera(PARAMS);
+        c.update(drag, input({ live: true }));
+        press(30, 0);
+        expect(w.added).toContain("click");
+        expect(click()).toEqual({ prevented: true, stopped: true });
+        expect(w.added).not.toContain("click");
+        expect(click()).toEqual({ prevented: false, stopped: false });
+        c.dispose();
+    });
+
+    test("a press that moved a few px or less still clicks", () => {
+        const c = new OrbitCamera(PARAMS);
+        c.update(drag, input({ live: true }));
+        press(0, 0);
+        expect(w.added).not.toContain("click");
+        expect(click().prevented).toBe(false);
+        press(CLICK_SLOP_PX * 0.6, CLICK_SLOP_PX * 0.6);
+        expect(click().prevented).toBe(false);
+        // Out and back counts as a drag.
+        w.fire("pointerdown", { clientX: 400, clientY: 400 });
+        w.fire("pointermove", { clientX: 460, clientY: 400 });
+        w.fire("pointermove", { clientX: 400, clientY: 400 });
+        w.fire("pointerup", { clientX: 400, clientY: 400 });
+        expect(click().prevented).toBe(true);
+        c.dispose();
+    });
+
+    test("only our drags; not after a cancel; gone if no click comes", () => {
+        const c = new OrbitCamera(PARAMS);
+        c.update(drag, input({ live: true }));
+        // Off the element: not ours.
+        w.fire("pointerdown", { clientX: 100, clientY: 100 });
+        w.fire("pointermove", { clientX: 200, clientY: 100 });
+        w.fire("pointerup");
+        expect(click().prevented).toBe(false);
+        press(50, 0, "pointercancel");
+        expect(click().prevented).toBe(false);
+        // No click in the pointerup's task (a keyboard click later must
+        // not be eaten).
+        press(50, 0);
+        vi.runAllTimers();
+        expect(w.added).not.toContain("click");
+        expect(click().prevented).toBe(false);
+        // Turning drag off or disposing removes a pending one.
+        press(50, 0);
+        c.update(PARAMS, input({ live: true }));
+        expect(w.added).toEqual([]);
+        c.update(drag, input({ live: true }));
+        press(50, 0);
+        c.dispose();
+        expect(w.added).toEqual([]);
+    });
+
+    test("with a hit area, a drag also starts on it", () => {
+        const h = fakeElement();
+        const c = new OrbitCamera(PARAMS);
+        c.update({ ...drag, hitArea: h.el }, input({ live: true }));
+        // Off the element's box, but on the hit area.
+        w.fire("pointerdown", {
+            clientX: 250,
+            clientY: 250,
+            composedPath: () => [h.el],
+        });
+        expect(c.dragging).toBe(true);
+        w.fire("pointerup");
+        w.fire("pointerdown", {
+            clientX: 250,
+            clientY: 250,
+            composedPath: () => [],
+        });
+        expect(c.dragging).toBe(false);
+        c.dispose();
     });
 });
