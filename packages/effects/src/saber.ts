@@ -381,13 +381,17 @@ ${GLSL_JAG}
 // Main line noise cell, as a share of scale.
 const float MAIN_CELL = 0.3;
 // Per line: reach as a share of amplitude, width as a share of thickness, and brightness.
-const float TIER_REACH[4] = float[4](0.0, 0.45, 0.7, 1.0);
+const float TIER_REACH[4] = float[4](0.0, 0.6, 0.8, 1.0);
+// Furthest any tier can reach, as a share of amplitude, with variation at most.
+const float MAX_REACH = 1.5;
 const float TIER_WIDTH[4] = float[4](1.0, 0.6, 0.45, 0.35);
 const float TIER_WEIGHT[4] = float[4](1.0, 0.6, 0.8, 0.6);
 // How much faster each tier's shape changes than the one before.
 const float TIER_PACE = 1.5;
-// Below this noise value a line lies back on the main line, so it sprouts in short arcs.
-const float PLUCK[4] = float[4](0.0, -0.3, -0.2, -0.2);
+// Within this much of zero the noise keeps a line on the main line, so it sprouts in short arcs.
+const float PLUCK[4] = float[4](0.0, 0.06, 0.06, 0.06);
+// Mild preference for arcs on the outside.
+const float OUTWARD_BIAS = 0.15;
 // Noise cell and pace of the companion line.
 const float COMPANION_CELL = 0.35;
 const float COMPANION_PACE = 2.5;
@@ -425,9 +429,10 @@ float vary(vec2 q, float t, float seed) {
     return snoise(vec3(q / (scale * VARY_SIZE) + seed * 13.1, t * 0.15 + seed));
 }
 
-// Outward arc that returns to the main line wherever the noise drops below the threshold.
+// Arc that leaves the main line to the side of the noise's sign and returns to it.
+// While the noise is within the threshold of zero the line lies on the main line, so it never crosses as one wave.
 float pluck(float noise, float threshold) {
-    return max(noise - threshold, 0.0) / (1.0 - threshold);
+    return sign(noise) * max(abs(noise) - threshold, 0.0) / (1.0 - threshold);
 }
 
 // Keep the displacement inside the room on each side of the contour.
@@ -442,7 +447,7 @@ float fit(float disp, float lineAmp, vec2 room) {
 void main() {
     // Decide per 2x2 quad, so derivatives stay valid in drawn quads.
     vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
-    if (quad.a < 0.5 || abs(quad.r) > max(amplitude, mainAmplitude) + thickness + 4.0) {
+    if (quad.a < 0.5 || abs(quad.r) > max(amplitude * MAX_REACH, mainAmplitude) + thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -521,15 +526,17 @@ void main() {
             float on = i == 1 ? smoothstep(0.1, 0.3, own) : mainOn * smoothstep(0.35, 0.6, own);
             vec2 xTier = x + fi * vec2(311.7, 173.3);
             float tTier = t * (i == 1 ? COMPANION_PACE : 1.0 + (fi - 1.0) * TIER_PACE);
-            float tier = fit(reach * pluck(jag(xTier, tTier, cell, sharp), PLUCK[i]), reach, room);
-            float tierNext = fit(reach * pluck(jag(xTier + tangent, tTier, cell, sharp), PLUCK[i]), reach, roomNext);
+            float tier = fit(reach * pluck(jag(xTier, tTier, cell, sharp) + OUTWARD_BIAS, PLUCK[i]), reach, room);
+            float tierNext = fit(reach * pluck(jag(xTier + tangent, tTier, cell, sharp) + OUTWARD_BIAS, PLUCK[i]), reach, roomNext);
             // Tiers leave from the main line and return to it.
             disp = mix(mainDisp, tier, on);
             dispNext = mix(mainNext, tierNext, on);
             // Wisps taper towards their ends.
             width = thickness * TIER_WIDTH[i] * mix(0.4, 1.0, on);
+            // Show arcs only where there is room on their side, outside or inside.
+            float sideRoom = tier >= 0.0 ? room.x : room.y;
+            weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, sideRoom / pixelRatio);
             // Fade out where the line lies on the main line, so it does not double it.
-            weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
             weight *= mix(0.3, 1.0, smoothstep(0.5, 3.0, abs(disp - mainDisp) / pixelRatio));
             // Now and then a wisp flares up and dies down.
             float flare = max(vary(q, t * 1.5, 5.0 + fi), 0.0);
