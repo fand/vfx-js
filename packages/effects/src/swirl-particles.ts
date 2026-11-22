@@ -1273,10 +1273,23 @@ void main() {
         col += shadowColor * sh * (1.0 - a);
         a += sh * (1.0 - a);
     }
-    // Noise dither against banding in the faint glow.
-    float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
-    col = clamp(col + dither / 255.0 * step(1.0 / 255.0, a), 0.0, a);
-    outColor = vec4(col, a);
+    // Noise dither against banding in the faint glow, on the alpha too:
+    // the glow composites as a translucent colour, so where its wide tail
+    // crosses an 8-bit alpha step it would draw a contour on a flat page.
+    // The colour scales with the dithered alpha (premultiplied, hue kept)
+    // and gets its own noise. Pixels with nothing drawn stay exactly 0.
+    if (a <= 0.0) {
+        outColor = vec4(0.0);
+        return;
+    }
+    vec2 fc = gl_FragCoord.xy;
+    float n1 = fract(sin(dot(fc, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+    float n2 = fract(sin(dot(fc, vec2(39.3468, 11.135))) * 24634.6345) - 0.5;
+    // Slightly under ±0.5 levels, so a vanishing tail can't round up to
+    // specks across the whole output rect.
+    float ad = clamp(a + n1 * 0.98 / 255.0, 0.0, 1.0);
+    col = clamp(col * (ad / a) + n2 / 255.0, 0.0, ad);
+    outColor = vec4(col, ad);
 }
 `;
 
