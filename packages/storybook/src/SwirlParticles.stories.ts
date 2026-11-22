@@ -193,3 +193,90 @@ export const amagi: StoryObj<Args> = {
 export const photo: StoryObj<Args> = {
     args: { source: "jellyfish", params: { sourceColor: 1 } },
 };
+
+const ARTICLE_TEXT = [
+    "Every particle in this heading is born on the surface of the extruded letters and carried along a flow that curls around them. Most stay close and comb the surface into fibres; a few peel off and drift away as wisps before they fade and respawn.",
+    "The heading is a plain <h1> in the page. VFX-JS hides it and draws the effect on a canvas over the page, at the heading's position, so the layout, the text selection and the scroll all stay with the document.",
+    "The drop shadow falls on the page behind, a plane parallel to the screen. It is drawn on the same canvas, so it darkens this text too, as a shadow cast on a sheet of paper would.",
+    "With the default pad of 200 CSS px, the effect only renders around the heading. Scroll down and the effect scrolls with it; the paragraphs below keep their normal rendering.",
+];
+
+/**
+ * A heading in an article page: the `<h1>` becomes the swirl, with the
+ * library defaults (numeric `pad`, 65k particles) plus a drop shadow on
+ * the page and the cursor repelling the particles.
+ */
+export const heading: StoryObj<Args> = {
+    args: { source: "VFX-JS logo" },
+    render: () => {
+        const page = document.createElement("div");
+        page.style.cssText =
+            // The preset centres #storybook-root's content; start at the top.
+            "align-self: flex-start; width: 100%; min-height: 100vh; background: #f4f1ea; color: #2b2b2b; font: 18px/1.7 Georgia, 'Times New Roman', serif";
+        const article = document.createElement("article");
+        article.style.cssText =
+            "max-width: 760px; margin: 0 auto; padding: 160px 24px 240px";
+
+        const kicker = document.createElement("p");
+        kicker.textContent = "VFX-JS / Effects";
+        kicker.style.cssText =
+            "margin: 0 0 8px; font: 600 13px/1 system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8270";
+
+        const h1 = document.createElement("h1");
+        h1.textContent = "Swirl";
+        h1.style.cssText =
+            "margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
+
+        article.append(kicker, h1);
+        for (let i = 0; i < 3; i++) {
+            for (const text of ARTICLE_TEXT) {
+                const p = document.createElement("p");
+                p.textContent = text;
+                p.style.cssText = "margin: 0 0 1.2em";
+                article.appendChild(p);
+            }
+        }
+        page.appendChild(article);
+
+        const vfx = initVFX();
+        const still = isChromatic();
+        const params: SwirlParticlesParams = {
+            ...new SwirlParticlesEffect({
+                depth: 0.3,
+                shadow: true,
+                mouse: "repel",
+            }).params,
+        };
+        let effect: SwirlParticlesEffect | null = null;
+
+        const mount = async (): Promise<void> => {
+            if (effect) {
+                vfx.remove(h1);
+            }
+            // Wait for the web font fallback and for Storybook to attach
+            // the page before VFX measures the heading.
+            await document.fonts?.ready;
+            await new Promise((r) => requestAnimationFrame(r));
+            effect = new SwirlParticlesEffect(params, { still });
+            await vfx.add(h1, { effect });
+        };
+
+        void mount().then(() => {
+            if (still) {
+                return;
+            }
+            attachSwirlParticlesPane(
+                "Swirl Particles",
+                params,
+                () => {
+                    if (effect) {
+                        Object.assign(effect.params, params);
+                    }
+                },
+                undefined,
+                () => void mount(),
+            );
+        });
+        return page;
+    },
+};
