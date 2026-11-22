@@ -810,13 +810,15 @@ export type SwirlSourceSelector = {
 /**
  * Tweakpane for SwirlParticlesEffect. Binds to a story-owned `params`
  * object; `apply` copies the edits into the current effect, which reads
- * them every frame.
+ * them every frame. `replay`, when given, adds a button that starts the
+ * effect over, to see the `intro` again.
  */
 export function attachSwirlParticlesPane(
     title: string,
     params: SwirlParticlesParams,
     apply: () => void,
     source?: SwirlSourceSelector,
+    replay?: () => void,
 ): Pane {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
@@ -861,6 +863,10 @@ export function attachSwirlParticlesPane(
         },
     });
     bind(particles, "life", range(0.5, 12, 0.1));
+    bind(particles, "intro", range(0, 5, 0.1));
+    if (replay) {
+        particles.addButton({ title: "Replay intro" }).on("click", replay);
+    }
     bind(particles, "pointSize", range(0.5, 5, 0.1));
     bind(particles, "streak", range(0, 1.5, 0.01));
 
@@ -921,9 +927,9 @@ export function attachSwirlParticlesPane(
     bind(shadow, "shadowColor", { view: "color" });
 
     const camera = pane.addFolder({ title: "Camera" });
-    bind(camera, "yaw", range(-Math.PI, Math.PI, 0.01));
-    bind(camera, "pitch", range(-1.5, 1.5, 0.01));
-    bind(camera, "orbit", range(0, 1.5, 0.01));
+    bind(camera, "yaw", range(-180, 180, 0.5));
+    bind(camera, "pitch", range(-85, 85, 0.5));
+    bind(camera, "orbit", range(0, 90, 0.5));
     bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");

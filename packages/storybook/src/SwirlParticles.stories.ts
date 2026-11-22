@@ -174,6 +174,8 @@ export default {
                         void mount();
                     },
                 },
+                // A new element and effect: the particles are born again.
+                () => void mount(),
             );
         });
         return root;

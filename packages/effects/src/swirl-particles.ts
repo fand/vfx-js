@@ -115,7 +115,8 @@ export type SwirlParticlesParams = {
     /**
      * Number of particles, at most 1,048,576 (2^20). Live: lowering it
      * draws fewer particles without freeing memory; raising it past what
-     * is allocated reallocates the particle state (the trails regrow).
+     * is allocated reallocates the particle state (the trails regrow, and
+     * the new particles grow in over {@link intro}).
      */
     count: number;
     /** Extrusion depth, relative to the long side of the element (= 2). */
@@ -134,6 +135,22 @@ export type SwirlParticlesParams = {
     peel: number;
     /** Mean particle lifetime in seconds (randomised ±40%). */
     life: number;
+    /**
+     * Seconds over which the particles are born when the effect starts.
+     * Each one appears at a random moment in that window, more of them
+     * towards its end, and grows in, so the coat sprouts and the flow
+     * builds up instead of popping in whole.
+     * The first lives are shortened at random, so the particles born
+     * together don't die together.
+     *
+     * Also applies when the WebGL context is restored and to the
+     * particles added when `count` grows past what is allocated, but not
+     * to {@link SwirlParticlesEffect.refresh | refresh()} or an automatic
+     * recapture: the flow carries on onto the new shape. 0 starts with
+     * every particle already in place, at a random age. Ignored by still
+     * frames.
+     */
+    intro: number;
     /** Particle width in CSS px at the z = 0 plane. */
     pointSize: number;
     /**
@@ -202,13 +219,20 @@ export type SwirlParticlesParams = {
     shadowDistance: number;
     /** Shadow colour, CSS hex. */
     shadowColor: string;
-    /** Camera yaw in radians. 0 looks straight at the front cap. */
+    /**
+     * Camera yaw in degrees. 0 looks straight at the front cap; positive
+     * turns the front cap to the right.
+     */
     yaw: number;
-    /** Camera pitch in radians. 0 looks straight at the front cap. */
+    /**
+     * Camera pitch in degrees. 0 looks straight at the front cap;
+     * positive turns the front cap down, showing the top.
+     */
     pitch: number;
     /**
-     * Amplitude of the slow camera wobble, in radians. 0 keeps the camera
-     * still (pointer drags still orbit it when {@link drag} is on).
+     * Amplitude of the slow camera wobble, in degrees of yaw (the pitch
+     * wobbles 0.3 times as far). 0 keeps the camera still (pointer drags
+     * still orbit it when {@link drag} is on).
      */
     orbit: number;
     /**
@@ -235,7 +259,7 @@ export type SwirlParticlesParams = {
      *   flow goes around. The hole stays while the pointer rests and
      *   refills once it leaves the page.
      * - `"tilt"`: hover parallax. The shape turns to face the cursor,
-     *   up to about 0.35 rad × {@link mouseStrength} when the cursor is
+     *   up to 20° × {@link mouseStrength} when the cursor is
      *   half a viewport away from the element's centre, and back to
      *   front-on once the pointer leaves the page. Adds to
      *   {@link yaw} / {@link pitch}, the {@link orbit} wobble and drags.
@@ -250,8 +274,7 @@ export type SwirlParticlesParams = {
     /**
      * Strength of the pointer interaction. `"repel"`: scales the push;
      * at 1 the hole opens to about {@link mouseRadius} at the default
-     * `speed`. `"tilt"`: scales the largest tilt angle (about 0.35 rad
-     * at 1).
+     * `speed`. `"tilt"`: scales the largest tilt angle (20° at 1).
      */
     mouseStrength: number;
     /**
@@ -294,6 +317,7 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     attract: 10.0,
     peel: 0.8,
     life: 4.0,
+    intro: 1.5,
     pointSize: 1.4,
     streak: 0.3,
     fireflyRatio: 0.01,
@@ -315,7 +339,7 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     shadowColor: "#1c2233",
     yaw: 0,
     pitch: 0,
-    orbit: 0.4,
+    orbit: 23,
     fov: 35,
     zoom: 1.0,
     drag: false,
@@ -373,8 +397,17 @@ const HIST_ROWS = Math.ceil(TRAIL_SAMPLES / HIST_COLS);
 // Ago of a slot that holds no sample.
 const HIST_NEVER = 1e9;
 // Generations wrap at this, so they stay exact in a 16-bit float
-// (integers up to 2048 are) and fit the trail's respawn check.
+// (integers up to 2048 are) and fit the trail's respawn check. The
+// generation of a particle's first life after an `intro` is GEN_WRAP
+// itself, which the wrap never reaches: that life is shortened (see
+// lifeOf), and the next generation is 1.
 const GEN_WRAP = 1024;
+// The first life after an `intro` is uniform in [FIRST_LIFE_MIN, 1] ×
+// the particle's life, close to the life a particle has left at a random
+// moment of the steady flow. So the deaths, and the wisps peeling off,
+// keep their steady rate after the intro instead of coming in waves.
+// Kept above 0 so no life is 0 s long.
+const FIRST_LIFE_MIN = 0.05;
 // Shadow coverage levels, from 1/2 to 1/16 of the scene resolution. The
 // blur runs on the coarsest level it still needs, so wide blurs stay cheap.
 const SHADOW_LEVELS = 4;
@@ -391,9 +424,11 @@ const REPEL_POS_TAU = 0.06;
 // Push speed at the cursor, in radii (at the particle's depth) per second,
 // at mouseStrength 1.
 const REPEL_K = 4;
-// Largest tilt at mouseStrength 1, radians, and its time constant.
-const TILT_MAX = 0.35;
+// Largest tilt at mouseStrength 1, degrees, and its time constant.
+const TILT_MAX = 20;
 const TILT_TAU = 0.25;
+// Degrees to radians: the camera angles in params are degrees.
+const DEG = Math.PI / 180;
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -528,8 +563,9 @@ precision highp float;
 precision highp int;
 precision highp sampler2D;
 
-// State: pos = xyz + age / life (0..1), vel = xyz + generation (wraps at
-// GEN_WRAP). Both stay meaningful in 16-bit float targets.
+// State: pos = xyz + age / life (0..1; < 0 while waiting to be born in
+// an intro), vel = xyz + generation (wraps at GEN_WRAP). Both stay
+// meaningful in 16-bit float targets.
 uniform sampler2D posTex;
 uniform sampler2D velTex;
 uniform int stateWidth;
@@ -538,6 +574,8 @@ uniform int count;
 // 1: respawn every particle. 2: the state grew; copy the first
 // \`oldCount\` particles from the old, \`oldWidth\` wide state, respawn the rest.
 uniform int reset;
+// Seconds over which respawned particles are born; 0: all at once.
+uniform float intro;
 uniform sampler2D oldPosTex;
 uniform sampler2D oldVelTex;
 uniform int oldWidth;
@@ -573,7 +611,13 @@ ${GLSL_SDF}
 ${GLSL_SPAWN}
 
 float lifeOf(uint id, float gen) {
-    return lifeMean * mix(0.6, 1.4, rnd(id * 1664525u + uint(gen) * 1013904223u + 7u));
+    float life = lifeMean * mix(0.6, 1.4, rnd(id * 1664525u + uint(gen) * 1013904223u + 7u));
+    // The first life after an intro is cut short at random, so the
+    // particles born together die over a whole life, not together.
+    if (gen >= ${GEN_WRAP.toFixed(1)}) {
+        life *= mix(${FIRST_LIFE_MIN.toFixed(2)}, 1.0, rnd(id * 40503u + 23u));
+    }
+    return life;
 }
 
 // Round onto the 16-bit float grid, up or down at random. In 16-bit
@@ -581,7 +625,7 @@ float lifeOf(uint id, float gen) {
 // otherwise round away every frame and the particle would never die;
 // this way the steps add up on average.
 float roundHalf(float x, float r) {
-    float e = exp2(floor(log2(max(x, 6.2e-5))) - 10.0);
+    float e = exp2(floor(log2(max(abs(x), 6.2e-5))) - 10.0);
     return floor(x / e + r) * e;
 }
 
@@ -606,6 +650,18 @@ void main() {
         return;
     }
     if (reset != 0) {
+        if (intro > 0.0) {
+            // Born at a random moment in the next \`intro\` seconds: until
+            // then the age is negative and the particle waits, undrawn.
+            // The births speed up (the share born by time t is
+            // (t / intro)²): a few particles already show the whole
+            // shape, so a steady rate would look done a third of the way in.
+            float gen0 = ${GEN_WRAP.toFixed(1)};
+            float wait = sqrt(rnd(id * 7919u + 3u)) * intro;
+            outPos = vec4(spawn(id, gen0), -wait / lifeOf(id, gen0));
+            outVel = vec4(0.0, 0.0, 0.0, gen0);
+            return;
+        }
         // Random ages, so the particles don't all respawn together.
         outPos = vec4(spawn(id, 0.0), rnd(id * 7919u + 3u));
         outVel = vec4(0.0);
@@ -625,6 +681,14 @@ void main() {
     float ageN = P.w + dt / life;
     if (halfState == 1) {
         ageN = roundHalf(ageN, rnd(id * 2654435761u + uint(frameSeed) * 2246822519u + 29u));
+    }
+    if (ageN < 0.0) {
+        // Not born yet: hold on the spawn point, at rest. It grows in
+        // once the age passes 0 (see lifeScale). After a refresh() it
+        // flows onto the new shape from there, like the others.
+        outPos = vec4(P.xyz, ageN);
+        outVel = vec4(0.0, 0.0, 0.0, gen);
+        return;
     }
     if (ageN >= 1.0) {
         gen = mod(gen + 1.0, ${GEN_WRAP.toFixed(1)});
@@ -1495,6 +1559,7 @@ const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
     attract: [0, 100],
     peel: [0, 1],
     life: [0.1, 120],
+    intro: [0, 120],
     pointSize: [0, 64],
     streak: [0, 10],
     fireflyRatio: [0, 1],
@@ -1508,9 +1573,9 @@ const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
     shadowOpacity: [0, 1],
     shadowSoftness: [0, 500],
     shadowDistance: [0, 100],
-    yaw: [-1000, 1000],
-    pitch: [-1000, 1000],
-    orbit: [-10, 10],
+    yaw: [-36000, 36000],
+    pitch: [-36000, 36000],
+    orbit: [-720, 720],
     fov: [1, 150],
     zoom: [0.01, 100],
     mouseRadius: [0, 10000],
@@ -1745,8 +1810,10 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
  * The silhouette is the element's alpha, read back when the effect starts
  * and again when the element's aspect ratio changes. Call
  * {@link SwirlParticlesEffect.refresh | refresh()} after its content
- * changes. An opaque photo becomes an extruded slab. The output is
- * premultiplied over transparency, so set the page background yourself.
+ * changes. An opaque photo becomes an extruded slab. The particles are
+ * born over the first {@link SwirlParticlesParams.intro | intro} seconds
+ * (1.5 by default). The output is premultiplied over transparency, so set
+ * the page background yourself. Camera angles are in degrees.
  *
  * All params, `count` and `fireflyRatio` included, are read every frame,
  * so you can mutate `params` live. Numbers that are not finite fall back
@@ -2616,7 +2683,7 @@ export class SwirlParticlesEffect implements Effect {
                     : ctx.dims.canvasPixel[1];
             const nx = clamp((mx - ew / 2) / Math.max(vw / 2, 1), -1, 1);
             const ny = clamp((my - eh / 2) / Math.max(vh / 2, 1), -1, 1);
-            const max = TILT_MAX * r.mouseStrength;
+            const max = TILT_MAX * DEG * r.mouseStrength;
             yawT = max * nx;
             pitchT = -max * ny;
         }
@@ -2625,18 +2692,18 @@ export class SwirlParticlesEffect implements Effect {
         this.#tiltPitch += (pitchT - this.#tiltPitch) * k;
     }
 
-    // Camera: base angles, a slow wobble, pointer drag and tilt.
+    // Camera: base angles and the wobble (params, degrees), pointer drag
+    // and tilt (radians).
     #camera(ctx: EffectContext): Camera {
         const r = this.#r;
         const t = this.#simTime;
         const yaw =
-            r.yaw +
-            r.orbit * Math.sin(t * 0.13) +
+            (r.yaw + r.orbit * Math.sin(t * 0.13)) * DEG +
             this.#dragYaw +
             this.#tiltYaw;
         const pitch =
-            r.pitch +
-            r.orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
+            (r.pitch + r.orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3)) *
+                DEG +
             this.#dragPitch +
             this.#tiltPitch;
 
@@ -2664,6 +2731,8 @@ export class SwirlParticlesEffect implements Effect {
             ...this.#shapeUniforms(),
             count: r.count,
             lifeMean: r.life,
+            // A still frame is simulated from scratch: no intro.
+            intro: this.#still ? 0 : r.intro,
             swirl: r.swirl,
             curl: r.curl,
             curlScale: r.curlScale,
