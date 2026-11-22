@@ -14,6 +14,7 @@ import {
     type BloomPyramid,
     createBloomPyramid,
     disposeBloomPyramid,
+    FRAG_BLOOM_DOWNSAMPLE,
     GLSL_BLOOM_KNEE,
     upsampleBloomPyramid,
 } from "./_bloom-common.js";
@@ -71,61 +72,6 @@ void main() {
     float f = contribution * mask;
 
     outColor = vec4(lin * f, f);
-}
-`;
-
-// 13-tap downsample. Five 2×2 boxes (4 outer + 1 inner). Default path
-// weights them 0.125×4 + 0.5 (COD:AW partial-overlap). `karis=1`
-// replaces that with a per-box Karis average — boxes are weighted
-// equally and modulated by 1/(1+luma) — to suppress fireflies on the
-// first downsample.
-const FRAG_DOWNSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 texelSize;
-uniform int karis;
-
-vec4 s(vec2 o) { return texture(src, uv + o); }
-float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-
-void main() {
-    vec2 t = texelSize;
-    vec4 a = s(vec2(-2.0 * t.x, -2.0 * t.y));
-    vec4 b = s(vec2( 0.0,       -2.0 * t.y));
-    vec4 c = s(vec2( 2.0 * t.x, -2.0 * t.y));
-    vec4 d = s(vec2(-2.0 * t.x,  0.0));
-    vec4 e = s(vec2( 0.0,        0.0));
-    vec4 f = s(vec2( 2.0 * t.x,  0.0));
-    vec4 g = s(vec2(-2.0 * t.x,  2.0 * t.y));
-    vec4 h = s(vec2( 0.0,        2.0 * t.y));
-    vec4 i = s(vec2( 2.0 * t.x,  2.0 * t.y));
-    vec4 j = s(vec2(-1.0 * t.x, -1.0 * t.y));
-    vec4 k = s(vec2( 1.0 * t.x, -1.0 * t.y));
-    vec4 l = s(vec2(-1.0 * t.x,  1.0 * t.y));
-    vec4 m = s(vec2( 1.0 * t.x,  1.0 * t.y));
-
-    vec4 box1 = (a + b + d + e) * 0.25;
-    vec4 box2 = (b + c + e + f) * 0.25;
-    vec4 box3 = (d + e + g + h) * 0.25;
-    vec4 box4 = (e + f + h + i) * 0.25;
-    vec4 box5 = (j + k + l + m) * 0.25;
-
-    vec4 color;
-    if (karis == 1) {
-        float w1 = 1.0 / (1.0 + luma(box1.rgb));
-        float w2 = 1.0 / (1.0 + luma(box2.rgb));
-        float w3 = 1.0 / (1.0 + luma(box3.rgb));
-        float w4 = 1.0 / (1.0 + luma(box4.rgb));
-        float w5 = 1.0 / (1.0 + luma(box5.rgb));
-        color = (box1 * w1 + box2 * w2 + box3 * w3 + box4 * w4 + box5 * w5)
-              / (w1 + w2 + w3 + w4 + w5);
-    } else {
-        color = box1 * 0.125 + box2 * 0.125 + box3 * 0.125 + box4 * 0.125
-              + box5 * 0.5;
-    }
-    outColor = color;
 }
 `;
 
@@ -350,7 +296,7 @@ export class BloomEffect implements Effect {
 
         // Downsample: bright → mipsDown[0] (Karis) → ... → mipsDown[n-1]
         ctx.draw({
-            frag: FRAG_DOWNSAMPLE,
+            frag: FRAG_BLOOM_DOWNSAMPLE,
             uniforms: {
                 src: this.#bright,
                 texelSize: [1 / this.#bright.width, 1 / this.#bright.height],
@@ -361,7 +307,7 @@ export class BloomEffect implements Effect {
         for (let i = 1; i < n; i++) {
             const prev = mipsDown[i - 1];
             ctx.draw({
-                frag: FRAG_DOWNSAMPLE,
+                frag: FRAG_BLOOM_DOWNSAMPLE,
                 uniforms: {
                     src: prev,
                     texelSize: [1 / prev.width, 1 / prev.height],

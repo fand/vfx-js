@@ -4,6 +4,14 @@ import type {
     EffectDims,
     EffectRenderTarget,
 } from "@vfx-js/core";
+import {
+    type BloomPyramid,
+    createBloomPyramid,
+    disposeBloomPyramid,
+    FRAG_BLOOM_DOWNSAMPLE,
+    upsampleBloomPyramid,
+} from "./_bloom-common.js";
+import { parseHexColor } from "./_figma-common.js";
 import { SNOISE3D } from "./_noise.js";
 import { padOutputRect } from "./_pad.js";
 
@@ -188,20 +196,65 @@ void main() {
 }
 `;
 
-// Temporary view: the core line over the dimmed source.
-const FRAG_VIEW = `#version 300 es
+// Light = crisp core + blurred glow, burnt to white where it is bright.
+// Output is premultiplied; the light adds on top of the source.
+const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D core;
+uniform sampler2D glowTex;
+uniform vec2 glowTexel;
+uniform vec3 color;
+uniform float coreGain;
+uniform float glowGain;
+uniform int source;
+uniform float edgeFade;
+
+float ign(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+}
 
 void main() {
-    vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
-    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * inside.x * inside.y;
-    vec3 light = texture(core, uv).rgb;
-    outColor = vec4(min(base.rgb * 0.3 + light, vec3(1.0)), 1.0);
+    // 5x5 binomial gaussian from 9 bilinear taps, as in bloom.ts.
+    vec2 t = glowTexel;
+    float glow = 0.0;
+    glow += texture(glowTex, uv + vec2(-t.x, -t.y)).r * 25.0;
+    glow += texture(glowTex, uv + vec2( 0.0, -t.y)).r * 30.0;
+    glow += texture(glowTex, uv + vec2( t.x, -t.y)).r * 25.0;
+    glow += texture(glowTex, uv + vec2(-t.x,  0.0)).r * 30.0;
+    glow += texture(glowTex, uv                  ).r * 36.0;
+    glow += texture(glowTex, uv + vec2( t.x,  0.0)).r * 30.0;
+    glow += texture(glowTex, uv + vec2(-t.x,  t.y)).r * 25.0;
+    glow += texture(glowTex, uv + vec2( 0.0,  t.y)).r * 30.0;
+    glow += texture(glowTex, uv + vec2( t.x,  t.y)).r * 25.0;
+    glow *= 1.0 / 256.0;
+
+    // Fade the glow out towards the buffer edge.
+    vec2 edgeDist = min(uv, 1.0 - uv) * vec2(textureSize(core, 0));
+    if (edgeFade > 0.0) {
+        glow *= smoothstep(0.0, edgeFade, min(edgeDist.x, edgeDist.y));
+    }
+
+    float light = texture(core, uv).r * coreGain + max(glow, 0.0) * glowGain;
+    vec3 rgb = 1.0 - exp(-light * mix(color, vec3(1.0), 0.08));
+
+    // TPDF dither, faded out where there is no light.
+    vec2 p = gl_FragCoord.xy;
+    vec3 noise = vec3(ign(p), ign(p + 17.0), ign(p + 41.0))
+        + vec3(ign(p + 113.0), ign(p + 131.0), ign(p + 149.0)) - 1.0;
+    float lightAlpha = max(max(rgb.r, rgb.g), rgb.b);
+    rgb = max(rgb + noise / 255.0 * clamp(lightAlpha * 64.0, 0.0, 1.0), 0.0);
+
+    vec4 base = vec4(0.0);
+    if (source == 1) {
+        vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+        base = texture(src, clamp(uvSrc, 0.0, 1.0)) * inside.x * inside.y;
+    }
+    float a = clamp(max(base.a, lightAlpha), 0.0, 1.0);
+    outColor = vec4(base.rgb + rgb, a);
 }
 `;
 
@@ -245,6 +298,10 @@ export type SaberParams = {
     pad: number | "fullscreen";
 };
 
+// Light gain of the core line and the glow, before `intensity`.
+const CORE_GAIN = 8;
+const GLOW_GAIN = 2;
+
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
@@ -279,6 +336,8 @@ export class SaberEffect implements Effect {
     #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
     #core: EffectRenderTarget | null = null;
+    #pyramid: BloomPyramid | null = null;
+    #pyramidLevels = 0;
     #dirty = true;
     #builtW = 0;
     #builtH = 0;
@@ -341,9 +400,25 @@ export class SaberEffect implements Effect {
             },
             target: core,
         });
+        const glowTex = this.#renderGlow(ctx, core);
+        const { color, intensity, glow, source } = this.params;
+        const [r, g, b] = parseHexColor(color);
         ctx.draw({
-            frag: FRAG_VIEW,
-            uniforms: { src: ctx.src, core },
+            frag: FRAG_COMPOSITE,
+            uniforms: {
+                src: ctx.src,
+                core,
+                glowTex,
+                glowTexel: [1.2 / glowTex.width, 1.2 / glowTex.height],
+                color: [r, g, b],
+                coreGain: CORE_GAIN * intensity,
+                glowGain: GLOW_GAIN * glow * intensity,
+                source: source ? 1 : 0,
+                edgeFade:
+                    this.params.pad === "fullscreen"
+                        ? 0
+                        : this.params.pad * ctx.dims.pixelRatio * 0.5,
+            },
             target: ctx.target,
         });
     }
@@ -357,11 +432,81 @@ export class SaberEffect implements Effect {
         this.#seedB = null;
         this.#field = null;
         this.#core = null;
+        if (this.#pyramid) {
+            disposeBloomPyramid(this.#pyramid);
+        }
+        this.#pyramid = null;
         this.#dirty = true;
         this.#builtW = 0;
         this.#builtH = 0;
         this.#builtEdge = null;
         this.#builtThreshold = Number.NaN;
+    }
+
+    // Blur the core with a bloom pyramid.
+    // Returns the result at half the buffer size.
+    #renderGlow(
+        ctx: EffectContext,
+        core: EffectRenderTarget,
+    ): EffectRenderTarget {
+        const baseW = core.width;
+        const baseH = core.height;
+        const pixelRatio = ctx.dims.pixelRatio;
+        // Keep the widest blur inside the pad, so the glow does not hit its edge.
+        const { pad } = this.params;
+        const padPx = pad === "fullscreen" ? Infinity : pad * pixelRatio;
+        const levels = Math.min(
+            8,
+            Math.max(1, Math.round(Math.log2(Math.max(padPx, 4))) - 2),
+        );
+        let pyramid = this.#pyramid;
+        if (
+            !pyramid ||
+            this.#pyramidLevels !== levels ||
+            pyramid.down[0].width !== Math.max(1, Math.floor(baseW / 2)) ||
+            pyramid.down[0].height !== Math.max(1, Math.floor(baseH / 2))
+        ) {
+            if (pyramid) {
+                disposeBloomPyramid(pyramid);
+            }
+            pyramid = createBloomPyramid(ctx, baseW, baseH, levels);
+            this.#pyramid = pyramid;
+            this.#pyramidLevels = levels;
+        }
+        const down = pyramid.down;
+        let prev = core;
+        for (let i = 0; i < down.length; i++) {
+            ctx.draw({
+                frag: FRAG_BLOOM_DOWNSAMPLE,
+                uniforms: {
+                    src: prev,
+                    texelSize: [1 / prev.width, 1 / prev.height],
+                    karis: i === 0 ? 1 : 0,
+                },
+                target: down[i],
+            });
+            prev = down[i];
+        }
+
+        // Level weights glowFalloff^i, summing to 1.
+        // Each level also gets 2^(i+1), so a thin line keeps its brightness as it blurs.
+        const falloff = Math.min(Math.max(this.params.glowFalloff, 0), 1);
+        const n = down.length;
+        const weights = down.map((_, i) => falloff ** i);
+        const total = weights.reduce((sum, w) => sum + w, 0);
+        const weightFor = (i: number) =>
+            ((weights[i] / total) * 2 ** (i + 1)) / pixelRatio;
+        return upsampleBloomPyramid(ctx, pyramid, (i) => {
+            const levelScale = 2 ** (i + 2);
+            return {
+                texelSize: [
+                    (0.5 * levelScale) / baseW,
+                    (0.5 * levelScale) / baseH,
+                ],
+                weightLarge: weightFor(i),
+                weightSmall: i === n - 2 ? weightFor(n - 1) : 1,
+            };
+        });
     }
 
     #buildField(ctx: EffectContext): void {

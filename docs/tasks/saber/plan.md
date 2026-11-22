@@ -57,8 +57,11 @@ Check that a render target with `persistent: false` keeps its content between fr
    - Line 0 is the main line with full weight and a smaller amplitude (`amplitude * 0.35`). The other lines are thinner arcs with the full amplitude, their own seed and envelope.
    - Output is one HDR intensity channel (write it to `rgb`, `a = 1`).
 5. **Glow pyramid**: `createBloomPyramid(ctx, w, h, 8)` from `_bloom-common.ts`.
-   - Move `FRAG_DOWNSAMPLE` (13-tap, `karis` uniform) from `bloom.ts` to `_bloom-common.ts` and use it in both effects. Use `karis: 1` on the first level to stop thin bright lines from flickering.
+   - Move the 13-tap downsample (`karis` uniform) from `bloom.ts` to `_bloom-common.ts` as `FRAG_BLOOM_DOWNSAMPLE` and use it in both effects. Use `karis: 1` on the first level to stop thin bright lines from flickering.
    - Upsample with `upsampleBloomPyramid`. Level weight `w_i = glowFalloff^i`, normalised so the weights sum to 1. `glowFalloff` near 1 gives a long tail, near 0 a tight halo.
+   - Each level also gets a gain of `2^(i+1)`, so a thin line keeps its brightness as it blurs.
+   - The level count follows `pad`, so the widest blur stays inside the buffer. The glow also fades out over the outer half of the pad.
+   - The halo must look the same at every pixel ratio.
 6. **Composite pass** → `ctx.target`.
    - `light = core * coreIntensity + glow * glowIntensity`, both times `intensity`.
    - `rgb = 1 - exp(-light * mix(color, vec3(1), 0.08))`: the tinted halo burns to white at the core with no extra branch.
