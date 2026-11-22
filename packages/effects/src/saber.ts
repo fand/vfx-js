@@ -133,66 +133,193 @@ void main() {
 }
 `;
 
-// Jagged noise along the contour.
-// Blends plain fbm with ridged fbm, so sharpness 1 gives sharp V corners.
+// Room for the line on each side of the contour: how far it may move along the normal
+// before it meets the line from the other side of a stroke or gap.
+// Marches from the contour point; past the middle the field reports a nearer contour.
+const FRAG_ROOM = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform sampler2D field;
+uniform float maxRoom;
+
+float march(vec2 q, vec2 dir, float side, vec2 size) {
+    float best = maxRoom;
+    for (int k = 1; k <= 12; k++) {
+        float s = maxRoom * float(k) / 12.0;
+        vec2 x = q + dir * s;
+        if (any(lessThan(x, vec2(0.0))) || any(greaterThan(x, size))) {
+            break;
+        }
+        vec4 f = texture(field, x / size);
+        float overshoot = s - side * f.r;
+        if (f.a > 0.5 && overshoot > 0.0) {
+            best = min(best, s - overshoot * 0.5);
+        }
+    }
+    return max(best, 0.0);
+}
+
+void main() {
+    vec2 size = vec2(textureSize(field, 0));
+    vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
+    if (f.a < 0.5) {
+        outColor = vec4(maxRoom, maxRoom, 0.0, 1.0);
+        return;
+    }
+    vec2 q = gl_FragCoord.xy - f.r * f.gb;
+    outColor = vec4(march(q, f.gb, 1.0, size), march(q, -f.gb, -1.0, size), 0.0, 1.0);
+}
+`;
+
+// Box blur along one axis, to smooth the room along the contour.
+const FRAG_ROOM_BLUR = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform sampler2D src;
+uniform ivec2 dir;
+
+void main() {
+    ivec2 p = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(src, 0);
+    vec4 sum = vec4(0.0);
+    for (int i = -4; i <= 4; i++) {
+        sum += texelFetch(src, clamp(p + dir * i, ivec2(0), size - 1), 0);
+    }
+    outColor = sum / 9.0;
+}
+`;
+
+// Noise for the lines.
+// `jag` is value noise on a lattice; sharpness 1 interpolates linearly,
+// so a line runs straight inside a cell and kinks at cell edges.
 const GLSL_JAG = `
 ${SNOISE3D}
 
 uniform float sharpness;
 
+float hash(vec3 p) {
+    p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return fract((p.x + p.y) * p.z) * 2.0 - 1.0;
+}
+
+float lattice(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = p - i;
+    vec2 smoothF = f.xy * f.xy * (3.0 - 2.0 * f.xy);
+    vec2 w = mix(smoothF, f.xy, sharpness);
+    float wt = f.z * f.z * (3.0 - 2.0 * f.z);
+    vec2 e = vec2(1.0, 0.0);
+    float a0 = mix(hash(i), hash(i + e.xyy), w.x);
+    float b0 = mix(hash(i + e.yxy), hash(i + e.xxy), w.x);
+    float a1 = mix(hash(i + e.yyx), hash(i + e.xyx), w.x);
+    float b1 = mix(hash(i + e.yxx), hash(i + e.xxx), w.x);
+    return mix(mix(a0, b0, w.y), mix(a1, b1, w.y), wt);
+}
+
+// Three octaves, each rotated so their kinks do not line up.
 float jag(vec2 x, float t) {
-    float plain = 0.0;
-    float ridged = 0.0;
+    const mat2 turn = mat2(0.8, 0.6, -0.6, 0.8);
+    float sum = 0.0;
     float amp = 1.0;
-    float norm = 0.0;
-    for (int i = 0; i < 4; i++) {
-        float n = snoise(vec3(x, t * (1.0 + float(i) * 0.5) + float(i) * 7.31));
-        plain += n * amp;
-        // Recentred ridges, flipped every other octave so kinks point both ways.
-        ridged += (0.9 - 2.0 * abs(n)) * (i % 2 == 0 ? amp : -amp);
-        norm += amp;
-        x = x * 2.0 + vec2(13.7, -5.3);
+    for (int i = 0; i < 3; i++) {
+        sum += lattice(vec3(x, t)) * amp;
+        x = turn * x * 2.2 + 17.1;
+        t = t * 1.6 + 3.7;
         amp *= 0.55;
     }
-    return mix(plain, ridged, sharpness) / norm;
+    // Soft limit to -1..1, so the line never leaves the band the early out keeps.
+    return tanh(sum * 1.1);
 }
 `;
 
-// Core line: the contour pushed along its normal by the jag noise.
+// Core lines: the contour pushed along its normal by noise.
+// Line 0 is a calm main line; the others are arcs that come and go.
 // Writes one HDR intensity channel.
 const FRAG_CORE = `#version 300 es
 precision highp float;
 out vec4 outColor;
 uniform sampler2D field;
+uniform sampler2D roomTex;
 uniform float amplitude;
 uniform float scale;
 uniform float thickness;
 uniform float time;
+uniform float burst;
+uniform float flicker;
+uniform int lines;
 ${GLSL_JAG}
+
+const float MAIN_SHARE = 0.3;
+const float ARC_LEAN = 0.1;
+const float ARC_SCALE = 0.7;
+const float SNAPS_PER_SECOND = 16.0;
+
+// Soft clamp of the displacement to the room on each side of the contour.
+float fit(float disp, vec2 room) {
+    float limit = min(disp > 0.0 ? room.x : room.y, amplitude) * 0.9 + 1e-3;
+    return limit * tanh(disp / limit);
+}
 
 void main() {
     // Decide per 2x2 quad, so derivatives stay valid in drawn quads.
     vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
-    if (quad.a < 0.5 || abs(quad.r) > amplitude * 1.2 + thickness + 4.0) {
+    if (quad.a < 0.5 || abs(quad.r) > amplitude + thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
+    vec2 size = vec2(textureSize(field, 0));
     vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
     float d = f.r;
-    vec2 q = gl_FragCoord.xy - d * f.gb;
-    float jagHere = jag(q / scale, time);
-    float g = d - amplitude * jagHere;
-    // Slope of the line along the contour, from one step along the tangent.
-    vec2 tangent = vec2(-f.b, f.g);
-    float slope = amplitude * (jag((q + tangent) / scale, time) - jagHere);
-    float slopeGrad = sqrt(1.0 + slope * slope);
-    // Screen derivatives jump where q flips sides across the medial axis.
-    // Take the smaller estimate so the jump does not draw a false line.
-    float screenGrad = length(vec2(dFdx(g), dFdy(g)));
-    float dist = abs(g) / max(min(screenGrad, slopeGrad), 1e-3);
-    float halfWidth = thickness * 0.5;
-    float line = 1.0 - smoothstep(halfWidth - 0.75, halfWidth + 0.75, dist);
-    outColor = vec4(vec3(line), 1.0);
+    vec2 n = f.gb;
+    vec2 q = gl_FragCoord.xy - d * n;
+    vec2 tangent = vec2(-n.y, n.x);
+    vec2 room = texture(roomTex, q / size).rg;
+    vec2 roomNext = texture(roomTex, (q + tangent) / size).rg;
+
+    // Mix smooth time with time that snaps to new shapes.
+    float snap = floor(time * SNAPS_PER_SECOND);
+    float snapped = snap / SNAPS_PER_SECOND + hash(vec3(snap, 1.7, 9.1)) * 0.5;
+    float t = mix(time, snapped, flicker);
+
+    float light = 0.0;
+    for (int i = 0; i < 4; i++) {
+        if (i >= lines) {
+            break;
+        }
+        float fi = float(i);
+        float lineScale = i > 0 ? scale * ARC_SCALE : scale;
+        vec2 x = q / lineScale + fi * vec2(31.7, 17.3);
+        float lineAmp = amplitude * MAIN_SHARE;
+        float width = thickness;
+        float weight = 1.0;
+        if (i > 0) {
+            // Arcs fade in and out along the contour; burst makes them rarer.
+            float env = snoise(vec3(q / (scale * 4.0) + fi * 7.3, t * 0.25)) * 0.5 + 0.5;
+            float low = burst * 0.7;
+            lineAmp = amplitude * smoothstep(low, low + 0.25, env);
+            width = thickness * 0.75;
+            weight = 0.85 * (1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5));
+        }
+        float tLine = t * (1.0 + fi * 0.15);
+        // Arcs lean outwards, away from the element.
+        float lean = i > 0 ? ARC_LEAN : 0.0;
+        float jagHere = jag(x, tLine);
+        float disp = fit(lineAmp * mix(jagHere, 1.0, lean), room);
+        float g = d - disp;
+        // Slope of the line along the contour, from one step along the tangent.
+        float jagNext = jag(x + tangent / lineScale, tLine);
+        float dispNext = fit(lineAmp * mix(jagNext, 1.0, lean), roomNext);
+        float slope = dispNext - disp;
+        float slopeGrad = sqrt(1.0 + slope * slope);
+        // Screen derivatives jump where q flips sides across the medial axis.
+        // Take the smaller estimate so the jump does not draw a false line.
+        float screenGrad = length(vec2(dFdx(g), dFdy(g)));
+        float dist = abs(g) / max(min(screenGrad, slopeGrad), 1e-3);
+        float halfWidth = width * 0.5;
+        light += weight * (1.0 - smoothstep(halfWidth - 0.75, halfWidth + 0.75, dist));
+    }
+    outColor = vec4(vec3(light), 1.0);
 }
 `;
 
@@ -212,6 +339,7 @@ uniform float coreGain;
 uniform float glowGain;
 uniform int source;
 uniform float edgeFade;
+uniform float whiteMix;
 
 float ign(vec2 p) {
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
@@ -239,7 +367,9 @@ void main() {
     }
 
     float light = texture(core, uv).r * coreGain + max(glow, 0.0) * glowGain;
-    vec3 rgb = 1.0 - exp(-light * mix(color, vec3(1.0), 0.08));
+    vec3 rgb = 1.0 - exp(-light * mix(color, vec3(1.0), whiteMix));
+    // Cut the last 8-bit step of the tail, so it ends along the glow, not at the pad edge.
+    rgb = max(rgb - 1.0 / 255.0, 0.0) * (255.0 / 254.0);
 
     // TPDF dither, faded out where there is no light.
     vec2 p = gl_FragCoord.xy;
@@ -298,23 +428,28 @@ export type SaberParams = {
     pad: number | "fullscreen";
 };
 
+// Largest room for the line that the field build measures, in CSS px.
+const MAX_ROOM = 96;
+
 // Light gain of the core line and the glow, before `intensity`.
-const CORE_GAIN = 8;
+const CORE_GAIN = 10;
 const GLOW_GAIN = 2;
+// Share of white in the light tint; higher burns the core whiter.
+const WHITE_MIX = 0.15;
 
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
     thickness: 2,
-    amplitude: 12,
+    amplitude: 24,
     scale: 60,
     sharpness: 0.8,
-    burst: 0.5,
+    burst: 0.6,
     speed: 1,
-    flicker: 0.5,
+    flicker: 0.3,
     lines: 3,
     glow: 1,
-    glowFalloff: 0.7,
+    glowFalloff: 0.6,
     edge: "alpha",
     edgeThreshold: 0.5,
     source: true,
@@ -336,6 +471,7 @@ export class SaberEffect implements Effect {
     #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
     #core: EffectRenderTarget | null = null;
+    #room: EffectRenderTarget | null = null;
     #pyramid: BloomPyramid | null = null;
     #pyramidLevels = 0;
     #dirty = true;
@@ -365,13 +501,15 @@ export class SaberEffect implements Effect {
         // So this keeps the field between frames without `persistent`.
         this.#field = ctx.createRenderTarget({ float: true });
         this.#core = ctx.createRenderTarget({ float: true });
+        this.#room = ctx.createRenderTarget({ float: true });
         this.#dirty = true;
     }
 
     render(ctx: EffectContext): void {
         const field = this.#field;
         const core = this.#core;
-        if (!field || !core) {
+        const room = this.#room;
+        if (!field || !core || !room) {
             return;
         }
         const { edge, edgeThreshold, dynamic } = this.params;
@@ -387,15 +525,28 @@ export class SaberEffect implements Effect {
         }
 
         const { pixelRatio } = ctx.dims;
-        const { amplitude, scale, sharpness, speed, thickness } = this.params;
+        const {
+            amplitude,
+            scale,
+            sharpness,
+            speed,
+            thickness,
+            burst,
+            flicker,
+            lines,
+        } = this.params;
         ctx.draw({
             frag: FRAG_CORE,
             uniforms: {
                 field,
+                roomTex: room,
                 amplitude: amplitude * pixelRatio,
                 scale: Math.max(scale, 1e-3) * pixelRatio,
                 thickness: thickness * pixelRatio,
                 sharpness,
+                burst,
+                flicker,
+                lines: Math.round(Math.min(Math.max(lines, 1), 4)),
                 time: ctx.time * speed,
             },
             target: core,
@@ -414,6 +565,7 @@ export class SaberEffect implements Effect {
                 coreGain: CORE_GAIN * intensity,
                 glowGain: GLOW_GAIN * glow * intensity,
                 source: source ? 1 : 0,
+                whiteMix: WHITE_MIX,
                 edgeFade:
                     this.params.pad === "fullscreen"
                         ? 0
@@ -432,6 +584,7 @@ export class SaberEffect implements Effect {
         this.#seedB = null;
         this.#field = null;
         this.#core = null;
+        this.#room = null;
         if (this.#pyramid) {
             disposeBloomPyramid(this.#pyramid);
         }
@@ -452,13 +605,16 @@ export class SaberEffect implements Effect {
         const baseW = core.width;
         const baseH = core.height;
         const pixelRatio = ctx.dims.pixelRatio;
+        // Levels are counted in CSS px, so the glow looks the same at any pixel ratio.
+        // Level i blurs over about 2^(i+1) buffer px; `shift` turns that into CSS px.
         // Keep the widest blur inside the pad, so the glow does not hit its edge.
+        const shift = Math.log2(Math.max(pixelRatio, 1e-3));
         const { pad } = this.params;
-        const padPx = pad === "fullscreen" ? Infinity : pad * pixelRatio;
-        const levels = Math.min(
-            8,
-            Math.max(1, Math.round(Math.log2(Math.max(padPx, 4))) - 2),
-        );
+        const cssLevels =
+            pad === "fullscreen"
+                ? 8
+                : Math.max(1, Math.round(Math.log2(Math.max(pad, 4))) - 2);
+        const levels = Math.min(10, Math.max(1, cssLevels + Math.ceil(shift)));
         let pyramid = this.#pyramid;
         if (
             !pyramid ||
@@ -488,14 +644,20 @@ export class SaberEffect implements Effect {
             prev = down[i];
         }
 
-        // Level weights glowFalloff^i, summing to 1.
-        // Each level also gets 2^(i+1), so a thin line keeps its brightness as it blurs.
+        // CSS level c = i - shift has weight glowFalloff^c; the weights sum to 1.
+        // Levels finer than 2 CSS px fade out.
+        // Each level also gets 2^(c+1), so a thin line keeps its brightness as it blurs.
         const falloff = Math.min(Math.max(this.params.glowFalloff, 0), 1);
         const n = down.length;
-        const weights = down.map((_, i) => falloff ** i);
-        const total = weights.reduce((sum, w) => sum + w, 0);
-        const weightFor = (i: number) =>
-            ((weights[i] / total) * 2 ** (i + 1)) / pixelRatio;
+        let total = 0;
+        for (let c = 0; c < cssLevels; c++) {
+            total += falloff ** c;
+        }
+        const weightFor = (i: number) => {
+            const c = i - shift;
+            const weight = c >= 0 ? falloff ** c : Math.max(0, 1 + c);
+            return (weight / total) * 2 ** (c + 1);
+        };
         return upsampleBloomPyramid(ctx, pyramid, (i) => {
             const levelScale = 2 ** (i + 2);
             return {
@@ -513,7 +675,8 @@ export class SaberEffect implements Effect {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
         const field = this.#field;
-        if (!seedA || !seedB || !field) {
+        const room = this.#room;
+        if (!seedA || !seedB || !field || !room) {
             return;
         }
         const { edge, edgeThreshold } = this.params;
@@ -550,6 +713,22 @@ export class SaberEffect implements Effect {
             frag: FRAG_RESOLVE,
             uniforms: { ...maskUniforms, seed: read },
             target: field,
+        });
+
+        ctx.draw({
+            frag: FRAG_ROOM,
+            uniforms: { field, maxRoom: MAX_ROOM * ctx.dims.pixelRatio },
+            target: seedA,
+        });
+        ctx.draw({
+            frag: FRAG_ROOM_BLUR,
+            uniforms: { src: seedA, dir: [1, 0] },
+            target: seedB,
+        });
+        ctx.draw({
+            frag: FRAG_ROOM_BLUR,
+            uniforms: { src: seedB, dir: [0, 1] },
+            target: room,
         });
 
         this.#dirty = false;
