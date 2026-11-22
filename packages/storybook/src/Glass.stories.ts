@@ -43,8 +43,6 @@ const PATTERNS: readonly GlassPatternName[] = [
     "stripes",
     "grid",
     "checker",
-    "dots",
-    "noise",
     "marble",
     "rainbow",
     "none",

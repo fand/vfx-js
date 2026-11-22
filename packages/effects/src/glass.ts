@@ -44,8 +44,6 @@ export type GlassPatternName =
     | "stripes"
     | "grid"
     | "checker"
-    | "dots"
-    | "noise"
     | "marble"
     | "rainbow";
 
@@ -172,7 +170,7 @@ export type GlassParams = {
     backdropDistance: number;
     /**
      * Speed of the pattern, in pattern periods per second. The patterns
-     * scroll, except `"noise"`, `"marble"` and `"rainbow"`, which morph
+     * scroll, except `"marble"` and `"rainbow"`, which morph
      * in place.
      */
     backdropSpeed: number;
@@ -181,6 +179,17 @@ export type GlassParams = {
      * has its own.
      */
     backdropColors: readonly [string, string];
+    /**
+     * Share of the area that the second colour covers in a two-colour
+     * pattern, 0 to 1: the width of the stripes and marble bands, of the
+     * grid's lines, the size of the checker's squares.
+     */
+    backdropRatio: number;
+    /**
+     * Softness of the edge between the two colours, 0 to 1, relative to
+     * the pattern's period. Near 1 the bands become smooth gradients.
+     */
+    backdropSoftness: number;
 
     /** Brightness of the soft box lights around the shape. 0 turns them off. */
     lightIntensity: number;
@@ -255,6 +264,8 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropDistance: 0.6,
     backdropSpeed: 0.15,
     backdropColors: ["#000000", "#ffffff"],
+    backdropRatio: 0.5,
+    backdropSoftness: 0.06,
     lightIntensity: 1.5,
     lightSoftness: 0.15,
     yaw: 0.5,
@@ -274,12 +285,10 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
     stripes: 1,
     grid: 2,
     checker: 3,
-    dots: 4,
-    noise: 5,
-    marble: 6,
-    rainbow: 7,
+    marble: 4,
+    rainbow: 5,
 };
-const IMAGE_MODE = 8;
+const IMAGE_MODE = 6;
 // Contour bands of "marble" per unit of its noise field.
 const MARBLE_BANDS = "3.0";
 // Size of the "marble" noise field, in pattern units.
@@ -448,6 +457,8 @@ uniform float backdropDistance;
 uniform float backdropOffset;
 uniform vec3 backdropA;
 uniform vec3 backdropB;
+uniform float backdropRatio;
+uniform float backdropSoftness;
 
 uniform float lightIntensity;
 uniform float lightSoftness;
@@ -468,12 +479,6 @@ float hash12(vec2 p) {
 
 ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
-
-// 0..1 mask for a signed distance in pattern periods, with an edge as
-// soft as the pixel's footprint fw.
-float edge(float d, float fw) {
-    return smoothstep(-fw, fw, d);
-}
 
 // "rainbow": pale, bright colours whose hue drifts in space and time.
 // q and fw are in pattern units.
@@ -516,51 +521,55 @@ vec3 backdrop(vec2 p, float fw) {
         return textureLod(backdropTex, q, lod).rgb;
     }
     vec2 q = p / max(backdropScale, 1e-3);
-    fw = clamp(fw / max(backdropScale, 1e-3), 0.03, 4.0);
-    float m = 0.0;
-    // Mean of the pattern: what it fades to when the footprint covers
-    // whole periods, where it would only alias.
-    float mean = 0.5;
+    fw = clamp(fw / max(backdropScale, 1e-3), 1e-4, 4.0);
+    if (backdropMode == 5) {
+        return rainbow(q, fw);
+    }
+    // The two-colour patterns share one finish. Each gives e, a signed
+    // distance to the edge between its colours (positive in the second),
+    // placed so that the second colour covers backdropRatio of the area.
+    // e and fw are in units where a band at an even split is 0.5 wide.
+    float r = clamp(backdropRatio, 0.0, 1.0);
+    float e = 0.0;
     if (backdropMode == 1) {
         float s = fract((q.x - q.y) * 0.7071 + backdropOffset);
-        m = edge(0.25 - abs(s - 0.5), fw);
+        e = 0.5 * r - abs(s - 0.5);
     } else if (backdropMode == 2) {
+        // Lines of the second colour: their share of the area sets
+        // their half width.
         vec2 g = abs(fract(q + vec2(backdropOffset, 0.0)) - 0.5);
-        m = 1.0 - edge(min(g.x, g.y) - 0.06, fw);
-        mean = 0.23;
+        e = 0.5 * (1.0 - sqrt(1.0 - r)) - min(g.x, g.y);
     } else if (backdropMode == 3) {
-        vec2 g = fract(q * 0.5 + vec2(backdropOffset * 0.5, 0.0)) - 0.5;
-        float a = edge(0.25 - abs(g.x), fw);
-        float b = edge(0.25 - abs(g.y), fw);
-        m = mix(a, 1.0 - a, b);
-    } else if (backdropMode == 4) {
-        vec2 g = fract(q + vec2(backdropOffset, 0.0)) - 0.5;
-        m = edge(0.3 - length(g), fw);
-        mean = 0.28;
-    } else if (backdropMode == 6) {
-        // Contour bands of a slow noise field, like zebra marble: closed
-        // loops round its peaks, bands crowding where it is steep. A
-        // weaker second octave makes the widths irregular.
+        // Squares centred in every other cell. Away from an even split
+        // the squares of one colour shrink and the other joins up.
+        vec2 x = q + vec2(backdropOffset + 0.5, 0.5);
+        vec2 cell = floor(x);
+        vec2 u = abs(fract(x) - 0.5);
+        float sgn = mod(cell.x + cell.y, 2.0) < 0.5 ? -1.0 : 1.0;
+        float c = r <= 0.5
+            ? 0.5 * (1.0 - sqrt(2.0 * r))
+            : -0.5 * (1.0 - sqrt(2.0 * (1.0 - r)));
+        e = 0.5 * (sgn * (0.5 - max(u.x, u.y)) - c);
+        fw *= 0.5;
+    } else {
+        // "marble": contour bands of a slow noise field: closed loops
+        // round its peaks, bands crowding where it is steep. A weaker
+        // second octave makes the widths irregular.
         vec3 n = vec3(q * ${MARBLE_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
         vec4 b = snoiseD(n * vec3(2.3, 2.3, 1.5) + vec3(5.2, 1.3, 7.7));
         float s = (a.w + 0.2 * b.w) * ${MARBLE_BANDS};
+        e = 0.5 * r - abs(fract(s) - 0.5);
         // The band width varies: the footprint in band periods follows
         // the field's gradient (in pattern units).
         vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
         fw = max(fw * ${MARBLE_BANDS} * length(g), 1e-4);
-        m = edge(0.25 - abs(fract(s) - 0.5), fw);
-    } else if (backdropMode == 7) {
-        return rainbow(q, fw);
-    } else {
-        // Simplex noise that morphs in place: time is its third axis.
-        vec3 n = vec3(q * 0.6, backdropOffset);
-        float f = snoise(n) * 0.6
-            + snoise(n * vec3(2.0, 2.0, 1.4) + vec3(7.1, 3.7, 1.9)) * 0.3
-            + snoise(n * vec3(4.0, 4.0, 1.9) + vec3(2.3, 9.1, 5.3)) * 0.1;
-        m = smoothstep(-0.12 - fw, 0.12 + fw, f);
     }
-    m = mix(m, mean, smoothstep(0.35, 1.0, fw));
+    float w = max(fw, 0.5 * backdropSoftness);
+    float m = smoothstep(-w, w, e);
+    // A footprint that covers whole periods would only alias: fade to
+    // the mean, which is the ratio.
+    m = mix(m, r, smoothstep(0.35, 1.0, fw));
     return mix(backdropA, backdropB, m);
 }
 
@@ -1495,6 +1504,8 @@ export class GlassEffect implements Effect {
                 backdropOffset: t * p.backdropSpeed,
                 backdropA: hexToRgb(p.backdropColors[0]),
                 backdropB: hexToRgb(p.backdropColors[1]),
+                backdropRatio: Math.min(Math.max(p.backdropRatio, 0), 1),
+                backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
                 lightIntensity: Math.max(p.lightIntensity, 0),
                 lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
                 debugView: this.#debugView(),

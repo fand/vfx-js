@@ -1105,6 +1105,8 @@ export function attachGlassPane(
     bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
     bind(backdrop, "backdropDistance", range(0, 3, 0.01));
     bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
+    bind(backdrop, "backdropRatio", range(0, 1, 0.01));
+    bind(backdrop, "backdropSoftness", range(0, 1, 0.01));
     backdrop
         .addBinding(pickers.colors, "a", { view: "color", label: "colorA" })
         .on("change", apply);
