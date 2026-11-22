@@ -481,7 +481,6 @@ uniform float backdropOffset;
 // its mean), and its number of colours.
 uniform sampler2D paletteTex;
 uniform int paletteSize;
-uniform float backdropRatio;
 uniform float backdropSoftness;
 
 uniform float lightIntensity;
@@ -596,19 +595,6 @@ vec3 backdrop(vec2 p, float fw) {
         vec2 ga = (v.x * b.xy - v.y * a.xy) / max(dot(v, v), 1e-8);
         gu = length(ga) * ${FLOW_FREQ} / 3.1416;
     }
-    // Two colours: move the boundary so the second covers backdropRatio
-    // of the area, by a piecewise-linear warp of u.
-    float slope = 1.0;
-    if (paletteSize == 2) {
-        float r = clamp(backdropRatio, 1e-4, 1.0 - 1e-4);
-        if (u < 1.0 - r) {
-            slope = 0.5 / (1.0 - r);
-            u *= slope;
-        } else {
-            slope = 0.5 / r;
-            u = 0.5 + (u - (1.0 - r)) * slope;
-        }
-    }
     // Softness and filtering are one blur along u: the pixel's footprint
     // in u, or the softness in shares of a colour. Low softness matches
     // the smoothstep edges the patterns had (3 shares per unit); it
@@ -616,7 +602,7 @@ vec3 backdrop(vec2 p, float fw) {
     float sf = clamp(backdropSoftness, 0.0, 1.0);
     float shares = 3.0 * sf / (1.0 + 2.0 * sf * sqrt(sf));
     float soft = k * shares / float(max(paletteSize, 2));
-    return palette(u, slope * max(fw * gu, soft));
+    return palette(u, max(fw * gu, soft));
 }
 
 // A rectangular light seen in direction d: centre c, half size in
@@ -1240,16 +1226,32 @@ function resolvePalette(v: GlassParams["backdropColors"]): string[] {
  * whole mip chain averaged exactly on the CPU, so the top level is the
  * palette's mean. The width is the number of colours times a power of
  * two, so each colour starts on a texel of every level narrower than it.
+ * Two colours split at `1 - ratio` instead, so the second covers `ratio`
+ * of the area and every level, the mean included, follows it; that
+ * boundary can fall inside a texel, which then holds the exact mix.
  */
-function bakePalette(colors: readonly string[]): Float32Array[] {
+function bakePalette(colors: readonly string[], ratio: number): Float32Array[] {
     const n = colors.length;
     const rgb = colors.map(hexToRgb);
     const w =
         n * 2 ** Math.max(0, Math.ceil(Math.log2(PALETTE_MIN_TEXELS / n)));
     // Prefix sums per channel, to average any range of texels.
     const sum = new Float64Array((w + 1) * 3);
+    const split = (1 - ratio) * w;
     for (let i = 0; i < w; i++) {
-        const c = rgb[Math.floor((i * n) / w)];
+        let c = rgb[Math.floor((i * n) / w)];
+        if (n === 2) {
+            // The share of the second colour in [i, i + 1].
+            const t = Math.min(Math.max(i + 1 - split, 0), 1);
+            c =
+                t === 0
+                    ? rgb[0]
+                    : t === 1
+                      ? rgb[1]
+                      : (rgb[0].map(
+                            (a, k) => a + (rgb[1][k] - a) * t,
+                        ) as typeof c);
+        }
         for (let k = 0; k < 3; k++) {
             sum[(i + 1) * 3 + k] = sum[i * 3 + k] + c[k];
         }
@@ -1615,7 +1617,6 @@ export class GlassEffect implements Effect {
                 backdropOffset: t * p.backdropSpeed,
                 paletteTex: this.#paletteTex ?? sdfTex,
                 paletteSize: this.#paletteSize,
-                backdropRatio: Math.min(Math.max(p.backdropRatio, 0), 1),
                 backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
                 lightIntensity: Math.max(p.lightIntensity, 0),
                 lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
@@ -1749,7 +1750,13 @@ export class GlassEffect implements Effect {
     // Bake the palette into its texture when the colours change.
     #updatePalette(ctx: EffectContext): void {
         const colors = resolvePalette(this.params.backdropColors);
-        const key = colors.join(",");
+        // A two-colour palette has backdropRatio baked in.
+        const r = this.params.backdropRatio;
+        const ratio = Number.isFinite(r) ? Math.min(Math.max(r, 0), 1) : 0.5;
+        const key =
+            colors.length === 2
+                ? `${colors.join(",")}|${ratio}`
+                : colors.join(",");
         if (key === this.#paletteKey) {
             return;
         }
@@ -1761,7 +1768,7 @@ export class GlassEffect implements Effect {
         }
         this.#paletteRaw = null;
         this.#paletteTex = null;
-        const levels = bakePalette(colors);
+        const levels = bakePalette(colors, ratio);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
