@@ -22,6 +22,7 @@ const PARAMS: OrbitCameraParams = {
     zoom: 1,
     drag: false,
     cameraOrigin: "element",
+    tiltRange: 20,
 };
 
 // The matrix as it was built before the camera moved here, radians.
@@ -56,7 +57,7 @@ function input(
         mouseViewport: [x, y],
         pixelRatio: 1,
         live: false,
-        tilt: 0,
+        tilt: false,
         ...over,
     };
 }
@@ -166,10 +167,12 @@ describe("OrbitCamera, element origin", () => {
                 yaw: Number.NaN,
                 zoom: -1,
                 cameraOrigin: "nope" as "element",
+                tiltRange: 400,
             },
             defaults,
         );
         expect(r.fov).toBe(150);
+        expect(r.tiltRange).toBe(90);
         expect(r.yaw).toBe(7);
         expect(r.zoom).toBe(0.01);
         expect(r.cameraOrigin).toBe("element");
@@ -332,15 +335,21 @@ describe("OrbitCamera, pointer", () => {
         expect(w.added.sort()).toEqual(
             ["pointercancel", "pointerdown", "pointermove", "pointerup"].sort(),
         );
-        c.update({ ...PARAMS, drag: true }, input({ live: true, tilt: 20 }));
+        c.update({ ...PARAMS, drag: true }, input({ live: true, tilt: true }));
         expect(w.added).toHaveLength(7);
-        c.update(PARAMS, input({ live: true, tilt: 20 }));
+        c.update(PARAMS, input({ live: true, tilt: true }));
         expect(w.added.sort()).toEqual(
             ["blur", "pointermove", "pointerout"].sort(),
         );
         c.update(PARAMS, input({ live: true, trackPointer: true }));
         expect(w.added).toHaveLength(3);
-        c.update({ ...PARAMS, drag: true }, input({ live: true, tilt: 20 }));
+        // A tilt of 0° is off.
+        c.update(
+            { ...PARAMS, tiltRange: 0 },
+            input({ live: true, tilt: true }),
+        );
+        expect(w.added).toEqual([]);
+        c.update({ ...PARAMS, drag: true }, input({ live: true, tilt: true }));
         c.dispose();
         expect(w.added).toEqual([]);
     });
@@ -388,7 +397,7 @@ describe("OrbitCamera, pointer", () => {
         const at = (dt: number, over: Partial<OrbitCameraInput> = {}) =>
             input({
                 live: true,
-                tilt: 20,
+                tilt: true,
                 dt,
                 mouse: [200 + 500, 100],
                 ...over,
@@ -417,6 +426,12 @@ describe("OrbitCamera, pointer", () => {
         c.update(PARAMS, at(100, { mouse: [200, 100 + 400] }));
         expect(c.offsets.tiltPitch).toBeCloseTo(-20 * DEG, 12);
         expect(c.offsets.tiltYaw).toBeCloseTo(0, 12);
+        // tiltRange is the largest angle.
+        c.update(
+            { ...PARAMS, tiltRange: 8 },
+            at(100, { mouse: [200, 100 + 400] }),
+        );
+        expect(c.offsets.tiltPitch).toBeCloseTo(-8 * DEG, 12);
         // Not live (a still frame): eases to 0.
         c.update(PARAMS, at(100, { live: false }));
         expect(c.offsets.tiltPitch).toBeCloseTo(0, 12);

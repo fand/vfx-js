@@ -87,6 +87,9 @@ export type GlassDebugView = "off" | "outer" | "inner" | "total";
  */
 export type GlassBevelShape = "round" | "chamfer";
 
+/** What the pointer does to a {@link GlassEffect}. */
+export type GlassPointer = "none" | "tilt";
+
 /**
  * The params of {@link GlassEffect}: the glass's own, and the camera's
  * ({@link OrbitCameraParams}).
@@ -234,11 +237,25 @@ export type GlassParams = OrbitCameraParams & {
      */
     resolution: number;
     /**
-     * Smooth the remaining stair steps with FXAA. Refraction on a narrow
-     * bevel changes faster than the pixels can follow; this is the cheap
-     * fix, `resolution: 2` the thorough one.
+     * Smooth the edges with FXAA, a cheap pass over the final image. The
+     * glass is ray-marched in one pass, so multisampling would not help;
+     * the march already blends the silhouette by coverage, and FXAA
+     * smooths what is left, mostly the refraction on a narrow bevel,
+     * which changes faster than the pixels can follow. `resolution: 2`
+     * is the thorough (and costly) fix.
      */
-    fxaa: boolean;
+    antialias: boolean;
+    /**
+     * How the glass reacts to the pointer hovering over the page:
+     *
+     * - `"none"` (default): it doesn't.
+     * - `"tilt"`: hover parallax. The shape turns to face the pointer,
+     *   up to {@link OrbitCameraParams.tiltRange | tiltRange} degrees.
+     *
+     * Ignored by still frames. While `"tilt"`, it listens for pointer
+     * events on `window` to tell when the pointer leaves the page.
+     */
+    pointer: GlassPointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
      * the whole canvas.
@@ -296,8 +313,10 @@ const DEFAULT_PARAMS: GlassParams = {
     zoom: 0.7,
     drag: false,
     cameraOrigin: "element",
+    tiltRange: 20,
+    pointer: "none",
     resolution: 1,
-    fxaa: true,
+    antialias: true,
     pad: "fullscreen",
     debug: "off",
 };
@@ -1326,7 +1345,8 @@ function clampInt(v: number, lo: number, hi: number, fallback: number): number {
  * Its defaults here: the glass turned by `yaw` 29 and `pitch` 14, a
  * faster wobble (`orbitSpeed` 3.3), and `zoom` 0.7, so the glass is a
  * little smaller than the element. Set `drag: true` to orbit it with
- * pointer drags that start on the element. The default
+ * pointer drags that start on the element, and `pointer: "tilt"` to turn
+ * it towards the pointer. The default
  * `pad: "fullscreen"` leaves room for an off-centre element to lean out
  * of its rect with `cameraOrigin: "viewport"`.
  *
@@ -1375,7 +1395,8 @@ export class GlassEffect implements Effect {
     #backdropDirty = false;
 
     #time = 0;
-    // Drags, and the window listeners while `drag` is on.
+    // Drags, the "tilt", and the window listeners while `drag` is on or
+    // `pointer` is "tilt".
     readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
     #unsubRestored: (() => void) | null = null;
     #disposed = false;
@@ -1449,7 +1470,7 @@ export class GlassEffect implements Effect {
             mouseViewport: ctx.mouseViewport,
             pixelRatio: ctx.pixelRatio,
             live: !this.#still,
-            tilt: 0,
+            tilt: this.params.pointer === "tilt",
         });
         const scene = this.#drawGlass(ctx, cam);
         const debug = this.#debugView() !== 0;
@@ -1458,7 +1479,11 @@ export class GlassEffect implements Effect {
         const lw = Math.round(ow);
         const lh = Math.round(oh);
         const fxaa =
-            this.params.fxaa && scene !== null && !debug && lw > 0 && lh > 0;
+            this.params.antialias &&
+            scene !== null &&
+            !debug &&
+            lw > 0 &&
+            lh > 0;
         if (fxaa && (this.#ldr?.width !== lw || this.#ldr?.height !== lh)) {
             this.#ldr?.dispose();
             this.#ldr = ctx.createRenderTarget({

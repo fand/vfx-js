@@ -48,7 +48,7 @@ const BACKDROP = [
 ].join(", ");
 
 // Base setup of the stories: front-on (the default `orbit` wobble still
-// turns it a little), drag to orbit, the cursor repels the particles, and
+// turns it a little), drag to orbit, the pointer repels the particles, and
 // a drop shadow on the backdrop. The demo draws more particles than the
 // default, over the whole canvas.
 const STORY_VIEW: Partial<SwirlParticleParams> = {
@@ -57,7 +57,7 @@ const STORY_VIEW: Partial<SwirlParticleParams> = {
     yaw: 0,
     pitch: 0,
     drag: true,
-    mouse: "repel",
+    pointer: "repel",
     shadow: true,
 };
 
@@ -241,7 +241,7 @@ export const heading: StoryObj<Args> = {
             ...new SwirlParticleEffect({
                 depth: 0.3,
                 shadow: true,
-                mouse: "repel",
+                pointer: "repel",
             }).params,
         };
         let effect: SwirlParticleEffect | null = null;

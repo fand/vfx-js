@@ -965,12 +965,13 @@ export function attachSwirlParticlePane(
     bind(camera, "drag");
     bind(camera, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
 
-    const mouse = pane.addFolder({ title: "Mouse" });
-    bind(mouse, "mouse", {
+    const pointer = pane.addFolder({ title: "Pointer" });
+    bind(pointer, "pointer", {
         options: { none: "none", repel: "repel", tilt: "tilt" },
     });
-    bind(mouse, "mouseRadius", range(10, 400, 1));
-    bind(mouse, "mouseStrength", range(0, 3, 0.01));
+    bind(pointer, "repelRadius", range(10, 400, 1));
+    bind(pointer, "repelStrength", range(0, 3, 0.01));
+    bind(pointer, "tiltRange", range(0, 90, 0.5));
 
     // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
     const padState = {
@@ -1160,8 +1161,10 @@ export function attachGlassPane(
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
     bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
+    bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
+    bind(view, "tiltRange", range(0, 90, 0.5));
     bind(view, "resolution", range(0.25, 2, 0.05));
-    bind(view, "fxaa");
+    bind(view, "antialias");
     bind(view, "debug", {
         options: { off: "off", outer: "outer", inner: "inner", total: "total" },
     });

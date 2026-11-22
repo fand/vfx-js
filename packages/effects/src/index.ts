@@ -37,6 +37,7 @@ export {
     type GlassPaletteName,
     type GlassParams,
     type GlassPatternName,
+    type GlassPointer,
 } from "./glass.js";
 export { GlitchEffect, type GlitchParams } from "./glitch.js";
 export {
@@ -119,6 +120,7 @@ export {
     type SwirlParticleEffectOptions,
     type SwirlParticlePaletteName,
     type SwirlParticleParams,
+    type SwirlParticlePointer,
 } from "./swirl-particle.js";
 export {
     TilePixelateEffect,

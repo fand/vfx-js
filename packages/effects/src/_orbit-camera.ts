@@ -78,13 +78,29 @@ export type OrbitCameraParams = {
      *   scrolls. Its front draws further out from the centre than the
      *   element, so a small `pad` can clip it.
      *
-     * The rotations ({@link yaw}, {@link pitch}, the wobble, drags)
-     * turn the shape about its own centre in both cases.
+     * The rotations ({@link yaw}, {@link pitch}, the wobble, drags, the
+     * hover tilt) turn the shape about its own centre in both cases.
      */
     cameraOrigin: "element" | "viewport";
+    /**
+     * Largest hover tilt in degrees, 0 to 90, used only while the
+     * effect's `pointer` is `"tilt"`: the shape turns to face the
+     * pointer, reaching this angle when the pointer is half a viewport
+     * away from the element's centre, and eases back to the rest pose
+     * once the pointer leaves the page. Adds to {@link yaw} /
+     * {@link pitch}, the wobble and drags.
+     */
+    tiltRange: number;
 };
 
-type NumKey = "yaw" | "pitch" | "orbit" | "orbitSpeed" | "fov" | "zoom";
+type NumKey =
+    | "yaw"
+    | "pitch"
+    | "orbit"
+    | "orbitSpeed"
+    | "fov"
+    | "zoom"
+    | "tiltRange";
 
 /**
  * [min, max] of each numeric camera param. A finite value is clamped
@@ -99,6 +115,7 @@ export const ORBIT_CAMERA_RANGE: Readonly<
     orbitSpeed: [0, 100],
     fov: [1, 150],
     zoom: [0.01, 100],
+    tiltRange: [0, 90],
 };
 const NUM_KEYS = Object.keys(ORBIT_CAMERA_RANGE) as NumKey[];
 
@@ -163,10 +180,10 @@ export type OrbitCameraInput = {
      */
     live: boolean;
     /**
-     * Largest hover tilt in degrees, reached when the pointer is half a
-     * viewport from the element's centre. 0 is off.
+     * Whether the hover tilt is on (the effect's `pointer` is `"tilt"`).
+     * Its angle is the params' `tiltRange`.
      */
-    tilt: number;
+    tilt: boolean;
     /**
      * Keep {@link OrbitCamera.pointerIn} up to date even with the tilt
      * off, for an effect's own pointer interaction.
@@ -305,7 +322,7 @@ export class OrbitCamera {
         this.#elementPx[0] = ew;
         this.#elementPx[1] = eh;
 
-        const tilt = Number.isFinite(input.tilt) ? Math.max(input.tilt, 0) : 0;
+        const tilt = input.tilt ? p.tiltRange : 0;
         const live = input.live && typeof window !== "undefined";
         this.#syncListeners(
             live && p.drag,
