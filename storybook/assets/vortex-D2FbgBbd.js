@@ -1,0 +1,196 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{a as t,i as n,n as r,r as i,t as a}from"./build-CGrXap9d.js";var o;function s(){return(s=e((()=>{o=`uniform float uInvD0, uSwirlR, uHand, uBands, uBandContrast, uDepthNm, uFanQ, uNc, uSigS;
+uniform vec2  uVortexOff;
+uniform vec3  uVortexFam;
+uniform mat3  uCardRot, uPrevCardRot;
+uniform int   uDebugLight;
+varying vec3 vWorldPos; varying vec3 vPrevWorldPos; varying vec2 vUv; varying vec3 vN; varying vec3 vT; varying vec3 vB;
+#if DEBUG_VIEW == 1 || DEBUG_VIEW == 2 || DEBUG_VIEW == 3 || DEBUG_VIEW == 4 || DEBUG_VIEW == 5 || DEBUG_VIEW == 6 || DEBUG_VIEW == 11 || DEBUG_VIEW == 12
+#define HOLO_RAW_VIEW 1
+#endif
+const float VORTEX_SIG_THETA = 0.00174533;
+const float VORTEX_SIG_FREL = 0.002;
+mat2 keyKernels(vec3 X, vec3 V, vec3 T, vec3 B, vec3 Nf, float snK, out vec2 qK) {
+  bool key = uKeyLight >= 0 && uKeyLight < MAX_LIGHTS;
+  int ki = clamp(uKeyLight, 0, MAX_LIGHTS - 1);
+  vec3 Lk = key ? normalize(uLightPos[ki] - X) : reflect(-V, Nf);
+  qK = vec2(dot(Lk + V, T), dot(Lk + V, B));
+  vec2 w = fwidth(qK);
+  float cap = 0.09 * snK * snK;
+  mat2 S = mat2(min(w.x * w.x / TAU, cap), 0.0, 0.0, min(w.y * w.y / TAU, cap));
+  if (key) {
+    mat3 Rrel = uPrevCardRot * transpose(uCardRot);
+    vec3 Hp = normalize(uPrevLightPos[ki] - vPrevWorldPos) + normalize(cameraPosition - vPrevWorldPos);
+    vec2 dq = qK - vec2(dot(Hp, Rrel * T), dot(Hp, Rrel * B));
+    float l = length(dq);
+    if (l > 0.2) dq *= 0.2 / l;
+    S += outerProduct(dq, dq) / 12.0;
+  }
+  return S;
+}
+float vortexP(float x) { return 0.5 * floor(x) + min(fract(x), 0.5); }
+float vortexFam(float invD) {
+  if (invD >= uVortexFam.x) return 0.0;
+  if (invD >= uVortexFam.y) return (uVortexFam.x - invD) / max(uVortexFam.x - uVortexFam.y, 1e-12);
+  return 1.0 + clamp((uVortexFam.y - invD) / max(uVortexFam.y - uVortexFam.z, 1e-12), 0.0, 1.0);
+}
+Elem vortexElem(vec2 p, Footprint F, mat3 fF, float mottle, out float band, out float xi) {
+  vec2 c = 0.5 * uCardSizeMm * (1.0 + uVortexOff);
+  vec2 d = wrapDelta(p - c);
+  float rl = length(d), r = max(rl, 0.02);
+  vec2 rh = rl > 1e-6 ? d / rl : vec2(1.0, 0.0), th = vec2(-rh.y, rh.x);
+  float k = uHand * uSwirlR / r;
+  vec2 gc = normalize(rh + k * th);
+  float sPx = sqrt(0.5 * (F.S[0][0] + F.S[1][1]));
+  float r2 = r * r, rs2 = uSwirlR * uSwirlR;
+  float sThPx = sqrt(1.0 / r2 + sq(uSwirlR / (r2 + rs2))) * sPx;
+  float sFPx = rs2 / (r * (r2 + rs2)) * sPx;
+  float rb = max(uSwirlR, 1.0);
+  xi = uBands / TAU * (atan(d.y, d.x) + uHand * r / rb);
+  float h = 0.5 * (uBands / TAU) * sqrt(1.0 / r2 + 1.0 / (rb * rb)) * 2.50662827 * sPx;
+  float I = h < 1e-4 ? (fract(xi) < 0.5 ? 1.0 : 0.0) : (vortexP(xi + h) - vortexP(xi - h)) / (2.0 * h);
+  band = uBands > 0.0 ? 1.0 - uBandContrast * I : 1.0;
+  Elem e;
+  e.n = fF[2];
+  e.g = normalize(gc.x * fF[0] + gc.y * fF[1]);
+  e.invD = uInvD0 * sqrt(1.0 + k * k);
+  e.hNm = uDepthNm; e.nc = uNc; e.sigS = uSigS; e.tauF = 0.0; e.fanQ = uFanQ;
+  e.sigTheta = sqrt(VORTEX_SIG_THETA * VORTEX_SIG_THETA + sThPx * sThPx);
+  e.sigFrel = sqrt(VORTEX_SIG_FREL * VORTEX_SIG_FREL + sFPx * sFPx);
+  e.iso2 = 0.0;
+  e.w = clamp(band * mottle, 0.0, 1.0);
+  e.fam = vortexFam(e.invD);
+  return e;
+}
+#if DEBUG_VIEW == 3 || DEBUG_VIEW == 12
+vec4 firstOrder(GLight g, vec3 Lp, vec3 Vp, Elem e, mat2 ScCard, vec3 T, vec3 B) {
+  float ciIn = dot(e.n, Lp), coIn = dot(e.n, Vp);
+  if (ciIn <= 0.0 || coIn <= 0.0 || g.A <= 0.0) return vec4(0.0);
+  vec3  t = cross(e.n, e.g), H = e.nc * (Lp + Vp);
+  float qg = dot(H, e.g), qt = dot(H, t), sn = dot(H, e.n);
+  mat2  R = mat2(dot(T, e.g), dot(T, t), dot(B, e.g), dot(B, t));
+  mat2  Sx = R * (ScCard + g.S) * transpose(R);
+  float rho = length(vec2(qg, qt)), iso2 = sq(sn * e.sigS) + sq(sn * e.tauF) + e.iso2;
+  float sgg = max(Sx[0][0] + iso2 + sq(rho * e.sigFrel), 1e-10);
+  float stt = max(Sx[1][1] + iso2 + sq(rho * e.sigTheta) + sq(e.fanQ), 1e-10);
+  float sgt = Sx[0][1], d = 1.0 / max(e.invD, 1e-6);
+  float lam = d * abs(qg - (sgt / stt) * qt);
+  float sigL = clamp(d * sqrt(max(sgg - sgt * sgt / stt, 1e-10)), 0.5, 512.0);
+  return vec4(lam, sigL, exp(-0.5 * qt * qt / stt), sqrt(stt));
+}
+#endif
+void main() {
+  vec3 X = vWorldPos, V = normalize(cameraPosition - X);
+  vec3 T = normalize(vT), B = normalize(vB), N = normalize(vN);
+  vec2 p = vUv * uCardSizeMm;
+  Footprint F = footprintOf(p);
+  vec4 dUv = printUvDerivs(p);
+  vec2 sB, sC; mat2 SgB, SgC;
+  wavesSlope(uWaveBoard, p, F, sB, SgB);
+  wavesSlope(uWaveCoat, p, F, sC, SgC);
+  vec2 sM; mat2 SgM;
+  bumpSlope(p, F, sM, SgM);
+  if (uBumpMode == 2) { sC += sM; SgC += SgM; } else { sB += sM; SgB += SgM; }
+  sB += bowSlope(p);
+  float snK = keySn(X, V, N);
+  mat3 fF = frameFromSlope(T, B, N, sB - (1.0 / snK) * sC);
+  mat3 fC = frameFromSlope(T, B, N, sB + sC);
+  vec2 qK;
+  mat2 ScCard = keyKernels(X, V, T, B, fF[2], snK, qK) + snK * snK * SgB + SgC;
+  float sig2 = SgB[0][0] + SgB[1][1] + SgC[0][0] + SgC[1][1];
+  Print pr = printLayer(p, dUv);
+  Wear wr = wearAt(p, F);
+#if DEBUG_VIEW == 14
+  pr.W = 0.0; pr.T2 = vec3(1.0); pr.onWhite = vec3(0.85); pr.silver = 0.0;
+  wr.alphaAdd = 0.0; wr.gloss = 1.0; wr.mottle = 1.0; wr.dust = 0.0;
+#endif
+  float band, xi;
+  Elem e = vortexElem(p, F, fF, wr.mottle, band, xi);
+  vec3 Vp = refractIn(V, fF[2], uNc);
+  float coIn = dot(fF[2], Vp);
+#ifdef HOLO_RAW_VIEW
+  vec3 raw = vec3(0.0);
+#if DEBUG_VIEW == 1
+  raw = vec3(dot(fF[2], T), dot(fF[2], B), dot(fF[2], N)) * 0.5 + 0.5;
+#elif DEBUG_VIEW == 2
+  raw = vec3(0.5 * (qK + 1.0), 0.0);
+#elif DEBUG_VIEW == 3 || DEBUG_VIEW == 12
+  GLight gd = lightSummary(uDebugLight, X, V, fF[0], fF[1], fF[2]);
+  vec4 fo = firstOrder(gd, refractIn(gd.L, fF[2], uNc), Vp, e, ScCard, fF[0], fF[1]);
+#if DEBUG_VIEW == 3
+  if (e.w > 0.0 && fo.x >= 360.0 && fo.x <= 830.0) raw = vec3((fo.x - 350.0) / 500.0, fo.z, 0.25);
+#else
+  if (fo.x > 0.0) raw = vec3(fo.y / 100.0, fo.w / 0.2, 0.0);
+#endif
+#elif DEBUG_VIEW == 11
+  raw = rnd3(ivec2(int(floor(xi)), 0), 0xB4D5u) * (0.35 + 0.65 * band);
+#elif DEBUG_VIEW == 6
+  raw = vec3(pr.W, (pr.T2.r + pr.T2.g + pr.T2.b) / 3.0, pr.silver);
+#endif
+  gl_FragColor = vec4(clamp(raw, 0.0, 1.0), 1.0);
+  return;
+#endif
+  vec3 Lc = vec3(0.0), Lpap = vec3(0.0), Lz = vec3(0.0), Lo = vec3(0.0), Ed = vec3(0.0);
+#if DEBUG_VIEW != 14
+  for (int k = 0; k < MAX_LIGHTS; ++k) {
+    int i = uLightOrder[k];
+    if (i < 0) break;
+    GLight g = lightSummary(i, X, V, fF[0], fF[1], fF[2]);
+    if (g.A <= 0.0) continue;
+    float Ti = coatT(fC[2], g.L, V);
+    vec3 Lp = refractIn(g.L, fF[2], uNc);
+    vec4 eta = etaOrdFor(i, e.fam);
+    vec3 mir = mix(specProject(vec4(1.0), g.spd),
+                   specProject(mirrorF1(e.hNm, e.nc, dot(fF[2], Lp), coIn, uEtaMir[i]), g.spd), e.w);
+    vec3 ord, zer;
+    if (g.type == 2) {
+#if RECT_EXACT
+      ord = elemOrdersRect(g, V, e, ScCard, fF[0], fF[1], Ti, eta);
+#else
+      ord = elemOrders(g, Lp, Vp, e, ScCard, fF[0], fF[1], Ti, eta);
+#endif
+#if RECT_LTC
+      zer = elemMirrorRect(g, X, V, e, ScCard, fF[0], fF[1], fF[2], 1.0, Ti, mir);
+#else
+      zer = elemMirror(g, Lp, Vp, e, ScCard, fF[0], fF[1], Ti, mir);
+#endif
+    } else {
+#if DEBUG_VIEW == 13
+      ord = elemOrdersRef(g, Lp, Vp, e, ScCard, fF[0], fF[1], Ti, eta);
+#else
+      ord = elemOrders(g, Lp, Vp, e, ScCard, fF[0], fF[1], Ti, eta);
+#endif
+      zer = elemMirror(g, Lp, Vp, e, ScCard, fF[0], fF[1], Ti, mir);
+    }
+    Lc += coatDirect(g, X, V, fC[2], uCoatAlpha + wr.alphaAdd, wr.gloss, sig2);
+    if (k < DISCRETE_LIGHTS) Lc += scratchLobe(g, V, fC, p, F, ScCard);
+    Lpap += pr.W * pr.onWhite * (g.rad * g.A / PI) * g.rgb;
+    Lz += zer;
+    Lo += ord;
+    Ed += g.rad * g.A * g.rgb;
+  }
+#endif
+  vec3 Ee = envIrradiance(fC[2]);
+  Lc += coatEnv(V, fC[2], sqrt(sq(uCoatAlpha + wr.alphaAdd) + sig2), wr.gloss);
+  Lpap += pr.W * pr.onWhite * Ee / PI;
+  vec3 mirEnv = mix(specProject(vec4(1.0), 0), specProject(mirrorF1(e.hNm, e.nc, coIn, coIn, uEtaEnv), 0), e.w);
+  Lz += envMirror(V, Vp, e, fF[2], ScCard, mirEnv);
+#if NB > 0
+  Lo += envDiffraction(V, e, ScCard, fF[0], fF[1]);
+#endif
+  vec3 tint = (1.0 - pr.W) * pr.T2;
+  vec3 L = mix(Lc + Lpap + tint * (Lz + Lo), dustRadiance(Ed + Ee, V, fC[2]), wr.dust);
+#if DEBUG_VIEW == 7
+  L = (1.0 - wr.dust) * Lc;
+#elif DEBUG_VIEW == 8
+  L = (1.0 - wr.dust) * (Lpap + tint * (Lz + Lo));
+#elif DEBUG_VIEW == 9
+  L = (1.0 - wr.dust) * tint * Lz;
+#elif DEBUG_VIEW == 10
+  L = (1.0 - wr.dust) * tint * Lo;
+#endif
+#ifdef HOLO_LDR
+  L = gamutMapLuma(L, LUMA_SRGB);
+#endif
+  gl_FragColor = encodeCard(L);
+}
+`})))()}function c(e){let t=e[`vortex.centre`],n=typeof t==`object`&&!!t&&`x`in t&&`y`in t,r=n?Number(t.x):0,i=n?Number(t.y):0;return{x:Number.isFinite(r)?f(r,-1,1):0,y:Number.isFinite(i)?f(i,-1,1):0}}var l,u,d,f,p,m,h,g,_;function v(){return(v=e((()=>{s(),r(),l=300,u=[`ccw`,`cw`],d={type:`longpass`,edgeNm:500,widthNm:50,floor:.3},f=(e,t,n)=>Math.min(Math.max(e,t),n),p=e=>f(i(e,`vortex.pitch`,1250),1,1e5),m=e=>Math.max(i(e,`vortex.depth`,45),0),h=e=>f(i(e,`vortex.nc`,1.5),1.0001,3),g=e=>Math.max(Math.round(i(e,`vortex.seed`,9)),0),_={id:`vortex`,fragmentMain:o,extraChunks:[],uniforms(e){let t=p(e),r=c(e);return{uInvD0:1/t,uSwirlR:f(i(e,`vortex.swirl`,15),0,1e4),uHand:n(e,`vortex.handedness`,u,`ccw`)===`cw`?-1:1,uVortexOff:[r.x,r.y],uVortexFam:[1/l,1/(.7*t),1/t],uDepthNm:m(e),uFanQ:Math.max(i(e,`vortex.fan`,1.5),0)*a,uBands:Math.max(Math.round(i(e,`vortex.bands`,24)),0),uBandContrast:f(i(e,`vortex.contrast`,.45),0,1),uNc:h(e),uSigS:Math.max(i(e,`vortex.roughness`,.25),0)*a,uCoatAlpha:f(i(e,`vortex.coatAlpha`,.045),.001,1)}},defines(){return{}},gratingSummary(e){let n=p(e);return{pitchesNm:[l,.7*n,n],depthNm:m(e),nc:h(e),gAzimuthRad:null,recycle:!0,tint:t(e,`vortex`,d)}},relief(e){return{seed:g(e),wavinessDeg:Math.max(i(e,`vortex.waviness`,.3),0),orangePeelUm:Math.max(i(e,`vortex.orangePeel`,.6),0)}}}})))()}v();export{_ as vortex};
