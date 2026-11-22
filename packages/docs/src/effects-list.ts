@@ -9,6 +9,7 @@ import {
     DitherEffect,
     DuotoneEffect,
     FluidEffect,
+    GlassEffect,
     GlitchEffect,
     GradientMapEffect,
     HalftoneEffect,
@@ -29,6 +30,7 @@ import {
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
+    SwirlParticleEffect,
     TilePixelateEffect,
     TritoneEffect,
     VignetteEffect,
@@ -194,6 +196,13 @@ export const effectDemos: EffectDemo[] = [
         hint: "Move the pointer over it.",
     },
     {
+        name: "GlassEffect",
+        text: "Dispersive glass in the shape of the silhouette.",
+        media: "logo",
+        // A small pad keeps the tile cheap.
+        create: () => new GlassEffect({ pad: 40, zoom: 0.9 }),
+    },
+    {
         name: "GlitchEffect",
         text: "Block shift and aberration glitch.",
         media: "pigeon",
@@ -317,6 +326,13 @@ export const effectDemos: EffectDemo[] = [
         text: "Split into strips and shift each one.",
         media: "pigeon",
         create: () => new SliceShiftEffect(),
+    },
+    {
+        name: "SwirlParticleEffect",
+        text: "Particles curling over the extruded silhouette.",
+        media: "logo",
+        // A small pad keeps the tile cheap; wisps that drift further are clipped.
+        create: () => new SwirlParticleEffect({ pad: 40, yaw: 11.5 }),
     },
     {
         name: "TilePixelateEffect",

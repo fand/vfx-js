@@ -25,6 +25,17 @@ export {
 export { DitherEffect, type DitherParams, type DitherStyle } from "./dither.js";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone.js";
 export { FluidEffect, type FluidParams } from "./fluid.js";
+export {
+    GLASS_PALETTES,
+    type GlassBevelShape,
+    type GlassDebugView,
+    GlassEffect,
+    type GlassEffectOptions,
+    type GlassImageSource,
+    type GlassPaletteName,
+    type GlassParams,
+    type GlassPatternName,
+} from "./glass.js";
 export { GlitchEffect, type GlitchParams } from "./glitch.js";
 export {
     GradientMapEffect,
@@ -99,6 +110,14 @@ export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift.js";
 export { ScanlineEffect, type ScanlineParams } from "./scanline.js";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave.js";
 export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift.js";
+export {
+    SWIRL_PARTICLE_PALETTES,
+    type SwirlParticleColorStop,
+    SwirlParticleEffect,
+    type SwirlParticleEffectOptions,
+    type SwirlParticlePaletteName,
+    type SwirlParticleParams,
+} from "./swirl-particle.js";
 export {
     TilePixelateEffect,
     type TilePixelateParams,
