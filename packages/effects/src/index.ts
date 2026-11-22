@@ -78,6 +78,14 @@ export { ScanlineEffect, type ScanlineParams } from "./scanline.js";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave.js";
 export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift.js";
 export {
+    SWIRL_PARTICLE_PALETTES,
+    type SwirlParticleColorStop,
+    SwirlParticleEffect,
+    type SwirlParticleEffectOptions,
+    type SwirlParticlePaletteName,
+    type SwirlParticleParams,
+} from "./swirl-particle.js";
+export {
     TilePixelateEffect,
     type TilePixelateParams,
     type TilePixelateShape,

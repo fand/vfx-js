@@ -10,6 +10,13 @@ import type {
     EffectDims,
     EffectRenderTarget,
 } from "@vfx-js/core";
+import {
+    type BloomPyramid,
+    createBloomPyramid,
+    disposeBloomPyramid,
+    GLSL_BLOOM_KNEE,
+    upsampleBloomPyramid,
+} from "./_bloom-common.js";
 import { padOutputRect } from "./_pad.js";
 
 // Threshold + sRGB→linear decode. Bloom math runs in linear space so
@@ -32,7 +39,7 @@ uniform sampler2D src;
 uniform float threshold;
 uniform float softness;
 uniform float edgeFade;
-
+${GLSL_BLOOM_KNEE}
 void main() {
     // Hard-gate sampling to uvSrc in [0,1]: a bare clamp would smear
     // src's edge pixels into the pad (visible as a stretched image
@@ -54,10 +61,7 @@ void main() {
     // so saturated primaries still trigger bloom where a Rec.709
     // luma would have hidden them.
     float br = max(max(lin.r, lin.g), lin.b);
-    float knee = threshold * softness;
-    float rq = clamp(br - threshold + knee, 0.0, 2.0 * knee);
-    rq = rq * rq / (4.0 * knee + 1e-4);
-    float contribution = max(rq, br - threshold) / max(br, 1e-4);
+    float contribution = bloomKnee(br, threshold, threshold * softness);
 
     // Chebyshev distance outside the inner rect in uvContent units;
     // 0 inside, positive in the pad region.
@@ -122,38 +126,6 @@ void main() {
               + box5 * 0.5;
     }
     outColor = color;
-}
-`;
-
-// 3×3 tent upsample — COD:AW additive pyramid. Each level contributes
-// `mipsDown[i] * weightLarge + tent(deeper) * weightSmall`; weights are
-// driven from JS so scatter maps to halo radius linearly.
-// (Unity HDRP's `mix(down, tent, scatter)` is geometric in radius —
-// replaced here with a per-level linear gate.)
-const FRAG_UPSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D srcSmall;
-uniform sampler2D srcLarge;
-uniform vec2 texelSize;
-uniform float weightLarge;
-uniform float weightSmall;
-
-void main() {
-    vec2 t = texelSize;
-    vec4 sum = vec4(0.0);
-    sum += texture(srcSmall, uv + vec2(-t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0, -t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv                  ) * 4.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0,  t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  t.y)) * 1.0;
-    sum *= (1.0 / 16.0);
-    outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
 }
 `;
 
@@ -313,9 +285,7 @@ export class BloomEffect implements Effect {
     params: BloomParams;
 
     #bright: EffectRenderTarget | null = null;
-    #mipsDown: EffectRenderTarget[] = [];
-    #mipsUp: EffectRenderTarget[] = [];
-    #allocated = false;
+    #pyramid: BloomPyramid | null = null;
     #lastBaseW = 0;
     #lastBaseH = 0;
 
@@ -346,20 +316,31 @@ export class BloomEffect implements Effect {
         // the host), `bright` auto-resizes — rebuild the pyramid so
         // mip dims keep matching the buffer.
         if (
+            !this.#pyramid ||
             this.#bright.width !== this.#lastBaseW ||
             this.#bright.height !== this.#lastBaseH
         ) {
-            this.#mipsDown.length = 0;
-            this.#mipsUp.length = 0;
-            this.#allocated = false;
+            if (this.#pyramid) {
+                disposeBloomPyramid(this.#pyramid);
+            }
+            // Auto-depth: halve until both axes hit 1 px, capped at 8
+            // levels. Going past the 13-tap stencil's "nice" size (4 px)
+            // is intentional — the deepest mips become degenerate box
+            // averages over the whole buffer, which is exactly what
+            // contributes the wide low-frequency halo tail that smears
+            // the 8-bit cutoff across enough pixels for dither to
+            // dissolve.
+            this.#pyramid = createBloomPyramid(
+                ctx,
+                this.#bright.width,
+                this.#bright.height,
+                8,
+            );
             this.#lastBaseW = this.#bright.width;
             this.#lastBaseH = this.#bright.height;
         }
-        this.#allocateMips(ctx, this.#bright.width, this.#bright.height);
-        const n = this.#mipsDown.length;
-        if (n === 0) {
-            return;
-        }
+        const mipsDown = this.#pyramid.down;
+        const n = mipsDown.length;
 
         ctx.draw({
             frag: FRAG_THRESHOLD,
@@ -375,10 +356,10 @@ export class BloomEffect implements Effect {
                 texelSize: [1 / this.#bright.width, 1 / this.#bright.height],
                 karis: 1,
             },
-            target: this.#mipsDown[0],
+            target: mipsDown[0],
         });
         for (let i = 1; i < n; i++) {
-            const prev = this.#mipsDown[i - 1];
+            const prev = mipsDown[i - 1];
             ctx.draw({
                 frag: FRAG_DOWNSAMPLE,
                 uniforms: {
@@ -386,7 +367,7 @@ export class BloomEffect implements Effect {
                     texelSize: [1 / prev.width, 1 / prev.height],
                     karis: 0,
                 },
-                target: this.#mipsDown[i],
+                target: mipsDown[i],
             });
         }
 
@@ -409,31 +390,22 @@ export class BloomEffect implements Effect {
         const activeDepth = 1 + scatter * Math.max(0, n - 1);
         const weightFor = (i: number) =>
             Math.min(1, Math.max(0, activeDepth - i));
-        for (let i = n - 2; i >= 0; i--) {
-            const small =
-                i === n - 2 ? this.#mipsDown[n - 1] : this.#mipsUp[i + 1];
+        const bloomTex = upsampleBloomPyramid(ctx, this.#pyramid, (i) => {
             const levelScale = 2 ** (i + 2);
-            // Bottom mip is raw downsample — its weight is applied here.
-            // Intermediate upsamples already carry per-level weights
-            // baked in from previous iterations, so pass-through = 1.
-            const wSmall = i === n - 2 ? weightFor(n - 1) : 1.0;
-            ctx.draw({
-                frag: FRAG_UPSAMPLE,
-                uniforms: {
-                    srcSmall: small,
-                    srcLarge: this.#mipsDown[i],
-                    texelSize: [
-                        (TENT_FILTER * levelScale) / baseW,
-                        (TENT_FILTER * levelScale) / baseH,
-                    ],
-                    weightLarge: weightFor(i),
-                    weightSmall: wSmall,
-                },
-                target: this.#mipsUp[i],
-            });
-        }
+            return {
+                texelSize: [
+                    (TENT_FILTER * levelScale) / baseW,
+                    (TENT_FILTER * levelScale) / baseH,
+                ],
+                weightLarge: weightFor(i),
+                // Bottom mip is raw downsample — its weight is applied
+                // here. Intermediate upsamples already carry per-level
+                // weights baked in from previous iterations, so
+                // pass-through = 1.
+                weightSmall: i === n - 2 ? weightFor(n - 1) : 1.0,
+            };
+        });
 
-        const bloomTex = n >= 2 ? this.#mipsUp[0] : this.#mipsDown[0];
         // Normalise by active depth so bloom amplitude stays roughly
         // constant across scatter — fully-additive pyramid sums N
         // levels, so raw amplitude scales with level count otherwise.
@@ -462,45 +434,11 @@ export class BloomEffect implements Effect {
 
     dispose(): void {
         this.#bright = null;
-        this.#mipsDown.length = 0;
-        this.#mipsUp.length = 0;
-        this.#allocated = false;
+        if (this.#pyramid) {
+            disposeBloomPyramid(this.#pyramid);
+        }
+        this.#pyramid = null;
         this.#lastBaseW = 0;
         this.#lastBaseH = 0;
-    }
-
-    #allocateMips(ctx: EffectContext, baseW: number, baseH: number): void {
-        if (this.#allocated) {
-            return;
-        }
-        // Auto-depth: halve until both axes hit 1 px, capped at 8
-        // levels. Going past the 13-tap stencil's "nice" size (4 px)
-        // is intentional — the deepest mips become degenerate box
-        // averages over the whole buffer, which is exactly what
-        // contributes the wide low-frequency halo tail that smears
-        // the 8-bit cutoff across enough pixels for dither to dissolve.
-        let w = Math.max(1, Math.floor(baseW / 2));
-        let h = Math.max(1, Math.floor(baseH / 2));
-        for (let i = 0; i < 8; i++) {
-            this.#mipsDown.push(
-                ctx.createRenderTarget({ size: [w, h], float: true }),
-            );
-            const nw = Math.max(1, Math.floor(w / 2));
-            const nh = Math.max(1, Math.floor(h / 2));
-            if (nw === w && nh === h) {
-                break;
-            }
-            w = nw;
-            h = nh;
-        }
-        for (let i = 0; i < this.#mipsDown.length - 1; i++) {
-            this.#mipsUp.push(
-                ctx.createRenderTarget({
-                    size: [this.#mipsDown[i].width, this.#mipsDown[i].height],
-                    float: true,
-                }),
-            );
-        }
-        this.#allocated = true;
     }
 }
