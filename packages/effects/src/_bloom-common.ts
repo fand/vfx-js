@@ -1,9 +1,9 @@
-// Shared by bloom.ts and swirl-particles.ts: the soft-knee threshold, the
+// Shared by bloom.ts and swirl-particle.ts: the soft-knee threshold, the
 // tent upsample and the pyramid's targets and upsample chain. Internal,
 // not exported from index.ts.
 //
 // The two effects build their pyramids differently (BloomEffect: sRGB
-// decode, edge fade and a 13-tap Karis downsample; SwirlParticles: an HDR
+// decode, edge fade and a 13-tap Karis downsample; SwirlParticleEffect: an HDR
 // box prefilter and a 5-tap downsample, which its shadow blur reuses), so
 // those passes stay in each effect.
 import type { EffectContext, EffectRenderTarget } from "@vfx-js/core";

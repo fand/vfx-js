@@ -38,18 +38,18 @@ import { padOutputRect } from "./_pad.js";
 import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
 
 /**
- * One stop of a {@link SwirlParticlesParams.palette} gradient, like a
+ * One stop of a {@link SwirlParticleParams.palette} gradient, like a
  * stop in a CSS `linear-gradient`.
  */
-export type SwirlParticlesColorStop = {
+export type SwirlParticleColorStop = {
     /** Position on the gradient, in [0, 1]. */
     offset: number;
     /** CSS hex colour (`"#rrggbb"` or `"#rgb"`). */
     color: string;
 };
 
-/** Name of a built-in {@link SWIRL_PARTICLES_PALETTES} gradient. */
-export type SwirlParticlesPaletteName =
+/** Name of a built-in {@link SWIRL_PARTICLE_PALETTES} gradient. */
+export type SwirlParticlePaletteName =
     | "nebula"
     | "ember"
     | "aurora"
@@ -59,8 +59,8 @@ export type SwirlParticlesPaletteName =
 
 // Frozen, so a preset can't be edited in place by accident.
 function stops(
-    list: SwirlParticlesColorStop[],
-): readonly SwirlParticlesColorStop[] {
+    list: SwirlParticleColorStop[],
+): readonly SwirlParticleColorStop[] {
     return Object.freeze(list.map((s) => Object.freeze(s)));
 }
 
@@ -69,8 +69,8 @@ function stops(
  * offsets the fast, glinting and peeled-off particles. Frozen: copy the
  * stops to edit them.
  */
-export const SWIRL_PARTICLES_PALETTES: Readonly<
-    Record<SwirlParticlesPaletteName, readonly SwirlParticlesColorStop[]>
+export const SWIRL_PARTICLE_PALETTES: Readonly<
+    Record<SwirlParticlePaletteName, readonly SwirlParticleColorStop[]>
 > = Object.freeze({
     // Deep navy → blue → violet-pink → near white.
     nebula: stops([
@@ -111,7 +111,7 @@ export const SWIRL_PARTICLES_PALETTES: Readonly<
     ]),
 });
 
-export type SwirlParticlesParams = {
+export type SwirlParticleParams = {
     /**
      * Number of particles, at most 1,048,576 (2^20). Live: lowering it
      * draws fewer particles without freeing memory; raising it past what
@@ -145,7 +145,7 @@ export type SwirlParticlesParams = {
      *
      * Also applies when the WebGL context is restored and to the
      * particles added when `count` grows past what is allocated, but not
-     * to {@link SwirlParticlesEffect.refresh | refresh()} or an automatic
+     * to {@link SwirlParticleEffect.refresh | refresh()} or an automatic
      * recapture: the flow carries on onto the new shape. 0 starts with
      * every particle already in place, at a random age. Ignored by still
      * frames.
@@ -173,7 +173,7 @@ export type SwirlParticlesParams = {
      * sorted by offset, the ends clamp, and colours blend linearly. Read
      * every frame; edits to the stops in place are picked up too.
      */
-    palette: SwirlParticlesPaletteName | readonly SwirlParticlesColorStop[];
+    palette: SwirlParticlePaletteName | readonly SwirlParticleColorStop[];
     /**
      * Mix from the palette colour (0) to the source element's colour at
      * each particle's spawn point (1). Lighting still applies on top.
@@ -296,8 +296,8 @@ export type SwirlParticlesParams = {
     antialias: boolean;
 };
 
-/** Options for {@link SwirlParticlesEffect}'s constructor. */
-export type SwirlParticlesEffectOptions = {
+/** Options for {@link SwirlParticleEffect}'s constructor. */
+export type SwirlParticleEffectOptions = {
     /**
      * Render a still frame: simulate a fixed number of steps once, then
      * stop. The frame is drawn again only when params or the element's
@@ -307,7 +307,7 @@ export type SwirlParticlesEffectOptions = {
     still?: boolean;
 };
 
-const DEFAULT_PARAMS: SwirlParticlesParams = {
+const DEFAULT_PARAMS: SwirlParticleParams = {
     count: 65536,
     depth: 0.22,
     swirl: 1.0,
@@ -1555,10 +1555,10 @@ function buildShape(
 type Rgb = [number, number, number];
 
 type NumKey = {
-    [K in keyof SwirlParticlesParams]-?: SwirlParticlesParams[K] extends number
+    [K in keyof SwirlParticleParams]-?: SwirlParticleParams[K] extends number
         ? K
         : never;
-}[keyof SwirlParticlesParams];
+}[keyof SwirlParticleParams];
 
 // [min, max] of every numeric param. A finite value is clamped into it,
 // anything else (NaN, ±Infinity, not a number) falls back to the default.
@@ -1603,7 +1603,7 @@ type Resolved = Record<NumKey, number> & {
     shadow: boolean;
     drag: boolean;
     antialias: boolean;
-    mouse: SwirlParticlesParams["mouse"];
+    mouse: SwirlParticleParams["mouse"];
     /** Unit vector towards the light. */
     light: Rgb;
     lightColor: Rgb;
@@ -1660,7 +1660,7 @@ function lightUnit(dir: unknown, out: Rgb): void {
 }
 
 // The one place params are checked: once a frame, into `out`.
-function resolveParams(p: SwirlParticlesParams, out?: Resolved): Resolved {
+function resolveParams(p: SwirlParticleParams, out?: Resolved): Resolved {
     const r = out ?? ({ light: [0, 0, 1] } as unknown as Resolved);
     for (const k of NUM_KEYS) {
         const v = p[k];
@@ -1684,21 +1684,21 @@ function resolveParams(p: SwirlParticlesParams, out?: Resolved): Resolved {
 }
 
 function resolvePalette(
-    palette: SwirlParticlesParams["palette"],
-): readonly SwirlParticlesColorStop[] {
+    palette: SwirlParticleParams["palette"],
+): readonly SwirlParticleColorStop[] {
     const stops = (
         typeof palette === "string"
-            ? SWIRL_PARTICLES_PALETTES[palette]
+            ? SWIRL_PARTICLE_PALETTES[palette]
             : Array.isArray(palette)
               ? palette.filter((s) => s && typeof s === "object")
               : null
-    ) as readonly SwirlParticlesColorStop[] | null | undefined;
-    return stops && stops.length > 0 ? stops : SWIRL_PARTICLES_PALETTES.nebula;
+    ) as readonly SwirlParticleColorStop[] | null | undefined;
+    return stops && stops.length > 0 ? stops : SWIRL_PARTICLE_PALETTES.nebula;
 }
 
 // Bake the stops into PALETTE_SIZE RGBA8 texels, like a CSS gradient:
 // sorted by offset, flat beyond the ends, linear in between.
-function bakePalette(palette: SwirlParticlesParams["palette"]): Uint8Array {
+function bakePalette(palette: SwirlParticleParams["palette"]): Uint8Array {
     const stops = resolvePalette(palette)
         .map((s) => ({
             offset: Number.isFinite(s.offset) ? clamp(s.offset, 0, 1) : 0,
@@ -1813,18 +1813,18 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
 /**
  * Particles that flow over the surface of the element's silhouette,
  * extruded into 3D, and peel off it in curling wisps. Fibres are shaded
- * from the shape's SDF, coloured by a gradient {@link SwirlParticlesParams.palette}
+ * from the shape's SDF, coloured by a gradient {@link SwirlParticleParams.palette}
  * (or the source colours, with `sourceColor`), with HDR sparkles and bloom.
  *
  * ```ts
- * vfx.add(img, { effect: new SwirlParticlesEffect({ palette: "ember" }) });
+ * vfx.add(img, { effect: new SwirlParticleEffect({ palette: "ember" }) });
  * ```
  *
  * The silhouette is the element's alpha, read back when the effect starts
  * and again when the element's aspect ratio changes. Call
- * {@link SwirlParticlesEffect.refresh | refresh()} after its content
+ * {@link SwirlParticleEffect.refresh | refresh()} after its content
  * changes. An opaque photo becomes an extruded slab. The particles are
- * born over the first {@link SwirlParticlesParams.intro | intro} seconds
+ * born over the first {@link SwirlParticleParams.intro | intro} seconds
  * (1.5 by default). The output is premultiplied over transparency, so set
  * the page background yourself. Camera angles are in degrees.
  *
@@ -1834,8 +1834,8 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
  * the element, `shadow: true` to cast a drop shadow onto the page
  * behind, and `antialias: true` to smooth the fibres' edges.
  */
-export class SwirlParticlesEffect implements Effect {
-    params: SwirlParticlesParams;
+export class SwirlParticleEffect implements Effect {
+    params: SwirlParticleParams;
     readonly #still: boolean;
     // Whether float targets are 16-bit: the core falls back to RGBA16F
     // without OES_texture_float_linear.
@@ -1908,7 +1908,7 @@ export class SwirlParticlesEffect implements Effect {
     #paletteTex: EffectTexture | null = null;
     // The palette last baked: the value, and for stops, a flat copy of
     // their offsets and colours to catch edits in place.
-    #paletteSrc: SwirlParticlesParams["palette"] | null = null;
+    #paletteSrc: SwirlParticleParams["palette"] | null = null;
     #paletteSnap: unknown[] = [];
     #paletteVersion = 0;
 
@@ -1949,15 +1949,15 @@ export class SwirlParticlesEffect implements Effect {
     #tiltPitch = 0;
 
     constructor(
-        initial: Partial<SwirlParticlesParams> = {},
-        opts: SwirlParticlesEffectOptions = {},
+        initial: Partial<SwirlParticleParams> = {},
+        opts: SwirlParticleEffectOptions = {},
     ) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
         this.#still = opts.still ?? false;
         this.#r = resolveParams(this.params);
     }
 
-    setParams(updates: Partial<SwirlParticlesParams>): void {
+    setParams(updates: Partial<SwirlParticleParams>): void {
         Object.assign(this.params, updates);
     }
 
@@ -2477,7 +2477,7 @@ export class SwirlParticlesEffect implements Effect {
 
     // Whether the palette is the one last baked, stops edited in place
     // included. No allocation when it is.
-    #paletteUnchanged(palette: SwirlParticlesParams["palette"]): boolean {
+    #paletteUnchanged(palette: SwirlParticleParams["palette"]): boolean {
         if (palette !== this.#paletteSrc) {
             return false;
         }

@@ -54,7 +54,7 @@ await vfx.add(img, {
 | `PixelateEffect`         | Nearest-neighbour pixelation                                    |
 | `PixelSortEffect`        | Threshold pixel sort, with optional arbitrary sort angle        |
 | `ScanlineEffect`         | CRT scanline overlay                                            |
-| `SwirlParticlesEffect`   | Particles curling over the extruded 3D silhouette               |
+| `SwirlParticleEffect`    | Particles curling over the extruded 3D silhouette               |
 
 See the [Storybook demos](https://amagi.dev/vfx-js/storybook) for live examples.
 

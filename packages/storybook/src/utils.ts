@@ -9,10 +9,10 @@ import {
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
-    SWIRL_PARTICLES_PALETTES,
-    type SwirlParticlesColorStop,
-    type SwirlParticlesPaletteName,
-    type SwirlParticlesParams,
+    SWIRL_PARTICLE_PALETTES,
+    type SwirlParticleColorStop,
+    type SwirlParticlePaletteName,
+    type SwirlParticleParams,
 } from "@vfx-js/effects";
 import { type BindingParams, type FolderApi, Pane } from "tweakpane";
 
@@ -800,7 +800,7 @@ export function attachClockPane(
     return pane;
 }
 
-/** Source picker for {@link attachSwirlParticlesPane}. */
+/** Source picker for {@link attachSwirlParticlePane}. */
 export type SwirlSourceSelector = {
     keys: readonly string[];
     value: string;
@@ -808,14 +808,14 @@ export type SwirlSourceSelector = {
 };
 
 /**
- * Tweakpane for SwirlParticlesEffect. Binds to a story-owned `params`
+ * Tweakpane for SwirlParticleEffect. Binds to a story-owned `params`
  * object; `apply` copies the edits into the current effect, which reads
  * them every frame. `replay`, when given, adds a button that starts the
  * effect over, to see the `intro` again.
  */
-export function attachSwirlParticlesPane(
+export function attachSwirlParticlePane(
     title: string,
-    params: SwirlParticlesParams,
+    params: SwirlParticleParams,
     apply: () => void,
     source?: SwirlSourceSelector,
     replay?: () => void,
@@ -839,7 +839,7 @@ export function attachSwirlParticlesPane(
 
     const bind = (
         folder: FolderApi | Pane,
-        key: keyof SwirlParticlesParams,
+        key: keyof SwirlParticleParams,
         opts: BindingParams = {},
     ) => {
         folder.addBinding(params, key, opts).on("change", apply);
@@ -964,17 +964,17 @@ export function attachSwirlParticlesPane(
 // objects in place; the effect re-bakes when an offset or colour changes.
 function addSwirlPaletteBindings(
     pane: Pane,
-    params: SwirlParticlesParams,
+    params: SwirlParticleParams,
     apply: () => void,
 ): void {
     const copyStops = (
-        stops: readonly SwirlParticlesColorStop[],
-    ): SwirlParticlesColorStop[] => stops.map((s) => ({ ...s }));
-    const initial: SwirlParticlesPaletteName =
+        stops: readonly SwirlParticleColorStop[],
+    ): SwirlParticleColorStop[] => stops.map((s) => ({ ...s }));
+    const initial: SwirlParticlePaletteName =
         typeof params.palette === "string" ? params.palette : "nebula";
     params.palette = copyStops(
         typeof params.palette === "string"
-            ? SWIRL_PARTICLES_PALETTES[params.palette]
+            ? SWIRL_PARTICLE_PALETTES[params.palette]
             : params.palette,
     );
 
@@ -983,11 +983,11 @@ function addSwirlPaletteBindings(
     color
         .addBinding(presetState, "palette", {
             options: Object.fromEntries(
-                Object.keys(SWIRL_PARTICLES_PALETTES).map((k) => [k, k]),
+                Object.keys(SWIRL_PARTICLE_PALETTES).map((k) => [k, k]),
             ),
         })
         .on("change", (ev) => {
-            params.palette = copyStops(SWIRL_PARTICLES_PALETTES[ev.value]);
+            params.palette = copyStops(SWIRL_PARTICLE_PALETTES[ev.value]);
             rebuildStops();
             apply();
         });
@@ -1000,7 +1000,7 @@ function addSwirlPaletteBindings(
         for (const child of [...stopsFolder.children]) {
             stopsFolder.remove(child);
         }
-        const stops = params.palette as SwirlParticlesColorStop[];
+        const stops = params.palette as SwirlParticleColorStop[];
         stops.forEach((stop, i) => {
             stopsFolder
                 .addBinding(stop, "offset", {

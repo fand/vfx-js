@@ -1,8 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import {
-    SwirlParticlesEffect,
-    type SwirlParticlesParams,
-} from "@vfx-js/effects";
+import { SwirlParticleEffect, type SwirlParticleParams } from "@vfx-js/effects";
 import Amagi from "../../docs/public/amagi.png";
 import BbbWebm from "./assets/bbb.webm";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
@@ -12,7 +9,7 @@ import Logo from "./assets/logo-640w-20p.svg";
 import Pigeon from "./assets/pigeon.webp";
 import Robot from "./assets/robot.webp";
 import "./preset.css";
-import { attachSwirlParticlesPane, initVFX, isChromatic } from "./utils";
+import { attachSwirlParticlePane, initVFX, isChromatic } from "./utils";
 
 type Source = {
     src: string;
@@ -38,7 +35,7 @@ type SourceKey = keyof typeof SOURCES;
 type Args = {
     source: SourceKey;
     /** Overrides of the effect defaults for this story. */
-    params?: Partial<SwirlParticlesParams>;
+    params?: Partial<SwirlParticleParams>;
 };
 
 // The soft grey-blue backdrop the demo used to paint in the shader
@@ -54,7 +51,7 @@ const BACKDROP = [
 // turns it a little), drag to orbit, the cursor repels the particles, and
 // a drop shadow on the backdrop. The demo draws more particles than the
 // default, over the whole canvas.
-const STORY_VIEW: Partial<SwirlParticlesParams> = {
+const STORY_VIEW: Partial<SwirlParticleParams> = {
     count: 262144,
     pad: "fullscreen",
     yaw: 0,
@@ -113,14 +110,14 @@ export default {
         const vfx = initVFX();
         const still = isChromatic();
         // Tweakpane edits this object; it is copied into the effect.
-        const params: SwirlParticlesParams = {
-            ...new SwirlParticlesEffect({ ...STORY_VIEW, ...args.params })
+        const params: SwirlParticleParams = {
+            ...new SwirlParticleEffect({ ...STORY_VIEW, ...args.params })
                 .params,
         };
 
         let sourceKey: SourceKey = args.source;
         let el: HTMLImageElement | HTMLVideoElement | null = null;
-        let effect: SwirlParticlesEffect | null = null;
+        let effect: SwirlParticleEffect | null = null;
         // Bumped on every swap, so a slow load can't attach a stale element.
         let token = 0;
         // `remove` must wait for a pending `add` on the same element.
@@ -149,7 +146,7 @@ export default {
             if (my !== token) {
                 return;
             }
-            effect = new SwirlParticlesEffect(params, { still });
+            effect = new SwirlParticleEffect(params, { still });
             adding = vfx.add(next, { effect });
             await adding;
         };
@@ -158,7 +155,7 @@ export default {
             if (still) {
                 return;
             }
-            attachSwirlParticlesPane(
+            attachSwirlParticlePane(
                 "Swirl Particles",
                 params,
                 () => {
@@ -240,14 +237,14 @@ export const heading: StoryObj<Args> = {
 
         const vfx = initVFX();
         const still = isChromatic();
-        const params: SwirlParticlesParams = {
-            ...new SwirlParticlesEffect({
+        const params: SwirlParticleParams = {
+            ...new SwirlParticleEffect({
                 depth: 0.3,
                 shadow: true,
                 mouse: "repel",
             }).params,
         };
-        let effect: SwirlParticlesEffect | null = null;
+        let effect: SwirlParticleEffect | null = null;
 
         const mount = async (): Promise<void> => {
             if (effect) {
@@ -257,7 +254,7 @@ export const heading: StoryObj<Args> = {
             // the page before VFX measures the heading.
             await document.fonts?.ready;
             await new Promise((r) => requestAnimationFrame(r));
-            effect = new SwirlParticlesEffect(params, { still });
+            effect = new SwirlParticleEffect(params, { still });
             await vfx.add(h1, { effect });
         };
 
@@ -265,7 +262,7 @@ export const heading: StoryObj<Args> = {
             if (still) {
                 return;
             }
-            attachSwirlParticlesPane(
+            attachSwirlParticlePane(
                 "Swirl Particles",
                 params,
                 () => {

@@ -28,7 +28,7 @@ import {
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
-    SwirlParticlesEffect,
+    SwirlParticleEffect,
     TilePixelateEffect,
     TritoneEffect,
     VignetteEffect,
@@ -313,11 +313,11 @@ export const effectDemos: EffectDemo[] = [
         create: () => new SliceShiftEffect(),
     },
     {
-        name: "SwirlParticlesEffect",
+        name: "SwirlParticleEffect",
         text: "Particles curling over the extruded silhouette.",
         media: "logo",
         // A small pad keeps the tile cheap; wisps that drift further are clipped.
-        create: () => new SwirlParticlesEffect({ pad: 40, yaw: 11.5 }),
+        create: () => new SwirlParticleEffect({ pad: 40, yaw: 11.5 }),
     },
     {
         name: "TilePixelateEffect",
