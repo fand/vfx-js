@@ -218,8 +218,10 @@ describe("HoloEffect lifecycle", () => {
     test("dispose resolves a pending ready, and init again draws with fresh resources", async () => {
         const { ctx, draws, readPixels, hasRestoreListener } = makeCtx();
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.logo": "element" },
+            holo: {
+                material: "emboss",
+                settings: { "emboss.logo": "element" },
+            },
         });
         await fx.init?.(ctx);
         frame(fx, ctx);
@@ -273,11 +275,13 @@ describe("HoloEffect emboss with the element as the logo", () => {
 
     test("the transparent ground's define follows emboss.paperColour", async () => {
         const { ctx, draws } = makeCtx();
-        const fx = new HoloEffect(element);
+        const fx = new HoloEffect({ holo: element });
         await fx.init?.(ctx);
         frame(fx, ctx);
         expect(lastMaterial(draws)?.frag).toMatch(/#define HOLO_CLEAR_PAPER\b/);
-        fx.setParams({ settings: { "emboss.paperColour": "#ffffff" } });
+        fx.setParams({
+            holo: [element, { settings: { "emboss.paperColour": "#ffffff" } }],
+        });
         frame(fx, ctx);
         expect(lastMaterial(draws)?.frag).not.toMatch(
             /#define HOLO_CLEAR_PAPER\b/,
@@ -290,7 +294,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
             128, 0, 0, 128, 128, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
         const { ctx, readPixels } = makeCtx({ w: 2, h: 2, pixels });
-        const fx = new HoloEffect(element);
+        const fx = new HoloEffect({ holo: element });
         await fx.init?.(ctx);
         frame(fx, ctx);
         expect(readPixels).toHaveBeenCalledTimes(1);
@@ -307,18 +311,18 @@ describe("HoloEffect emboss with the element as the logo", () => {
         ]);
     });
 
-    test("the element is read once at a time, and not again on an unrelated setParams", async () => {
+    test("the element is read once at a time, again for a new holo, not for other params", async () => {
         const { ctx, readPixels } = makeCtx();
-        const fx = new HoloEffect(element);
+        const fx = new HoloEffect({ holo: element });
         await fx.init?.(ctx);
         frame(fx, ctx);
         frame(fx, ctx); // the first read is still on its way
         expect(readPixels).toHaveBeenCalledTimes(1);
         await tick();
-        fx.setParams({ exposure: 1 });
+        fx.setParams({ ink: 0.5, flat: true });
         frame(fx, ctx);
         expect(readPixels).toHaveBeenCalledTimes(1);
-        fx.setParams({ settings: { "emboss.logo": "element" } });
+        fx.setParams({ holo: [element, { exposure: 1 }] });
         frame(fx, ctx);
         expect(readPixels).toHaveBeenCalledTimes(2);
     });
@@ -350,8 +354,12 @@ describe("HoloEffect emboss with the element as the logo", () => {
             return wrap(src as never, o as never);
         }) as typeof ctx.wrapTexture;
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.print": img as unknown as HTMLImageElement },
+            holo: {
+                material: "emboss",
+                settings: {
+                    "emboss.print": img as unknown as HTMLImageElement,
+                },
+            },
         });
         await fx.init?.(ctx);
         frame(fx, ctx);
@@ -367,10 +375,12 @@ describe("HoloEffect emboss with the element as the logo", () => {
     test("no print while emboss.print loads; the element is the print otherwise", async () => {
         const loading = makeCtx();
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: {
-                "emboss.logo": "element",
-                "emboss.print": "/print.png",
+            holo: {
+                material: "emboss",
+                settings: {
+                    "emboss.logo": "element",
+                    "emboss.print": "/print.png",
+                },
             },
         });
         await fx.init?.(loading.ctx);
@@ -378,7 +388,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
         expect(printOn(loading.draws)).toBe(0);
 
         const plain = makeCtx();
-        const fy = new HoloEffect({ material: "emboss" });
+        const fy = new HoloEffect({ holo: { material: "emboss" } });
         await fy.init?.(plain.ctx);
         frame(fy, plain.ctx);
         expect(printOn(plain.draws)).toBe(1);
@@ -394,7 +404,7 @@ describe("HoloEffect loads a material's code on first use", () => {
         frame(fx, ctx);
         expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
         expect(loadedMaterial("vortex")).toBeUndefined();
-        fx.setParams({ material: "vortex" });
+        fx.setParams({ holo: { material: "vortex" } });
         frame(fx, ctx); // vortex is on its way: still prism
         expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
         const ready = fx.ready;
@@ -406,7 +416,9 @@ describe("HoloEffect loads a material's code on first use", () => {
 
     test("preload loads ahead; resolvedSettings needs no material code", async () => {
         expect(loadedMaterial("nebula")).toBeUndefined();
-        const v = new HoloEffect({ material: "nebula" }).resolvedSettings();
+        const v = new HoloEffect({
+            holo: { material: "nebula" },
+        }).resolvedSettings();
         expect(typeof v["nebula.size"]).toBe("number");
         expect(loadedMaterial("nebula")).toBeUndefined();
         await HoloEffect.preload("nebula");
@@ -464,7 +476,7 @@ describe("HoloEffect when loading fails or is cut short", () => {
         const fx = new HoloEffect();
         await fx.init?.(ctx);
         frame(fx, ctx);
-        fx.setParams({ material: "sparkle" });
+        fx.setParams({ holo: { material: "sparkle" } });
         const ready = fx.ready;
         frame(fx, ctx); // the load starts when the frame resolves the settings
         await vi.waitFor(() =>
@@ -483,7 +495,7 @@ describe("HoloEffect when loading fails or is cut short", () => {
             draws.filter((d) => d.uniforms && "uExposure" in d.uniforms).at(-1)
                 ?.uniforms?.uExposure;
         const before = exposure();
-        fx.setParams({ exposure: 2 });
+        fx.setParams({ holo: { material: "sparkle", exposure: 2 } });
         frame(fx, ctx);
         expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
         expect(exposure()).not.toBe(before); // the scene change is drawn
@@ -499,14 +511,18 @@ describe("HoloEffect when loading fails or is cut short", () => {
             pixels: new Uint8Array(16),
         });
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.logo": "element" },
+            holo: {
+                material: "emboss",
+                settings: { "emboss.logo": "element" },
+            },
         });
         await fx.init?.(ctx);
         frame(fx, ctx);
         await tick();
         expect(readPixels).toHaveBeenCalled();
-        fx.setParams({ settings: { "emboss.logo": "" } });
+        fx.setParams({
+            holo: { material: "emboss", settings: { "emboss.logo": "" } },
+        });
         const ready = fx.ready;
         for (let i = 0; i < 5; i++) {
             frame(fx, ctx);
@@ -530,8 +546,10 @@ describe("HoloEffect when loading fails or is cut short", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const { ctx, draws } = makeCtx();
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.print": "/missing.png" },
+            holo: {
+                material: "emboss",
+                settings: { "emboss.print": "/missing.png" },
+            },
         });
         await fx.init?.(ctx);
         const ready = fx.ready;
@@ -556,8 +574,10 @@ describe("HoloEffect when loading fails or is cut short", () => {
             Promise.reject(new Error("context lost")),
         );
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.logo": "element" },
+            holo: {
+                material: "emboss",
+                settings: { "emboss.logo": "element" },
+            },
         });
         await fx.init?.(ctx);
         frame(fx, ctx);
@@ -575,8 +595,10 @@ describe("HoloEffect when loading fails or is cut short", () => {
             .mockImplementationOnce(() => first.promise)
             .mockImplementationOnce(() => second.promise);
         const fx = new HoloEffect({
-            material: "emboss",
-            settings: { "emboss.logo": "element" },
+            holo: {
+                material: "emboss",
+                settings: { "emboss.logo": "element" },
+            },
         });
         await fx.init?.(ctx);
         frame(fx, ctx);
@@ -595,7 +617,7 @@ describe("HoloEffect when loading fails or is cut short", () => {
 
     test("an init that awaits across a dispose stops", async () => {
         const { ctx, hasRestoreListener } = makeCtx();
-        const fx = new HoloEffect({ material: "shatter" });
+        const fx = new HoloEffect({ holo: { material: "shatter" } });
         const created = vi.spyOn(ctx, "createRenderTarget");
         const init = fx.init?.(ctx);
         fx.dispose?.();

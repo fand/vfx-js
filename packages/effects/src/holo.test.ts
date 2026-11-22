@@ -1,6 +1,10 @@
 import { expect, test, vi } from "vitest";
 import { resolveSettings } from "./_holo/settings.js";
-import { HoloEffect, type HoloMaterial } from "./holo.js";
+import {
+    HoloEffect,
+    type HoloMaterial,
+    type HoloSettingsInput,
+} from "./holo.js";
 
 test("settingSpecs: the material's ids first, then the scene's, none of other materials", () => {
     const specs = HoloEffect.settingSpecs("shatter");
@@ -22,22 +26,26 @@ test("the default is holo.spot's parameter defaults", () => {
 });
 
 test("grain and glare take holo.spot's units", () => {
-    const v = new HoloEffect({ grain: 0.18, glare: 0.05 }).resolvedSettings();
+    const v = new HoloEffect({
+        holo: { grain: 0.18, glare: 0.05 },
+    }).resolvedSettings();
     expect(v["grain.amount"]).toBe(0.18);
     expect(v["grain.on"]).toBe(true);
     expect(v["display.glare"]).toBe(0.05);
-    const off = new HoloEffect({ grain: 0 }).resolvedSettings();
+    const off = new HoloEffect({ holo: { grain: 0 } }).resolvedSettings();
     expect(off["grain.on"]).toBe(false);
 });
 
 test("typed params map to holo.spot's settings, clamped to its ranges", () => {
     const v = new HoloEffect({
-        tiltRange: 80,
-        wobble: false,
-        wobbleAmp: 40,
-        pose: { x: 50, y: -50 },
-        bow: 3,
-        lens: 10,
+        holo: {
+            tiltRange: 80,
+            wobble: false,
+            wobbleAmp: 40,
+            pose: { x: 50, y: -50 },
+            bow: 3,
+            lens: 10,
+        },
     }).resolvedSettings();
     expect(v["motion.tiltRange"]).toBe(35);
     expect(v["motion.wobble"]).toBe(false);
@@ -47,88 +55,79 @@ test("typed params map to holo.spot's settings, clamped to its ranges", () => {
     expect(v["dof.lens"]).toBe(24);
 });
 
-test("looks carry the quality holospot ships them with; msaa is on by default", () => {
+test("looks carry the quality holospot ships them with; the params' defaults", () => {
     expect(HoloEffect.looks.card.quality).toBe("medium");
     expect(HoloEffect.looks.object.quality).toBe("low");
     expect(HoloEffect.looks.image.quality).toBe("medium");
-    expect(new HoloEffect().params.quality).toBe("medium");
-    expect(new HoloEffect().config.msaa).toBe(true);
-});
-
-test("the config comes last and setParams takes params or a config, told apart by their keys", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const fx = new HoloEffect(
-        HoloEffect.looks.card,
-        { material: "shatter", exposure: 1 },
-        { flat: true, sourceChannel: "luminance" },
-    );
-    expect(fx.params.material).toBe("shatter");
-    expect(fx.params.settings["display.ev"]).toBe(1);
-    expect(fx.config).toEqual({
-        sizeMm: null,
-        sourceChannel: "luminance",
+    expect(new HoloEffect().params).toEqual({
+        holo: [],
+        sourceChannel: "alpha",
         ink: 0,
-        flat: true,
-        msaa: true,
+        flat: false,
+        sizeMm: null,
+        antialias: true,
     });
-    expect("flat" in fx.params).toBe(false);
-    fx.setParams({ ink: 0.5 });
-    fx.setParams({ material: "nebula" });
-    expect(fx.config.ink).toBe(0.5);
-    expect(fx.config.flat).toBe(true);
-    expect(fx.params.material).toBe("nebula");
-    expect(warn).not.toHaveBeenCalled();
-    // a param in a config is ignored, with a warning
-    // @ts-expect-error: params and config are separate arguments
-    fx.setParams({ flat: false, material: "vortex" });
-    expect(fx.params.material).toBe("nebula");
-    expect(fx.config.flat).toBe(false);
-    expect(
-        warn.mock.calls.some((c) => String(c[0]).includes('"material"')),
-    ).toBe(true);
-    warn.mockRestore();
 });
 
-test("an unknown param warns", () => {
+test("holo takes one input or a list, applied in order; setParams assigns params as other effects do", () => {
+    const fx = new HoloEffect({
+        holo: [HoloEffect.looks.card, { material: "shatter", exposure: 1 }],
+        flat: true,
+    });
+    expect(fx.material).toBe("shatter");
+    expect(fx.resolvedSettings()["display.ev"]).toBe(1);
+    expect(fx.params.flat).toBe(true);
+    fx.setParams({ ink: 0.5 });
+    expect(fx.params.ink).toBe(0.5);
+    expect(fx.material).toBe("shatter"); // holo untouched
+    fx.setParams({ holo: { material: "nebula" } });
+    expect(fx.material).toBe("nebula");
+    expect(fx.resolvedSettings()["display.ev"]).toBe(0.5); // a new holo starts over: holo.spot's default
+    // writing params works too; a new holo is taken up when next read
+    fx.params.holo = [{ material: "vortex" }];
+    expect(fx.material).toBe("vortex");
+    expect(new HoloEffect({ holo: { material: "sparkle" } }).material).toBe(
+        "sparkle",
+    );
+});
+
+test("an unknown key in holo warns, and names the param it belongs to", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // @ts-expect-error: not a param
-    new HoloEffect({ mask: "luma" });
+    // @ts-expect-error: not a key of holo
+    new HoloEffect({ holo: { mask: "luma" } });
+    // @ts-expect-error: flat is a param of its own
+    new HoloEffect({ holo: { flat: true } });
+    const msgs = warn.mock.calls.map((c) => String(c[0]));
+    expect(msgs.some((m) => m.includes('unknown key "mask"'))).toBe(true);
     expect(
-        warn.mock.calls.some((c) =>
-            String(c[0]).includes('unknown param "mask"'),
+        msgs.some(
+            (m) =>
+                m.includes('unknown key "flat"') &&
+                m.includes("{ holo, flat }"),
         ),
     ).toBe(true);
     warn.mockRestore();
 });
 
-// types only: the config can only be the last argument
-() => {
-    // @ts-expect-error: the config comes last
-    new HoloEffect({ flat: true }, { exposure: 1 });
-    new HoloEffect({ exposure: 1 }, { flat: true });
-    new HoloEffect({ flat: true });
-};
-
 test("scene shorthands write settings ids: later values win, whichever way they are written", () => {
-    const fx = new HoloEffect({
-        material: "prism",
-        settings: { "prism.pitch": 1200, "display.ev": 2 },
-        exposure: -1,
-        grain: 0,
-        studio: "spot",
-    });
-    const v = fx.resolvedSettings();
+    const v = new HoloEffect({
+        holo: {
+            material: "prism",
+            settings: { "prism.pitch": 1200, "display.ev": 2 },
+            exposure: -1,
+            grain: 0,
+            studio: "spot",
+        },
+    }).resolvedSettings();
     expect(v["prism.pitch"]).toBe(1200);
     expect(v["display.ev"]).toBe(-1); // in one input, the shorthand wins
     expect(v["grain.on"]).toBe(false);
     expect(v["studio.panel.on"]).toBe(false); // the spot rig
-    expect(fx.params.settings["display.ev"]).toBe(-1);
-    fx.setParams({ settings: { "display.ev": 1.5 } });
-    expect(fx.resolvedSettings()["display.ev"]).toBe(1.5); // later settings win over the earlier shorthand
-    fx.setParams({ exposure: null });
-    expect(fx.resolvedSettings()["display.ev"]).toBe(0.5); // removed: holo.spot's default
-    fx.setParams({}, { resetSettings: true });
-    expect(fx.params.settings).toEqual({});
+    const ev = (...holo: HoloSettingsInput[]) =>
+        new HoloEffect({ holo }).resolvedSettings()["display.ev"];
+    expect(ev({ exposure: -1 }, { settings: { "display.ev": 1.5 } })).toBe(1.5); // later settings win
+    expect(ev({ settings: { "display.ev": 1.5 } }, { exposure: -1 })).toBe(-1); // and later shorthands
+    expect(ev({ exposure: -1 }, { exposure: null })).toBe(0.5); // removed: holo.spot's default
 });
 
 test("a light rig goes over the look's lights; single lights given later win", () => {
@@ -136,18 +135,27 @@ test("a light rig goes over the look's lights; single lights given later win", (
     const want = resolveSettings("prism", "card", {
         "studio.preset": "softbox",
     }).values;
-    const v = new HoloEffect(HoloEffect.looks.card, {
-        studio: "softbox",
+    const v = new HoloEffect({
+        holo: [
+            HoloEffect.looks.card,
+            {
+                studio: "softbox",
+            },
+        ],
     }).resolvedSettings();
     for (const [id, x] of Object.entries(want)) {
         expect(close(v[id], x), id).toBe(true);
     }
-    const softbox = new HoloEffect({ studio: "softbox" }).resolvedSettings();
-    const w = new HoloEffect(
-        { settings: { "studio.ambient.fill": 0.5 } },
-        { studio: "softbox" },
-        { settings: { "studio.ambient.rims": 0.3 } },
-    ).resolvedSettings();
+    const softbox = new HoloEffect({
+        holo: { studio: "softbox" },
+    }).resolvedSettings();
+    const w = new HoloEffect({
+        holo: [
+            { settings: { "studio.ambient.fill": 0.5 } },
+            { studio: "softbox" },
+            { settings: { "studio.ambient.rims": 0.3 } },
+        ],
+    }).resolvedSettings();
     expect(w["studio.ambient.fill"]).toBe(softbox["studio.ambient.fill"]); // before the rig: replaced
     expect(w["studio.ambient.rims"]).toBe(0.3); // after: wins
 });
@@ -160,32 +168,39 @@ test("a Copy settings blob brings its material and pose, and later settings merg
         values: { "shatter.size": 3, "display.ev": 1.5, "object.scene": "x" },
         pose: { rx: -8, ry: 12 },
     };
-    const fx = new HoloEffect(
-        { settings: blob },
-        { settings: { "display.glare": 0.05 } },
-    );
+    const fx = new HoloEffect({
+        holo: [blob, { settings: { "display.glare": 0.05 } }],
+    });
     const v = fx.resolvedSettings();
-    expect(fx.params.material).toBe("shatter");
+    expect(fx.material).toBe("shatter");
     expect(v["shatter.size"]).toBe(3);
     expect(v["display.ev"]).toBe(1.5);
     expect(v["display.glare"]).toBe(0.05);
     expect(v["motion.pose"]).toEqual({ x: 12, y: -8 });
-    fx.setParams({ settings: { "display.ev": -1 } });
-    expect(fx.resolvedSettings()["display.ev"]).toBe(-1);
-    expect(
-        new HoloEffect({ material: "prism", settings: blob }).params.material,
-    ).toBe("prism");
+    // a blob starts the settings over; values after it win
+    const after = new HoloEffect({
+        holo: [
+            { settings: { "display.glare": 0.08 } },
+            blob,
+            { material: "prism", settings: { "display.ev": -1 } },
+        ],
+    });
+    expect(after.material).toBe("prism");
+    expect(after.resolvedSettings()["display.ev"]).toBe(-1);
+    expect(after.resolvedSettings()["display.glare"]).not.toBe(0.08);
 });
 
 test("settings are checked: clamped to holo.spot's ranges, bad values and unknown ids warn", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const v = new HoloEffect({
-        settings: {
-            "display.ev": 9,
-            "display.tone": "sepia",
-            "prism.picth": 1,
-        } as never,
-        background: "#fff",
+        holo: {
+            settings: {
+                "display.ev": 9,
+                "display.tone": "sepia",
+                "prism.picth": 1,
+            } as never,
+            background: "#fff",
+        },
     }).resolvedSettings();
     expect(v["display.ev"]).toBe(3);
     expect(v["display.tone"]).toBe("neutral");
@@ -199,11 +214,15 @@ test("settings are checked: clamped to holo.spot's ranges, bad values and unknow
     ).toBe(true);
     warn.mockClear();
     new HoloEffect({
-        settings: { "bump.strength": 0.78, "scene.wall": "x" } as never,
+        holo: {
+            settings: { "bump.strength": 0.78, "scene.wall": "x" } as never,
+        },
     }).resolvedSettings();
     expect(warn).not.toHaveBeenCalled(); // holospot's default of an unported id, a site-only id
     new HoloEffect({
-        settings: { "dof.on": true } as never,
+        holo: {
+            settings: { "dof.on": true } as never,
+        },
     }).resolvedSettings();
     expect(warn.mock.calls.some((c) => String(c[0]).includes("dof.on"))).toBe(
         true,
@@ -225,8 +244,10 @@ test.each([
     "looks.%s with %s resolves as holo.spot's look",
     (look, material) => {
         const fx = new HoloEffect({
-            ...HoloEffect.looks[look],
-            material: material as HoloMaterial,
+            holo: {
+                ...HoloEffect.looks[look],
+                material: material as HoloMaterial,
+            },
         });
         const got = fx.resolvedSettings();
         const want = resolveSettings(material, look, {});
@@ -243,7 +264,7 @@ test.each([
 test("looks.image is the emboss paper card", () => {
     const p = HoloEffect.looks.image;
     expect(p.material).toBe("emboss");
-    const got = new HoloEffect({ ...p }).resolvedSettings();
+    const got = new HoloEffect({ holo: { ...p } }).resolvedSettings();
     const want = resolveSettings("emboss", "card", {});
     for (const [id, v] of Object.entries(want.values)) {
         expect(close(got[id], v), id).toBe(true);
@@ -268,13 +289,15 @@ test("startingPoints: every id is a setting of its material or the scene", () =>
 });
 
 test("constructor parts compose: look, then preset, then own values; settings merge by id", () => {
-    const fx = new HoloEffect(
-        HoloEffect.looks.card,
-        HoloEffect.startingPoints.prism.compactDisc,
-        { exposure: 1, settings: { "prism.fan": 3 } },
-    );
+    const fx = new HoloEffect({
+        holo: [
+            HoloEffect.looks.card,
+            HoloEffect.startingPoints.prism.compactDisc,
+            { exposure: 1, settings: { "prism.fan": 3 } },
+        ],
+    });
     const v = fx.resolvedSettings();
-    expect(fx.params.material).toBe("prism");
+    expect(fx.material).toBe("prism");
     expect(v["prism.pitch"]).toBe(1600); // the preset over the look's 1765
     expect(v["prism.fan"]).toBe(3); // own over the preset's 1.5
     expect(v["display.ev"]).toBe(1);
@@ -326,31 +349,37 @@ test("flat view: the turned rig meets the card as the turned card meets the rig"
 
 test("emboss.logo takes a URL or an image, kept by reference; none by default", () => {
     expect(
-        new HoloEffect({ material: "emboss" }).resolvedSettings()[
+        new HoloEffect({ holo: { material: "emboss" } }).resolvedSettings()[
             "emboss.logo"
         ],
     ).toBe("");
     const img = { width: 10, height: 10 } as unknown as HTMLCanvasElement;
     const v = new HoloEffect({
-        material: "emboss",
-        settings: { "emboss.logo": img },
+        holo: {
+            material: "emboss",
+            settings: { "emboss.logo": img },
+        },
     }).resolvedSettings();
     expect(v["emboss.logo"]).toBe(img);
 });
 
 test("the emboss logo's placement is CSS px: unset by default, mm from a holo.spot blob dropped", () => {
-    const v = new HoloEffect({ material: "emboss" }).resolvedSettings();
+    const v = new HoloEffect({
+        holo: { material: "emboss" },
+    }).resolvedSettings();
     expect(v["emboss.x"]).toBeUndefined(); // centred, 36/63 of the width
     expect(v["emboss.width"]).toBeUndefined();
     const placed = new HoloEffect({
-        material: "emboss",
-        settings: { "emboss.x": 80, "emboss.width": 400 },
+        holo: {
+            material: "emboss",
+            settings: { "emboss.x": 80, "emboss.width": 400 },
+        },
     }).resolvedSettings();
     expect(placed["emboss.x"]).toBe(80);
     expect(placed["emboss.width"]).toBe(400); // no mm range
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fromBlob = new HoloEffect({
-        settings: {
+        holo: {
             holoDev: 1,
             material: "emboss",
             values: {
@@ -371,16 +400,20 @@ test("the emboss logo's placement is CSS px: unset by default, mm from a holo.sp
 test("emboss: the element as the logo, its threshold, and an own print", () => {
     const img = { width: 10, height: 10 } as unknown as HTMLCanvasElement;
     const v = new HoloEffect({
-        material: "emboss",
-        settings: { "emboss.logo": "element", "emboss.print": img },
+        holo: {
+            material: "emboss",
+            settings: { "emboss.logo": "element", "emboss.print": img },
+        },
     }).resolvedSettings();
     expect(v["emboss.logo"]).toBe("element");
     expect(v["emboss.print"]).toBe(img);
     expect(v["emboss.threshold"]).toBe(0.5); // the port's: holospot cuts at ½
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const t = new HoloEffect({
-        material: "emboss",
-        settings: { "emboss.threshold": 2 },
+        holo: {
+            material: "emboss",
+            settings: { "emboss.threshold": 2 },
+        },
     }).resolvedSettings();
     expect(t["emboss.threshold"]).toBe(0.99);
     warn.mockRestore();
@@ -389,7 +422,7 @@ test("emboss: the element as the logo, its threshold, and an own print", () => {
 test("a Copy settings blob's holo.spot images are ignored with a warning", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const v = new HoloEffect({
-        settings: {
+        holo: {
             holoDev: 1,
             material: "emboss",
             values: {
@@ -412,7 +445,7 @@ test("a Copy settings blob of holo.spot's cloth, stickers or flag warns, and a c
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const blob = (entity: string) =>
         new HoloEffect({
-            settings: { holoDev: 1, entity, material: "prism", values: {} },
+            holo: { holoDev: 1, entity, material: "prism", values: {} },
         }).resolvedSettings();
     blob("card");
     blob("object");

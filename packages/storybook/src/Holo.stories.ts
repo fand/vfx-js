@@ -6,6 +6,7 @@ import {
     type HoloPointer,
     type HoloQuality,
     type HoloSettingSpec,
+    type HoloSettingsInput,
     type HoloSettingValue,
     type HoloSourceChannel,
     type HoloStartingPoint,
@@ -78,14 +79,23 @@ holo.play = async ({ canvasElement }) => {
 
 /**
  * Tweakpane for HoloEffect. The scene and material folders show the values in effect and are rebuilt when the
- * material, the look or the lights change. A look is applied with `setParams(look, { resetSettings: true })`.
+ * material, the look or the lights change. Each control appends its change to the list given as `holo`; a look
+ * starts the list over.
  */
 function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
     let pane: Pane | null = null;
+    let edits: HoloSettingsInput[] = [];
+    const push = (input: HoloSettingsInput) => {
+        edits = [...edits, input];
+        effect.setParams({ holo: edits });
+    };
     const ui = {
         source: "Logo" as keyof typeof SOURCES,
         look: "(none)" as LookName,
         preset: "(none)",
+        // not readable from the effect (they compose in holo): kept here for the controls
+        quality: "medium" as HoloQuality,
+        structureScale: 1,
     };
 
     // rebuilding inside a control's own change event would dispose it mid-event: defer it
@@ -95,7 +105,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         const p = makePane("Holo");
         pane = p;
         const params = effect.params;
-        const config = effect.config;
+        const material = effect.material;
         const v = effect.resolvedSettings();
 
         p.addBinding(ui, "source", { options: opts(Object.keys(SOURCES)) }).on(
@@ -110,20 +120,20 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         // ---- the effect
         const fx = p.addFolder({ title: "Effect" });
         const general = {
-            material: params.material,
-            quality: params.quality,
-            sourceChannel: config.sourceChannel,
-            flat: config.flat,
+            material,
+            quality: ui.quality,
+            sourceChannel: params.sourceChannel,
+            flat: params.flat,
             lens: typeof v["dof.lens"] === "number" ? v["dof.lens"] : 62,
-            msaa: config.msaa,
-            structureScale: params.structureScale,
-            ink: config.ink,
+            antialias: params.antialias,
+            structureScale: ui.structureScale,
+            ink: params.ink,
         };
         fx.addBinding(general, "material", { options: opts(MATERIALS) }).on(
             "change",
             (ev) => {
                 ui.preset = "(none)";
-                effect.setParams({ material: ev.value as HoloMaterial });
+                push({ material: ev.value as HoloMaterial });
                 rebuild();
             },
         );
@@ -132,37 +142,40 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) => {
             // a look starts clean: the settings go back to holo.spot's defaults, then the look applies
             const look = ev.value as LookName;
-            effect.setParams(look === "(none)" ? {} : HoloEffect.looks[look], {
-                resetSettings: true,
-            });
+            edits = look === "(none)" ? [] : [HoloEffect.looks[look]];
+            ui.quality =
+                look === "(none)" ? "medium" : HoloEffect.looks[look].quality;
+            ui.structureScale = 1;
+            effect.setParams({ holo: edits });
             rebuild();
         });
         // holospot's "Starting points" of the material: its settings replace the material's (the scene stays)
-        const points = HoloEffect.startingPoints[params.material] as Record<
+        const points = HoloEffect.startingPoints[material] as Record<
             string,
             HoloStartingPoint
         >;
         fx.addBinding(ui, "preset", {
             options: opts(["(none)", ...Object.keys(points)]),
         }).on("change", (ev) => {
-            const own = `${params.material}.`;
+            const own = `${material}.`;
             // remove the material's ids (null), then apply the starting point
             const clear = Object.fromEntries(
-                Object.keys(effect.params.settings)
+                Object.keys(effect.resolvedSettings())
                     .filter((id) => id.startsWith(own))
                     .map((id) => [id, null]),
             );
-            effect.setParams({ settings: clear });
+            push({ settings: clear });
             if (ev.value !== "(none)") {
-                effect.setParams(points[ev.value]);
+                push(points[ev.value]);
             }
             rebuild();
         });
         fx.addBinding(general, "quality", {
             options: opts<HoloQuality>(["auto", "low", "medium", "high"]),
-        }).on("change", (ev) =>
-            effect.setParams({ quality: ev.value as HoloQuality }),
-        );
+        }).on("change", (ev) => {
+            ui.quality = ev.value as HoloQuality;
+            push({ quality: ui.quality });
+        });
         fx.addBinding(general, "sourceChannel", {
             options: opts<HoloSourceChannel>(["alpha", "luminance", "none"]),
         }).on("change", (ev) =>
@@ -175,21 +188,24 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             effect.setParams({ flat: ev.value });
             rebuild();
         });
-        if (!config.flat) {
+        if (!params.flat) {
             fx.addBinding(general, "lens", { min: 24, max: 200, step: 1 }).on(
                 "change",
-                (ev) => effect.setParams({ lens: ev.value }),
+                (ev) => push({ lens: ev.value }),
             );
-            fx.addBinding(general, "msaa").on("change", (ev) =>
-                effect.setParams({ msaa: ev.value }),
+            fx.addBinding(general, "antialias").on("change", (ev) =>
+                effect.setParams({ antialias: ev.value }),
             );
         }
         fx.addBinding(general, "structureScale", {
             min: 0.25,
             max: 4,
             step: 0.05,
-        }).on("change", (ev) => effect.setParams({ structureScale: ev.value }));
-        if (params.material !== "emboss") {
+        }).on("change", (ev) => {
+            ui.structureScale = ev.value;
+            push({ structureScale: ev.value });
+        });
+        if (material !== "emboss") {
             fx.addBinding(general, "ink", { min: 0, max: 1, step: 0.01 }).on(
                 "change",
                 (ev) => effect.setParams({ ink: ev.value }),
@@ -222,66 +238,65 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         };
         sc.addBinding(scene, "exposure", { min: -3, max: 3, step: 0.05 }).on(
             "change",
-            (ev) => effect.setParams({ exposure: ev.value }),
+            (ev) => push({ exposure: ev.value }),
         );
         sc.addBinding(scene, "tone", {
             options: opts<HoloTone>(["neutral", "agx", "clamp"]),
-        }).on("change", (ev) =>
-            effect.setParams({ tone: ev.value as HoloTone }),
-        );
+        }).on("change", (ev) => push({ tone: ev.value as HoloTone }));
         sc.addBinding(scene, "glare", { min: 0, max: 0.1, step: 0.001 }).on(
             "change",
-            (ev) => effect.setParams({ glare: ev.value }),
+            (ev) => push({ glare: ev.value }),
         );
         sc.addBinding(scene, "grain", { min: 0, max: 0.6, step: 0.005 }).on(
             "change",
-            (ev) => effect.setParams({ grain: ev.value }),
+            (ev) => push({ grain: ev.value }),
         );
         sc.addBinding(scene, "studio", { options: opts(STUDIOS) }).on(
             "change",
             (ev) => {
-                effect.setParams({ studio: ev.value as HoloStudio });
+                push({ studio: ev.value as HoloStudio });
                 rebuild(); // the single lights below follow the rig
             },
         );
         sc.addBinding(scene, "background", {
             options: { black: "black", white: "white", grey: "#3a4458" },
-        }).on("change", (ev) => effect.setParams({ background: ev.value }));
+        }).on("change", (ev) => push({ background: ev.value }));
         sc.addBinding(scene, "bow", { min: 0, max: 2, step: 0.05 }).on(
             "change",
-            (ev) => effect.setParams({ bow: ev.value }),
+            (ev) => push({ bow: ev.value }),
         );
         sc.addBinding(scene, "pose", {
             x: { min: -35, max: 35 },
             y: { min: -35, max: 35, inverted: true },
         }).on("change", (ev) =>
-            effect.setParams({ pose: { x: ev.value.x, y: ev.value.y } }),
+            push({ pose: { x: ev.value.x, y: ev.value.y } }),
         );
         sc.addBinding(scene, "pointer", {
             options: opts<HoloPointer>(["tilt", "light", "flash", "none"]),
-        }).on("change", (ev) =>
-            effect.setParams({ pointer: ev.value as HoloPointer }),
-        );
+        }).on("change", (ev) => push({ pointer: ev.value as HoloPointer }));
         sc.addBinding(scene, "tiltRange", { min: 5, max: 35, step: 1 }).on(
             "change",
-            (ev) => effect.setParams({ tiltRange: ev.value }),
+            (ev) => push({ tiltRange: ev.value }),
         );
         sc.addBinding(scene, "wobble").on("change", (ev) =>
-            effect.setParams({ wobble: ev.value }),
+            push({ wobble: ev.value }),
         );
         sc.addBinding(scene, "wobbleAmp", { min: 0, max: 25, step: 0.5 }).on(
             "change",
-            (ev) => effect.setParams({ wobbleAmp: ev.value }),
+            (ev) => push({ wobbleAmp: ev.value }),
         );
         sc.addButton({ title: "Reset scene" }).on("click", () => {
             ui.look = "(none)";
-            effect.setParams({}, { resetSettings: true });
+            ui.quality = "medium";
+            ui.structureScale = 1;
+            edits = [];
+            effect.setParams({ holo: edits });
             rebuild();
         });
 
         // ---- every holo.spot setting of the material, then the single lights
-        const specs = HoloEffect.settingSpecs(params.material);
-        const own = specs.filter((s) => s.id.startsWith(`${params.material}.`));
+        const specs = HoloEffect.settingSpecs(material);
+        const own = specs.filter((s) => s.id.startsWith(`${material}.`));
         // the emboss logo's px placement has no default (centre, 36/63 of the width): show what is drawn
         const placed = {
             "emboss.x": Math.round(img.clientWidth / 2),
@@ -290,10 +305,10 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             ...v,
         };
         addSettings(
-            p.addFolder({ title: `${params.material}.*`, expanded: false }),
+            p.addFolder({ title: `${material}.*`, expanded: false }),
             own,
             placed,
-            effect,
+            push,
         );
         addSettings(
             p.addFolder({ title: "studio.* (lights)", expanded: false }),
@@ -301,7 +316,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
                 (s) => s.id.startsWith("studio.") && s.id !== "studio.preset",
             ),
             v,
-            effect,
+            push,
         );
     };
     build();
@@ -314,12 +329,12 @@ function addSettings(
     folder: FolderApi,
     specs: readonly HoloSettingSpec[],
     v: ReturnType<HoloEffect["resolvedSettings"]>,
-    effect: HoloEffect,
+    push: (input: HoloSettingsInput) => void,
 ) {
     const state: Record<string, HoloSettingValue> = {};
     for (const s of specs) {
         try {
-            addSetting(folder, s, state, v, effect);
+            addSetting(folder, s, state, v, push);
         } catch (e) {
             console.warn(`Holo pane: no control for ${s.id}`, e);
         }
@@ -331,7 +346,7 @@ function addSetting(
     s: HoloSettingSpec,
     state: Record<string, HoloSettingValue>,
     v: ReturnType<HoloEffect["resolvedSettings"]>,
-    effect: HoloEffect,
+    push: (input: HoloSettingsInput) => void,
 ) {
     {
         // an image given as emboss.logo has no option in the select: show the default
@@ -345,7 +360,7 @@ function addSetting(
                 ? { ...(cur as { x: number; y: number }) }
                 : cur;
         const set = (value: HoloSettingValue) =>
-            effect.setParams({ settings: { [s.id]: value } });
+            push({ settings: { [s.id]: value } });
         if (s.kind === "select") {
             folder
                 .addBinding(state, key, { options: opts(s.options ?? []) })
