@@ -9,6 +9,7 @@ import {
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
+    type SaberEffect,
     SWIRL_PARTICLE_PALETTES,
     type SwirlParticleColorStop,
     type SwirlParticlePaletteName,
@@ -1016,4 +1017,65 @@ function addSwirlPaletteBindings(
         });
     };
     rebuildStops();
+}
+
+/** Tweakpane for SaberEffect, bound to `effect.params`. */
+export function attachSaberPane(title: string, effect: SaberEffect): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const p = effect.params;
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+
+    const line = pane.addFolder({ title: "Line" });
+    line.addBinding(p, "color", { view: "color" });
+    line.addBinding(p, "intensity", range(0, 5, 0.01));
+    line.addBinding(p, "thickness", range(0.5, 10, 0.1));
+    line.addBinding(p, "amplitude", range(0, 60, 0.5));
+    line.addBinding(p, "scale", range(5, 300, 1));
+    line.addBinding(p, "sharpness", range(0, 1, 0.01));
+    line.addBinding(p, "burst", range(0, 1, 0.01));
+    line.addBinding(p, "lines", range(1, 4, 1));
+
+    const motion = pane.addFolder({ title: "Motion" });
+    motion.addBinding(p, "speed", range(0, 5, 0.01));
+    motion.addBinding(p, "flicker", range(0, 1, 0.01));
+
+    const glow = pane.addFolder({ title: "Glow" });
+    glow.addBinding(p, "glow", range(0, 5, 0.01));
+    glow.addBinding(p, "glowFalloff", range(0, 1, 0.01));
+
+    const edge = pane.addFolder({ title: "Edge" });
+    edge.addBinding(p, "edge", {
+        options: { alpha: "alpha", luminance: "luminance" },
+    });
+    edge.addBinding(p, "edgeThreshold", range(0, 1, 0.01));
+    edge.addBinding(p, "dynamic");
+    edge.addButton({ title: "Invalidate" }).on("click", () =>
+        effect.invalidate(),
+    );
+
+    // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
+    const padState = {
+        fullscreen: p.pad === "fullscreen",
+        pad: typeof p.pad === "number" ? p.pad : 80,
+    };
+    const writePad = () => {
+        p.pad = padState.fullscreen ? "fullscreen" : padState.pad;
+    };
+    const output = pane.addFolder({ title: "Output" });
+    output.addBinding(p, "source");
+    output.addBinding(padState, "fullscreen").on("change", writePad);
+    output.addBinding(padState, "pad", range(0, 400, 1)).on("change", writePad);
+
+    trackPane(pane);
+    return pane;
 }

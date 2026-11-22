@@ -30,12 +30,12 @@ Rebuild only when the buffer size, `edge` or `edgeThreshold` changes, when `inva
 1. **Seed pass** → `seedA` (float, nearest).
    - Mask value `m` = alpha (`edge: "alpha"`) or luminance (`edge: "luminance"`) of `src`, zero outside the valid src rect.
    - A texel is a seed when `m` crosses `edgeThreshold` between it and any 4-neighbour.
-   - Store the **offset** from the texel centre to the contour point, in px: `rg = offset`, `a = 1` (valid). Refine to sub-pixel with the mask gradient: `offset = -grad * (m - threshold) / dot(grad, grad)`, clamped to 1 px.
+   - Store the **offset** from the texel centre to the contour point, in px: `rg = offset`, `a = 1` (valid). Refine to sub-pixel: find the crossing along x and along y by linear interpolation, then take the nearest point on the line through both crossings.
    - Offsets, not absolute coords: they stay precise in RGBA16F at any buffer size.
 2. **JFA passes** `seedA ↔ seedB`, step = `2^ceil(log2(max(w, h)))/2` down to 1, then one extra pass at step 1.
    - A neighbour's candidate is `neighbourOffset + neighbourDelta`. Keep the shortest.
 3. **Resolve pass** → `field` (float, linear).
-   - `r` = signed distance in px (negative inside: `m >= threshold`), `gb` = unit direction to the contour point (the normal), `a` = valid flag.
+   - `r` = signed distance in px (negative inside: `m >= threshold`), `gb` = outward unit normal, `a` = valid flag.
 
 Check that a render target with `persistent: false` keeps its content between frames when the effect does not draw to it. If the host clears it, use `persistent: true` for `field`.
 
