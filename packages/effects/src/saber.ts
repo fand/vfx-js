@@ -381,13 +381,16 @@ ${GLSL_JAG}
 // Main line noise cell, as a share of scale.
 const float MAIN_CELL = 0.3;
 // Per line: reach as a share of amplitude, width as a share of thickness, and brightness.
-const float TIER_REACH[4] = float[4](0.0, 0.4, 0.7, 1.0);
+const float TIER_REACH[4] = float[4](0.0, 0.45, 0.7, 1.0);
 const float TIER_WIDTH[4] = float[4](1.0, 0.6, 0.45, 0.35);
 const float TIER_WEIGHT[4] = float[4](1.0, 0.6, 0.8, 0.6);
 // How much faster each tier's shape changes than the one before.
 const float TIER_PACE = 1.5;
-// How far each tier leans outwards, off the main line.
-const float TIER_LEAN[4] = float[4](0.0, 0.5, 0.25, 0.25);
+// Below this noise value a line lies back on the main line, so it sprouts in short arcs.
+const float PLUCK[4] = float[4](0.0, -0.3, -0.2, -0.2);
+// Noise cell and pace of the companion line.
+const float COMPANION_CELL = 0.35;
+const float COMPANION_PACE = 2.5;
 // Reach of the companion line outside the active spots, as a share of its reach.
 const float COMPANION_CALM = 0.3;
 // Each tier's noise cell is this many times finer than the one before.
@@ -420,6 +423,11 @@ float activity(vec2 q, float t, float seed) {
 // Slow variation along the outline, -1..1, for brightness, width and reach.
 float vary(vec2 q, float t, float seed) {
     return snoise(vec3(q / (scale * VARY_SIZE) + seed * 13.1, t * 0.15 + seed));
+}
+
+// Outward arc that returns to the main line wherever the noise drops below the threshold.
+float pluck(float noise, float threshold) {
+    return max(noise - threshold, 0.0) / (1.0 - threshold);
 }
 
 // Keep the displacement inside the room on each side of the contour.
@@ -504,17 +512,17 @@ void main() {
             float reach = amplitude * TIER_REACH[i] * (1.0 + variation * 0.5 * vary(q, t, 3.0 + fi));
             // The companion line stays close outside the active spots, so the motion stays local.
             reach *= i == 1 ? mix(COMPANION_CALM, 1.0, mainOn) : 1.0;
-            float cell = scale * pow(TIER_CELL_STEP, -(fi - 1.0));
+            // The companion line gets the finest noise, so it kinks often and never runs parallel for long.
+            float cell = i == 1 ? scale * COMPANION_CELL : scale * pow(TIER_CELL_STEP, -(fi - 1.0));
             // The finest tier bends smoothly, so it curls rather than kinks.
             float sharp = i == 3 ? sharpness * CURL_SHARPNESS : sharpness;
             // The companion line runs almost all the way round; the wisps only in active spots.
             float own = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
             float on = i == 1 ? smoothstep(0.1, 0.3, own) : mainOn * smoothstep(0.35, 0.6, own);
             vec2 xTier = x + fi * vec2(311.7, 173.3);
-            float tTier = t * (1.0 + (fi - 1.0) * TIER_PACE);
-            float lean = TIER_LEAN[i];
-            float tier = fit(reach * mix(jag(xTier, tTier, cell, sharp), 1.0, lean), reach, room);
-            float tierNext = fit(reach * mix(jag(xTier + tangent, tTier, cell, sharp), 1.0, lean), reach, roomNext);
+            float tTier = t * (i == 1 ? COMPANION_PACE : 1.0 + (fi - 1.0) * TIER_PACE);
+            float tier = fit(reach * pluck(jag(xTier, tTier, cell, sharp), PLUCK[i]), reach, room);
+            float tierNext = fit(reach * pluck(jag(xTier + tangent, tTier, cell, sharp), PLUCK[i]), reach, roomNext);
             // Tiers leave from the main line and return to it.
             disp = mix(mainDisp, tier, on);
             dispNext = mix(mainNext, tierNext, on);
@@ -522,6 +530,7 @@ void main() {
             width = thickness * TIER_WIDTH[i] * mix(0.4, 1.0, on);
             // Fade out where the line lies on the main line, so it does not double it.
             weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
+            weight *= mix(0.3, 1.0, smoothstep(0.5, 3.0, abs(disp - mainDisp) / pixelRatio));
             // Now and then a wisp flares up and dies down.
             float flare = max(vary(q, t * 1.5, 5.0 + fi), 0.0);
             weight *= 1.0 + variation * 2.0 * flare * flare * flare;
