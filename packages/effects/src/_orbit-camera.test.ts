@@ -310,7 +310,9 @@ function fakeWindow(width = 1000, height = 800) {
         },
     };
     const fire = (type: string, props: Record<string, unknown> = {}) => {
-        target.dispatchEvent(Object.assign(new Event(type), props));
+        const e = Object.assign(new Event(type, { cancelable: true }), props);
+        target.dispatchEvent(e);
+        return e;
     };
     return { win, added, fire };
 }
@@ -333,10 +335,17 @@ describe("OrbitCamera, pointer", () => {
         expect(w.added).toEqual([]);
         c.update({ ...PARAMS, drag: true }, input({ live: true }));
         expect(w.added.sort()).toEqual(
-            ["pointercancel", "pointerdown", "pointermove", "pointerup"].sort(),
+            [
+                "dragstart",
+                "pointercancel",
+                "pointerdown",
+                "pointermove",
+                "pointerup",
+                "selectstart",
+            ].sort(),
         );
         c.update({ ...PARAMS, drag: true }, input({ live: true, tilt: true }));
-        expect(w.added).toHaveLength(7);
+        expect(w.added).toHaveLength(9);
         c.update(PARAMS, input({ live: true, tilt: true }));
         expect(w.added.sort()).toEqual(
             ["blur", "pointermove", "pointerout"].sort(),
@@ -388,6 +397,23 @@ describe("OrbitCamera, pointer", () => {
         expect(c.offsets.dragYaw).toBeCloseTo(50 * DRAG_RAD_PER_PX, 12);
         c.dispose();
         expect(c.offsets.dragYaw).toBe(0);
+    });
+
+    test("a drag that orbits prevents the browser's drag and text selection", () => {
+        const c = new OrbitCamera(PARAMS);
+        c.update({ ...PARAMS, drag: true }, input({ live: true }));
+        // Not ours: a drag elsewhere on the page is left alone.
+        w.fire("pointerdown", { clientX: 100, clientY: 100 });
+        expect(w.fire("dragstart").defaultPrevented).toBe(false);
+        expect(w.fire("selectstart").defaultPrevented).toBe(false);
+        w.fire("pointerup");
+
+        w.fire("pointerdown", { clientX: 400, clientY: 400 });
+        expect(w.fire("dragstart").defaultPrevented).toBe(true);
+        expect(w.fire("selectstart").defaultPrevented).toBe(true);
+        w.fire("pointerup");
+        expect(w.fire("dragstart").defaultPrevented).toBe(false);
+        c.dispose();
     });
 
     test("the tilt eases towards the pointer while it is in the page, and back when it leaves", () => {

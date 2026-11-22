@@ -61,8 +61,10 @@ export type OrbitCameraParams = {
     /**
      * Orbit the camera by dragging the pointer. A drag starts on the
      * element's box and can then leave it. While on, it listens for
-     * pointer events on `window`; UI on top of the element that should
-     * not orbit can stop `pointerdown` propagation.
+     * pointer events on `window`, and a drag that orbits keeps the
+     * browser from dragging the element (an image, a link) or selecting
+     * its text; UI on top of the element that should not orbit can stop
+     * `pointerdown` propagation.
      */
     drag: boolean;
     /**
@@ -451,11 +453,22 @@ export class OrbitCamera {
         const up = () => {
             this.#dragging = false;
         };
+        // The browser's own drag (of an image, a link, selected text) and
+        // text selection would take the pointer over and cancel ours.
+        const prevent = (e: Event) => {
+            if (this.#dragging) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("dragstart", prevent);
+        window.addEventListener("selectstart", prevent);
         window.addEventListener("pointerdown", down);
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
         window.addEventListener("pointercancel", up);
         this.#unlistenDrag = () => {
+            window.removeEventListener("dragstart", prevent);
+            window.removeEventListener("selectstart", prevent);
             window.removeEventListener("pointerdown", down);
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
