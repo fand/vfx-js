@@ -522,7 +522,7 @@ vec3 backdrop(vec2 p, float fw) {
     // whole periods, where it would only alias.
     float mean = 0.5;
     if (backdropMode == 1) {
-        float s = fract((q.x + q.y) * 0.7071 + backdropOffset);
+        float s = fract((q.x - q.y) * 0.7071 + backdropOffset);
         m = edge(0.25 - abs(s - 0.5), fw);
     } else if (backdropMode == 2) {
         vec2 g = abs(fract(q + vec2(backdropOffset, 0.0)) - 0.5);
