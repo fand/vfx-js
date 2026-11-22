@@ -36,7 +36,7 @@ import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 /**
  * A procedural {@link GlassParams.backdrop}. `"none"` is black.
  * `"marble"` is the contour bands of a slow noise field, like zebra
- * marble. `"rainbow"` is a noise field through a bright hue gradient; it
+ * marble. `"rainbow"` is pale, bright colours drifting through all hues; it
  * ignores {@link GlassParams.backdropColors}.
  */
 export type GlassPatternName =
@@ -282,6 +282,8 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
 const IMAGE_MODE = 8;
 // Contour bands of "marble" per unit of its noise field.
 const MARBLE_BANDS = "3.0";
+// Size of the "marble" noise field, in pattern units.
+const MARBLE_FREQ = "0.14";
 const DEBUG_VIEWS: Record<GlassDebugView, number> = {
     off: 0,
     outer: 1,
@@ -473,21 +475,24 @@ float edge(float d, float fw) {
     return smoothstep(-fw, fw, d);
 }
 
-// "rainbow": a noise field through a bright hue gradient, the hue
-// drifting slowly in space and time. q and fw are in pattern units.
+// "rainbow": pale, bright colours whose hue drifts in space and time.
+// q and fw are in pattern units.
 vec3 rainbow(vec2 q, float fw) {
-    vec3 n = vec3(q * 0.4, backdropOffset);
-    float f = snoise(n) * 0.7
-        + snoise(n * vec3(2.1, 2.1, 1.3) + vec3(3.1, 8.7, 2.9)) * 0.3;
-    // A wide footprint averages the field: lower its contrast, keeping
-    // the slow drift, so frost blurs to a smooth gradient, not to grey.
+    // The hue is the direction of a 2D noise vector. A single noise
+    // value sits near its middle most of the time, which would show two
+    // or three hues only; a direction covers the whole circle evenly.
+    vec3 n = vec3(q * 0.3, backdropOffset);
+    vec2 v = vec2(snoise(n), snoise(n + vec3(17.3, 5.1, 9.7)));
+    float r = length(v);
+    float hue = atan(v.y, v.x) / 6.2832 + backdropOffset * 0.05;
+    vec3 c = 0.5 + 0.5 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
+    // Pastel: mostly white, tinted. All hues meet where the vector
+    // vanishes, so the colour fades out there. A wide footprint averages
+    // the hues, which is white too.
     float k = 1.0 - smoothstep(0.35, 2.0, fw);
-    float t = f * 0.6 * k + (q.x - q.y) * 0.04 + backdropOffset * 0.05;
-    // Cosine palette with the channels a third apart: never grey.
-    vec3 c = 0.5 + 0.5 * cos(6.2832 * (t + vec3(0.0, 0.33, 0.67)));
-    // Brighter on the field's peaks, above 1 so highlights bloom.
-    float v = mix(0.95, 0.75 + 0.6 * smoothstep(0.2, 0.9, f), k);
-    return c * v;
+    float sat = 0.5 * smoothstep(0.0, 0.35, r) * k;
+    // A little above 1 on the strong parts, so highlights bloom.
+    return mix(vec3(1.0), c, sat) * (1.0 + 0.2 * smoothstep(0.3, 0.8, r) * k);
 }
 
 // The backdrop plane, at view-space xy. fw is the footprint of the pixel
@@ -536,13 +541,13 @@ vec3 backdrop(vec2 p, float fw) {
         // Contour bands of a slow noise field, like zebra marble: closed
         // loops round its peaks, bands crowding where it is steep. A
         // weaker second octave makes the widths irregular.
-        vec3 n = vec3(q * 0.35, backdropOffset);
+        vec3 n = vec3(q * ${MARBLE_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
         vec4 b = snoiseD(n * vec3(2.3, 2.3, 1.5) + vec3(5.2, 1.3, 7.7));
         float s = (a.w + 0.2 * b.w) * ${MARBLE_BANDS};
         // The band width varies: the footprint in band periods follows
         // the field's gradient (in pattern units).
-        vec2 g = (a.xy + 0.46 * b.xy) * 0.35;
+        vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
         fw = max(fw * ${MARBLE_BANDS} * length(g), 1e-4);
         m = edge(0.25 - abs(fract(s) - 0.5), fw);
     } else if (backdropMode == 7) {
