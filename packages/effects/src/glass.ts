@@ -37,8 +37,8 @@ import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
  * A procedural {@link GlassParams.backdrop}, coloured through the
  * {@link GlassParams.backdropColors} palette. `"none"` is black.
  * `"marble"` is the contour bands of a slow noise field, like zebra
- * marble. `"flow"` follows the direction of a slow noise vector, so every
- * colour of the palette shows in smooth, swirling patches.
+ * marble. `"flow"` runs through the palette diagonally, bent by a slow
+ * noise field into wavering ribbons.
  */
 export type GlassPatternName = "none" | "stripes" | "grid" | "marble" | "flow";
 
@@ -567,17 +567,17 @@ vec3 backdrop(vec2 p, float fw) {
         vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
         gu = ${MARBLE_BANDS} * length(g);
     } else {
-        // "flow": the direction of a 2D noise vector, once round the
-        // palette per turn. Its gradient blows up where the vector
-        // vanishes, which blurs to the palette's mean there.
+        // "flow": a diagonal run through the palette, bent by a noise
+        // field. The bend stays weaker than the run, so the colours keep
+        // going one way: no closed rings, and no points where they all
+        // meet.
         vec3 n = vec3(q * ${FLOW_FREQ}, backdropOffset);
         vec4 a = snoiseD(n);
-        vec4 b = snoiseD(n + vec3(17.3, 5.1, 9.7));
-        vec2 v = vec2(a.w, b.w);
-        float h = atan(v.y, v.x) / 6.2832 + backdropOffset * 0.05;
+        vec4 b = snoiseD(n * vec3(2.1, 2.1, 1.3) + vec3(17.3, 5.1, 9.7));
+        vec2 dir = vec2(0.7071, -0.7071) * 0.22;
+        float h = dot(q, dir) + (a.w + 0.25 * b.w) * 0.32 + backdropOffset * 0.05;
         u = fract(h);
-        vec2 ga = (v.x * b.xy - v.y * a.xy) / max(dot(v, v), 1e-8);
-        gu = length(ga) * ${FLOW_FREQ} / 6.2832;
+        gu = length(dir + (a.xy + 0.525 * b.xy) * 0.32 * ${FLOW_FREQ});
     }
     // Softness and filtering are one blur along u: the pixel's footprint
     // in u, or the softness in shares of a colour. Low softness matches

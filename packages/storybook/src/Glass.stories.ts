@@ -301,8 +301,8 @@ export const marble: StoryObj<Args> = {
     args: { source: "VFX-JS logo", backdrop: "marble" },
 };
 
-// A soft holographic sheet: the pastel palette along the direction of a
-// noise field, through dispersive, faceted glass.
+// A soft holographic sheet: the pastel palette in wavering ribbons,
+// through dispersive, faceted glass.
 export const flow: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",
