@@ -34,6 +34,8 @@ type Args = {
     | "start"
     | "end"
     | "segments"
+    | "fade"
+    | "variation"
 >;
 
 const DEFAULTS = new SaberEffect().params;
@@ -65,6 +67,8 @@ export default {
         start: DEFAULTS.start,
         end: DEFAULTS.end,
         segments: DEFAULTS.segments,
+        fade: DEFAULTS.fade,
+        variation: DEFAULTS.variation,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
@@ -96,6 +100,8 @@ export default {
         start: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
         end: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
         segments: { control: { type: "range", min: 1, max: 8, step: 1 } },
+        fade: { control: { type: "range", min: 0, max: 300, step: 1 } },
+        variation: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
     },
 } satisfies Meta<Args>;
 
@@ -130,11 +136,11 @@ async function mount(
 
 const easeInOut = (x: number) => x * x * (3 - 2 * x);
 
-// Draw the outline on, hold, wipe it out, pause, repeat.
+// Draw the outline on, hold, wipe it out with a fading tail, pause, repeat.
 function revealLoop(effect: SaberEffect, time: number): void {
-    const t = time % 5.5;
+    const t = time % 6;
     effect.params.end = easeInOut(Math.min(t / 2, 1));
-    effect.params.start = easeInOut(Math.min(Math.max((t - 4) / 1, 0), 1));
+    effect.params.start = easeInOut(Math.min(Math.max((t - 3.8) / 1.6, 0), 1));
 }
 
 export const logo: StoryObj<Args> = {

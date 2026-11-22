@@ -1045,6 +1045,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     line.addBinding(p, "sharpness", range(0, 1, 0.01));
     line.addBinding(p, "burst", range(0, 1, 0.01));
     line.addBinding(p, "lines", range(1, 4, 1));
+    line.addBinding(p, "variation", range(0, 1, 0.01));
 
     const motion = pane.addFolder({ title: "Motion" });
     motion.addBinding(p, "speed", range(0, 5, 0.01));
@@ -1054,6 +1055,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     reveal.addBinding(p, "start", range(0, 1, 0.001));
     reveal.addBinding(p, "end", range(0, 1, 0.001));
     reveal.addBinding(p, "segments", range(1, 8, 1));
+    reveal.addBinding(p, "fade", range(0, 300, 1));
 
     const glow = pane.addFolder({ title: "Glow" });
     glow.addBinding(p, "glow", range(0, 5, 0.01));

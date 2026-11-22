@@ -374,20 +374,27 @@ uniform int reveal;
 uniform float revealStart;
 uniform float revealEnd;
 uniform float segments;
+uniform float fade;
+uniform float variation;
 ${GLSL_JAG}
 
 // Main line noise cell, as a share of scale.
 const float MAIN_CELL = 0.3;
-const float ARC_LEAN = 0.25;
 // Per line: reach as a share of amplitude, width as a share of thickness, and brightness.
 const float TIER_REACH[4] = float[4](0.0, 0.4, 0.7, 1.0);
 const float TIER_WIDTH[4] = float[4](1.0, 0.6, 0.45, 0.35);
-const float TIER_WEIGHT[4] = float[4](1.0, 0.5, 0.35, 0.2);
+const float TIER_WEIGHT[4] = float[4](1.0, 0.6, 0.8, 0.6);
+// How much faster each tier's shape changes than the one before.
+const float TIER_PACE = 1.5;
+// How far each tier leans outwards, off the main line.
+const float TIER_LEAN[4] = float[4](0.0, 0.5, 0.25, 0.25);
 // Reach of the companion line outside the active spots, as a share of its reach.
 const float COMPANION_CALM = 0.3;
 // Each tier's noise cell is this many times finer than the one before.
 const float TIER_CELL_STEP = 1.8;
 const float CURL_SHARPNESS = 0.4;
+// Size of the stretches that vary in brightness and reach, in units of scale.
+const float VARY_SIZE = 5.0;
 // Size of the active spots, in units of scale.
 const float ACTIVITY_SIZE = 3.0;
 const float TOWARDS_PIXEL = 0.6;
@@ -408,6 +415,11 @@ float activity(vec2 q, float t, float seed) {
     float n = snoise(vec3(q / (scale * ACTIVITY_SIZE) + drift + seed, t * 0.3)) * 0.5 + 0.5;
     float low = burst * 0.7;
     return smoothstep(low, low + 0.2, n);
+}
+
+// Slow variation along the outline, -1..1, for brightness, width and reach.
+float vary(vec2 q, float t, float seed) {
+    return snoise(vec3(q / (scale * VARY_SIZE) + seed * 13.1, t * 0.15 + seed));
 }
 
 // Keep the displacement inside the room on each side of the contour.
@@ -452,6 +464,30 @@ void main() {
     float mainDisp = fit(mainAmp * jag(x, t, mainCell, sharpness), mainAmp, room);
     float mainNext = fit(mainAmp * jag(x + tangent, t, mainCell, sharpness), mainAmp, roomNext);
 
+    // Reveal: which part of each loop shows, a long fading tail behind start, and a bright head at end.
+    float shown = 1.0;
+    float head = 0.0;
+    if (reveal == 1) {
+        vec2 arc = texelFetch(arcTex, ivec2(q), 0).rg;
+        // Split each loop into segments that reveal together; short loops get fewer.
+        float count = clamp(floor(arc.y / (MIN_SEGMENT * pixelRatio)), 1.0, segments);
+        float along = fract(arc.x * count);
+        float segmentLength = arc.y / count;
+        float soft = CUT_SOFTNESS * pixelRatio;
+        float fromStart = (along - revealStart) * segmentLength;
+        float toEnd = (revealEnd - along) * segmentLength;
+        // The tail grows with start, so nothing dims while start is still 0.
+        float tail = max(soft, min(fade, revealStart * segmentLength));
+        shown = smoothstep(0.0, tail, fromStart);
+        shown *= revealEnd >= 1.0 ? 1.0 : smoothstep(0.0, soft, toEnd);
+        // A loop the tracer missed has no length; hide it rather than show it whole.
+        shown *= step(0.5, arc.y);
+        // A bright head at the growing end, which fades out as the loop closes.
+        float headLength = HEAD_LENGTH * pixelRatio;
+        head = exp(-max(toEnd, 0.0) / headLength);
+        head *= clamp((1.0 - revealEnd) * segmentLength / headLength, 0.0, 1.0);
+    }
+
     float light = 0.0;
     for (int i = 0; i < 4; i++) {
         if (i >= lines) {
@@ -459,12 +495,13 @@ void main() {
         }
         float disp = mainDisp;
         float dispNext = mainNext;
-        float width = thickness;
-        float weight = 1.0;
+        // The main line has hot knots where it is active, and slowly brighter and dimmer stretches.
+        float width = thickness * (1.0 + variation * 0.35 * vary(q, t, 2.0));
+        float weight = 1.0 + variation * (0.5 * vary(q, t, 1.0) + 0.8 * mainOn);
         if (i > 0) {
             float fi = float(i);
             // Each tier reaches further, with finer noise, and is thinner and dimmer.
-            float reach = amplitude * TIER_REACH[i];
+            float reach = amplitude * TIER_REACH[i] * (1.0 + variation * 0.5 * vary(q, t, 3.0 + fi));
             // The companion line stays close outside the active spots, so the motion stays local.
             reach *= i == 1 ? mix(COMPANION_CALM, 1.0, mainOn) : 1.0;
             float cell = scale * pow(TIER_CELL_STEP, -(fi - 1.0));
@@ -474,17 +511,24 @@ void main() {
             float own = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
             float on = i == 1 ? smoothstep(0.1, 0.3, own) : mainOn * smoothstep(0.35, 0.6, own);
             vec2 xTier = x + fi * vec2(311.7, 173.3);
-            float tTier = t * (1.0 + fi * 0.15);
-            float tier = fit(reach * mix(jag(xTier, tTier, cell, sharp), 1.0, ARC_LEAN), reach, room);
-            float tierNext = fit(reach * mix(jag(xTier + tangent, tTier, cell, sharp), 1.0, ARC_LEAN), reach, roomNext);
+            float tTier = t * (1.0 + (fi - 1.0) * TIER_PACE);
+            float lean = TIER_LEAN[i];
+            float tier = fit(reach * mix(jag(xTier, tTier, cell, sharp), 1.0, lean), reach, room);
+            float tierNext = fit(reach * mix(jag(xTier + tangent, tTier, cell, sharp), 1.0, lean), reach, roomNext);
             // Tiers leave from the main line and return to it.
             disp = mix(mainDisp, tier, on);
             dispNext = mix(mainNext, tierNext, on);
-            width = thickness * TIER_WIDTH[i];
+            // Wisps taper towards their ends.
+            width = thickness * TIER_WIDTH[i] * mix(0.4, 1.0, on);
             // Fade out where the line lies on the main line, so it does not double it.
             weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
+            // Now and then a wisp flares up and dies down.
+            float flare = max(vary(q, t * 1.5, 5.0 + fi), 0.0);
+            weight *= 1.0 + variation * 2.0 * flare * flare * flare;
             weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
         }
+        // The fading tail also thins out.
+        width *= mix(0.5, 1.0, shown);
         // Lines thinner than a pixel get dimmer instead of breaking up.
         weight *= min(width, 1.0);
         width = max(width, 1.0);
@@ -499,25 +543,7 @@ void main() {
         float halfWidth = width * 0.5;
         light += weight * (1.0 - smoothstep(halfWidth - 0.75, halfWidth + 0.75, dist));
     }
-    if (reveal == 1) {
-        // Keep the lines whose contour point lies between start and end along its loop.
-        vec2 arc = texelFetch(arcTex, ivec2(q), 0).rg;
-        // Split each loop into segments that reveal together; short loops get fewer.
-        float count = clamp(floor(arc.y / (MIN_SEGMENT * pixelRatio)), 1.0, segments);
-        float along = fract(arc.x * count);
-        float segmentLength = arc.y / count;
-        float soft = CUT_SOFTNESS * pixelRatio;
-        float fromStart = (along - revealStart) * segmentLength;
-        float toEnd = (revealEnd - along) * segmentLength;
-        float shown = smoothstep(0.0, soft, fromStart) * smoothstep(0.0, soft, toEnd);
-        // A loop the tracer missed has no length; hide it rather than show it whole.
-        shown *= step(0.5, arc.y);
-        // A bright head at the growing end, which fades out as the loop closes.
-        float headLength = HEAD_LENGTH * pixelRatio;
-        float head = exp(-max(toEnd, 0.0) / headLength);
-        head *= clamp((1.0 - revealEnd) * segmentLength / headLength, 0.0, 1.0);
-        light *= shown * (1.0 + HEAD_GAIN * head);
-    }
+    light *= shown * (1.0 + HEAD_GAIN * head);
     outColor = vec4(vec3(light), 1.0);
 }
 `;
@@ -647,6 +673,16 @@ export type SaberParams = {
      */
     segments: number;
     /**
+     * Length of the fading tail behind `start`, in CSS px, so a wipe-out trails off gently.
+     * 0 cuts crisply.
+     */
+    fade: number;
+    /**
+     * How much the lines vary along the outline and over time, 0..1: brighter knots, flaring wisps, changing reach.
+     * 0 looks even everywhere.
+     */
+    variation: number;
+    /**
      * Room for the lines and glow around the element, in CSS px.
      * `"fullscreen"` fills the canvas.
      */
@@ -660,8 +696,8 @@ const MIN_CELL = 5;
 const MAX_ROOM = 96;
 
 // Light gain of the core line and the glow, before `intensity`.
-const CORE_GAIN = 10;
-const GLOW_GAIN = 1.6;
+const CORE_GAIN = 3;
+const GLOW_GAIN = 1;
 // Share of white in the light tint; higher burns the core whiter.
 const WHITE_MIX = 0.15;
 
@@ -669,11 +705,11 @@ const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
     thickness: 2,
-    amplitude: 24,
+    amplitude: 32,
     mainAmplitude: 1,
     scale: 24,
     sharpness: 0.8,
-    burst: 0.5,
+    burst: 0.45,
     speed: 1,
     flicker: 0,
     lines: 4,
@@ -686,6 +722,8 @@ const DEFAULT_PARAMS: SaberParams = {
     start: 0,
     end: 1,
     segments: 3,
+    fade: 100,
+    variation: 0.7,
     pad: 80,
 };
 
@@ -705,7 +743,7 @@ const DEFAULT_PARAMS: SaberParams = {
  * For video, set `dynamic: true` to follow the outline every frame.
  *
  * Animate `end` from 0 to 1 to draw the outline on along each loop, and `start` from 0 to 1 to wipe it out.
- * With `segments`, each loop grows from several points at once.
+ * With `segments`, each loop grows from several points at once, and `fade` makes the wiped-out end trail off gently.
  * The reveal traces the outline on the CPU once, so the lines show a few frames after it is first used.
  *
  * The lines and glow draw outside the element, within `pad` CSS px.
@@ -842,6 +880,8 @@ export class SaberEffect implements Effect {
                 revealStart: usePayload ? start : 1,
                 revealEnd: usePayload ? end : 0,
                 segments: Math.max(1, Math.round(this.params.segments)),
+                fade: Math.max(this.params.fade, 0) * pixelRatio,
+                variation: Math.min(Math.max(this.params.variation, 0), 1),
             },
             target: core,
         });
