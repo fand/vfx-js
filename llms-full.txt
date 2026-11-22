@@ -488,6 +488,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `ScanlineEffect` | CRT scanlines. |
 | `SinewaveEffect` | Sine wave distortion. |
 | `SliceShiftEffect` | Split into strips and shift each toward the center. |
+| `SwirlParticleEffect` | Particles flow over the element's silhouette, extruded to 3D, and peel off in wisps. Gradient `palette` (preset name from `SWIRL_PARTICLE_PALETTES` or `{ offset, color }` stops), `sourceColor` to use the image's colors, `count` (default 65536, max 2^20, live), `intro` (seconds the particles take to be born at start, default 1.5; 0 = all at once), camera `yaw` / `pitch` / `orbit` / `fov` (all in degrees), `drag: true` to orbit by dragging the element, pointer interaction `mouse: "repel" | "tilt"` (`mouseRadius` in CSS px, `mouseStrength`; default `"none"`), light `lightDirection` / `lightColor` / `lightIntensity` / `ambient` / `occlusion` / `glint`, and an optional drop shadow on the page behind (`shadow: true`, `shadowOpacity` / `shadowSoftness` / `shadowDistance` / `shadowColor`). `antialias: true` turns on 4× MSAA for the fibres (memory-heavy fullscreen at high DPR). Draws outside the element (`pad` in CSS px, default 200, or `"fullscreen"`) over transparency. The silhouette is read back at start and when the element's aspect ratio changes; after changing its content (e.g. `img.src`, then `await vfx.update(img)`), call `effect.refresh()`. |
 | `TilePixelateEffect` | Pixelate into shaped tiles. |
 | `TritoneEffect` | Three-color map. |
 | `VignetteEffect` | Vignette. |
