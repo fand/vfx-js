@@ -29,10 +29,11 @@ Rebuild only when the buffer size, `edge` or `edgeThreshold` changes, when `inva
 
 1. **Seed pass** → `seedA` (float, nearest).
    - Mask value `m` = alpha (`edge: "alpha"`) or luminance (`edge: "luminance"`) of `src`, zero outside the valid src rect.
+   - Luminance is blurred a little first, so photo texture makes fewer tiny contours.
    - A texel is a seed when `m` crosses `edgeThreshold` between it and any 4-neighbour.
    - Store the **offset** from the texel centre to the contour point, in px: `rg = offset`, `a = 1` (valid). Refine to sub-pixel: find the crossing along x and along y by linear interpolation, then take the nearest point on the line through both crossings.
    - Offsets, not absolute coords: they stay precise in RGBA16F at any buffer size.
-2. **JFA passes** `seedA ↔ seedB`, step = `2^ceil(log2(max(w, h)))/2` down to 1, then one extra pass at step 1.
+2. **JFA passes** `seedA ↔ seedB`, from a step that reaches 192 CSS px down to 1, then one extra pass at step 1. Texels further out stay invalid and draw nothing.
    - A neighbour's candidate is `neighbourOffset + neighbourDelta`. Keep the shortest.
 3. **Resolve pass** → `field` (float, linear).
    - `r` = signed distance in px (negative inside: `m >= threshold`), `gb` = outward unit normal, `a` = valid flag.
@@ -50,14 +51,14 @@ Check that a render target with `persistent: false` keeps its content between fr
    - Early out per 2×2 quad when `abs(d) > amplitude + thickness + 4.0`, so derivatives stay valid in drawn quads.
    - Sample the noise at `q + n * d * 0.6`, not at `q`. At a convex corner `q` is fixed, and the line would be a round blob.
    - For each line `i < lines` (max 4):
-     - `disp = fit(lineAmp * jag(x, t), room)`. `fit` is a smooth min against the room on that side.
+     - `disp = fit(lineAmp * jag(x, t), room)`. `fit` folds the line back at the room limit on that side, so it bounces off with a kink.
      - `f = d - disp`. Line distance `dist = abs(f) / min(screenGrad, slopeGrad)`. This keeps the line width even on steep spikes.
        - `screenGrad = length(vec2(dFdx(f), dFdy(f)))`.
        - `slopeGrad = sqrt(1 + slope^2)`, with `slope` from one more `jag` call one px along the tangent.
        - `screenGrad` alone jumps on the medial axis and draws false lines there.
    - `jag`: value noise on a 3D lattice (`xy` = contour point, `z` = time), built like midpoint displacement: each octave halves the cell and the amplitude, so the slope is the same at every scale. `sharpness` blends smooth and linear interpolation; linear gives straight runs with kinks. Octaves finer than 5 CSS px fade out. Hard clamp to -1..1.
    - Line 0 is the main line: smaller amplitude, finer cell, full weight, no envelope.
-   - The other lines are arcs: full amplitude, thinner, own seed. An envelope (low-frequency simplex) switches them on in short stretches; `burst` makes the stretches rarer. Arcs lean outward and only show where there is room outside.
+   - The other lines are arcs: full amplitude, thinner, own seed. They leave from the main line and return to it. An envelope (low-frequency simplex) switches them on in short stretches; `burst` makes the stretches rarer. Arcs lean outward and only show where there is room outside.
    - Time: `t = time * speed`. `flicker` mixes smooth time with time that snaps 16 times per second, and varies the arc brightness per snap.
    - Output is one HDR intensity channel (write it to `rgb`, `a = 1`).
 6. **Glow pyramid**: `createBloomPyramid(ctx, w, h, 8)` from `_bloom-common.ts`.

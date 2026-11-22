@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { SaberEffect, type SaberParams } from "@vfx-js/effects";
+import JellyfishMp4 from "./assets/jellyfish.mp4";
+import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
 import { attachSaberPane, initVFX } from "./utils";
@@ -25,6 +27,9 @@ type Args = {
     | "glowFalloff"
     | "source"
     | "pad"
+    | "edge"
+    | "edgeThreshold"
+    | "dynamic"
 >;
 
 const DEFAULTS = new SaberEffect().params;
@@ -49,6 +54,9 @@ export default {
         glowFalloff: DEFAULTS.glowFalloff,
         source: DEFAULTS.source,
         pad: DEFAULTS.pad,
+        edge: DEFAULTS.edge,
+        edgeThreshold: DEFAULTS.edgeThreshold,
+        dynamic: DEFAULTS.dynamic,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
@@ -69,6 +77,11 @@ export default {
         },
         source: { control: { type: "boolean" } },
         pad: { control: { type: "range", min: 0, max: 400, step: 1 } },
+        edge: { control: { type: "radio" }, options: ["alpha", "luminance"] },
+        edgeThreshold: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        dynamic: { control: { type: "boolean" } },
     },
 } satisfies Meta<Args>;
 
@@ -128,4 +141,48 @@ export const smallText: StoryObj<Args> = {
     args: { fontSize: 28 },
     render: (args) => renderText("Electric outline on small text", args),
     play: ({ canvasElement, args }) => playText(canvasElement, args),
+};
+
+const PHOTO_STYLE = "max-width: min(70vw, 900px); max-height: 70vh";
+
+export const photo: StoryObj<Args> = {
+    args: { edge: "luminance", edgeThreshold: 0.35 },
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        img.style.cssText = PHOTO_STYLE;
+        return img;
+    },
+    play: async ({ canvasElement, args }) => {
+        const img = canvasElement.querySelector("img") as HTMLImageElement;
+        if (!img.complete) {
+            await new Promise((o) => {
+                img.onload = o;
+            });
+        }
+        await mount(img, args);
+    },
+};
+
+export const video: StoryObj<Args> = {
+    args: { edge: "luminance", edgeThreshold: 0.35, dynamic: true },
+    render: () => {
+        const video = document.createElement("video");
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        video.src = JellyfishMp4;
+        video.style.cssText = PHOTO_STYLE;
+        return video;
+    },
+    play: async ({ canvasElement, args }) => {
+        const video = canvasElement.querySelector("video") as HTMLVideoElement;
+        if (video.readyState < 2) {
+            await new Promise((o) => {
+                video.addEventListener("loadeddata", o, { once: true });
+            });
+        }
+        await mount(video, args);
+    },
 };

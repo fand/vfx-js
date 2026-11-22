@@ -21,11 +21,25 @@ uniform sampler2D src;
 uniform int edgeMode;
 uniform float edgeThreshold;
 
-float maskAt(vec2 p) {
+float lumaAt(vec2 p) {
     vec2 inside = step(vec2(0.0), p) * step(p, vec2(1.0));
-    vec4 c = texture(src, clamp(p, 0.0, 1.0));
-    float m = edgeMode == 1 ? dot(c.rgb, vec3(0.299, 0.587, 0.114)) : c.a;
-    return m * inside.x * inside.y - edgeThreshold;
+    vec3 c = texture(src, clamp(p, 0.0, 1.0)).rgb;
+    return dot(c, vec3(0.299, 0.587, 0.114)) * inside.x * inside.y;
+}
+
+float maskAt(vec2 p) {
+    if (edgeMode == 1) {
+        // Blur photos a little, so texture noise does not make tiny contours.
+        vec2 t = 1.5 / vec2(textureSize(src, 0));
+        float m = lumaAt(p) * 0.2;
+        m += (lumaAt(p + vec2(t.x, t.y)) + lumaAt(p + vec2(-t.x, t.y))
+            + lumaAt(p + vec2(t.x, -t.y)) + lumaAt(p - t)) * 0.1;
+        m += (lumaAt(p + vec2(2.0 * t.x, 0.0)) + lumaAt(p - vec2(2.0 * t.x, 0.0))
+            + lumaAt(p + vec2(0.0, 2.0 * t.y)) + lumaAt(p - vec2(0.0, 2.0 * t.y))) * 0.1;
+        return m - edgeThreshold;
+    }
+    vec2 inside = step(vec2(0.0), p) * step(p, vec2(1.0));
+    return texture(src, clamp(p, 0.0, 1.0)).a * inside.x * inside.y - edgeThreshold;
 }
 `;
 
@@ -162,7 +176,8 @@ float march(vec2 q, vec2 dir, float side, vec2 size) {
 void main() {
     vec2 size = vec2(textureSize(field, 0));
     vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
-    if (f.a < 0.5) {
+    // The room is only read near the contour, after a 4 px blur.
+    if (f.a < 0.5 || abs(f.r) > 6.0) {
         outColor = vec4(maxRoom, maxRoom, 0.0, 1.0);
         return;
     }
@@ -265,13 +280,13 @@ const float ARC_WIDTH = 0.6;
 const float TOWARDS_PIXEL = 0.6;
 const float SNAPS_PER_SECOND = 16.0;
 
-// Clamp the displacement to the room on each side of the contour.
-// A smooth min with a 2 px knee, so it only bends the line near the limit.
-float fit(float disp, vec2 room) {
-    float limit = min((disp > 0.0 ? room.x : room.y) * 0.9, amplitude);
-    float a = abs(disp);
-    float h = clamp(0.5 + 0.25 * (limit - a), 0.0, 1.0);
-    return sign(disp) * max(mix(limit, a, h) - 2.0 * h * (1.0 - h), 0.0);
+// Keep the displacement inside the room on each side of the contour.
+// Past the limit the line folds back, so it bounces off with a kink instead of running flat.
+// Squeeze first when the room is tight, so it folds at most once.
+float fit(float disp, float lineAmp, vec2 room) {
+    float limit = min((disp > 0.0 ? room.x : room.y) * 0.9, lineAmp) + 1e-3;
+    float t = abs(disp) / limit * min(1.0, 2.0 * limit / max(lineAmp, 1e-3));
+    return sign(disp) * limit * (1.0 - abs(1.0 - min(t, 2.0)));
 }
 
 void main() {
@@ -295,40 +310,46 @@ void main() {
     float snapped = snap / SNAPS_PER_SECOND + hash(vec3(snap, 1.7, 9.1)) * 0.5;
     float t = mix(time, snapped, flicker);
 
+    // Sample the noise part of the way from q towards the pixel.
+    // Round a convex corner q stays put, so this keeps kinks there.
+    // It also halves the jitter that per-pixel normal errors put into q.
+    vec2 x = q + n * d * TOWARDS_PIXEL;
+
+    // The main line, which the arcs leave from and return to.
+    float mainAmp = amplitude * MAIN_SHARE;
+    float mainCell = scale * MAIN_SHARE;
+    float mainDisp = fit(mainAmp * jag(x, t, mainCell), mainAmp, room);
+    float mainNext = fit(mainAmp * jag(x + tangent, t, mainCell), mainAmp, roomNext);
+
     float light = 0.0;
     for (int i = 0; i < 4; i++) {
         if (i >= lines) {
             break;
         }
-        float fi = float(i);
-        float lineAmp = amplitude * MAIN_SHARE;
-        float cell = scale * MAIN_SHARE;
-        float lean = 0.0;
+        float disp = mainDisp;
+        float dispNext = mainNext;
         float width = thickness;
         float weight = 1.0;
         if (i > 0) {
+            float fi = float(i);
             // Arcs switch on in short stretches along the contour; burst makes them rarer.
             // They need room outside the element to jump into.
             float env = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
             float low = burst * 0.75;
-            lineAmp = amplitude * smoothstep(low, low + 0.25, env);
-            cell = scale;
-            lean = ARC_LEAN;
+            float on = smoothstep(low, low + 0.25, env);
+            vec2 xArc = x + fi * vec2(311.7, 173.3);
+            float tArc = t * (1.0 + fi * 0.15);
+            float arc = fit(amplitude * mix(jag(xArc, tArc, scale), 1.0, ARC_LEAN), amplitude, room);
+            float arcNext = fit(amplitude * mix(jag(xArc + tangent, tArc, scale), 1.0, ARC_LEAN), amplitude, roomNext);
+            disp = mix(mainDisp, arc, on);
+            dispNext = mix(mainNext, arcNext, on);
             width = thickness * ARC_WIDTH;
-            weight = smoothstep(2.0, 8.0, room.x / pixelRatio);
+            // Fade out where the arc lies on the main line, so it does not double it.
+            weight = on * smoothstep(2.0, 8.0, room.x / pixelRatio);
             weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
         }
-        // Sample the noise part of the way from q towards the pixel.
-        // Round a convex corner q stays put, so this keeps kinks there.
-        // It also halves the jitter that per-pixel normal errors put into q.
-        vec2 x = q + n * d * TOWARDS_PIXEL + fi * vec2(311.7, 173.3);
-        float tLine = t * (1.0 + fi * 0.15);
-        float jagHere = jag(x, tLine, cell);
-        float disp = fit(lineAmp * mix(jagHere, 1.0, lean), room);
         float g = d - disp;
         // Slope of the line along the contour, from one step along the tangent.
-        float jagNext = jag(x + tangent, tLine, cell);
-        float dispNext = fit(lineAmp * mix(jagNext, 1.0, lean), roomNext);
         float slope = dispNext - disp;
         float slopeGrad = sqrt(1.0 + slope * slope);
         // Screen derivatives jump where q flips sides across the medial axis.
@@ -525,6 +546,10 @@ export class SaberEffect implements Effect {
         this.#core = ctx.createRenderTarget({ float: true });
         this.#room = ctx.createRenderTarget({ float: true });
         this.#dirty = true;
+        // Restored targets come back empty, so the cached field must be built again.
+        ctx.onContextRestored(() => {
+            this.#dirty = true;
+        });
     }
 
     render(ctx: EffectContext): void {
@@ -613,6 +638,7 @@ export class SaberEffect implements Effect {
             disposeBloomPyramid(this.#pyramid);
         }
         this.#pyramid = null;
+        this.#pyramidLevels = 0;
         this.#dirty = true;
         this.#builtW = 0;
         this.#builtH = 0;
@@ -722,9 +748,12 @@ export class SaberEffect implements Effect {
             });
             [read, write] = [write, read];
         };
+        // Lines and the room never reach past MAX_ROOM, so the flood can stop there.
+        // Texels further out stay invalid and draw nothing.
         const maxSide = Math.max(field.width, field.height);
+        const reach = Math.min(maxSide, MAX_ROOM * ctx.dims.pixelRatio * 2);
         for (
-            let stepSize = 2 ** Math.ceil(Math.log2(maxSide)) / 2;
+            let stepSize = 2 ** Math.ceil(Math.log2(reach)) / 2;
             stepSize >= 1;
             stepSize /= 2
         ) {
