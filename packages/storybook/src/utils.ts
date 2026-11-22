@@ -7,6 +7,7 @@ import {
     type HalftoneEffect,
     type HalftoneInkPresetName,
     type LightStreakEffect,
+    type OrbitCameraParams,
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
@@ -814,6 +815,12 @@ export function attachClockPane(
     return pane;
 }
 
+// Options for a `cameraOrigin` dropdown (GlassEffect, SwirlParticleEffect).
+const CAMERA_ORIGIN_OPTIONS = {
+    element: "element",
+    viewport: "viewport",
+} satisfies Record<OrbitCameraParams["cameraOrigin"], string>;
+
 // Options for a `sourceChannel` dropdown (GlassEffect, SwirlParticleEffect).
 const SOURCE_CHANNEL_OPTIONS = {
     alpha: "alpha",
@@ -952,9 +959,11 @@ export function attachSwirlParticlePane(
     bind(camera, "yaw", range(-180, 180, 0.5));
     bind(camera, "pitch", range(-85, 85, 0.5));
     bind(camera, "orbit", range(0, 90, 0.5));
+    bind(camera, "orbitSpeed", range(0, 10, 0.1));
     bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");
+    bind(camera, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
 
     const mouse = pane.addFolder({ title: "Mouse" });
     bind(mouse, "mouse", {
@@ -1143,12 +1152,14 @@ export function attachGlassPane(
     bind(light, "lightSoftness", range(0, 1, 0.01));
 
     const view = pane.addFolder({ title: "View" });
-    bind(view, "yaw", range(-3.15, 3.15, 0.01));
-    bind(view, "pitch", range(-1.5, 1.5, 0.01));
-    bind(view, "orbit", range(0, 1.5, 0.01));
+    bind(view, "yaw", range(-180, 180, 0.5));
+    bind(view, "pitch", range(-85, 85, 0.5));
+    bind(view, "orbit", range(0, 90, 0.5));
+    bind(view, "orbitSpeed", range(0, 10, 0.1));
     bind(view, "fov", range(5, 90, 1));
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
+    bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
     bind(view, "resolution", range(0.25, 2, 0.05));
     bind(view, "fxaa");
     bind(view, "debug", {

@@ -1,7 +1,7 @@
 // The extruded silhouette shared by the 3D shape effects: a 2D signed
 // distance field built on the CPU from the element's alpha (or another
-// channel, see SourceChannel), its GLSL lookup, and the orbit camera
-// rotation.
+// channel, see SourceChannel) and its GLSL lookup. The camera is in
+// _orbit-camera.ts.
 
 import type { SourceChannel } from "./_source.js";
 
@@ -363,24 +363,4 @@ export function buildShape(
         spawn,
         aspect,
     };
-}
-
-// Column-major rotation: pitch (around X) after yaw (around Y).
-export function viewMatrix(yaw: number, pitch: number): number[] {
-    const cy = Math.cos(yaw);
-    const sy = Math.sin(yaw);
-    const cp = Math.cos(pitch);
-    const sp = Math.sin(pitch);
-    // R = Rx(pitch) * Ry(yaw)
-    // Ry = [cy 0 sy; 0 1 0; -sy 0 cy], Rx = [1 0 0; 0 cp -sp; 0 sp cp]
-    const r00 = cy;
-    const r01 = 0;
-    const r02 = sy;
-    const r10 = sp * sy;
-    const r11 = cp;
-    const r12 = -sp * cy;
-    const r20 = -cp * sy;
-    const r21 = sp;
-    const r22 = cp * cy;
-    return [r00, r10, r20, r01, r11, r21, r02, r12, r22];
 }

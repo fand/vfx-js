@@ -23,13 +23,17 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 import { parseHexColor } from "./_figma-common.js";
+import {
+    OrbitCamera,
+    type OrbitCameraParams,
+    type OrbitCameraView,
+} from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
     boxBlur1d,
     buildShape,
     GLSL_SD2,
     type ShapeData,
-    viewMatrix,
 } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
@@ -83,7 +87,11 @@ export type GlassDebugView = "off" | "outer" | "inner" | "total";
  */
 export type GlassBevelShape = "round" | "chamfer";
 
-export type GlassParams = {
+/**
+ * The params of {@link GlassEffect}: the glass's own, and the camera's
+ * ({@link OrbitCameraParams}).
+ */
+export type GlassParams = OrbitCameraParams & {
     /**
      * Which channel of the element is read as the silhouette: `"alpha"`
      * (where it is opaque; default), `"luminance"` (where it is bright,
@@ -220,19 +228,6 @@ export type GlassParams = {
     /** Softness of the lights' edges, 0 to 1. */
     lightSoftness: number;
 
-    /** Camera yaw in radians. 0 looks straight at the front cap. */
-    yaw: number;
-    /** Camera pitch in radians. 0 looks straight at the front cap. */
-    pitch: number;
-    /** Amplitude of a slow camera wobble, in radians. */
-    orbit: number;
-    /** Vertical field of view in degrees. */
-    fov: number;
-    /** Size of the shape relative to the element. */
-    zoom: number;
-    /** Orbit the camera with pointer drags. */
-    drag: boolean;
-
     /**
      * Render scale, 0.25 to 2. Below 1 is cheaper and softer; 2
      * supersamples the silhouette's edge.
@@ -293,12 +288,14 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropSoftness: 0.03,
     lightIntensity: 1.5,
     lightSoftness: 0.15,
-    yaw: 0.5,
-    pitch: 0.25,
-    orbit: 0.35,
+    yaw: 29,
+    pitch: 14,
+    orbit: 20,
+    orbitSpeed: 3.3,
     fov: 30,
     zoom: 0.7,
     drag: false,
+    cameraOrigin: "element",
     resolution: 1,
     fxaa: true,
     pad: "fullscreen",
@@ -357,8 +354,6 @@ const RELIEF_PASSES = 3;
 const RELIEF_MAX_RADIUS = 256;
 // A sunk relief keeps at least this share of the glass's thickness.
 const RELIEF_MIN_THICKNESS = 0.2;
-// Pitch wobble relative to the yaw wobble.
-const PITCH_WOBBLE = 0.3;
 
 const FRAG_GLASS = `#version 300 es
 precision highp float;
@@ -456,10 +451,13 @@ vec4 sdf3(vec3 p) {
 
 uniform vec2 sdfSize;
 uniform vec2 shapeHalf;
+// The camera (see _orbit-camera.ts): the eye in view space is
+// (eye, camDist), and its axis meets the output at principalPx.
 uniform mat3 viewRot;
 uniform float camDist;
 uniform float focalPx;
-uniform vec2 centerPx;
+uniform vec2 eye;
+uniform vec2 principalPx;
 uniform vec2 bufferPx;
 // Size of a pixel of the target, in output px.
 uniform float pixelSize;
@@ -865,8 +863,8 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
 
 void main() {
     vec2 px = uv * bufferPx;
-    vec3 rdV = normalize(vec3((px - centerPx) / focalPx, -1.0));
-    vec3 roV = vec3(0.0, 0.0, camDist);
+    vec3 rdV = normalize(vec3((px - principalPx) / focalPx, -1.0));
+    vec3 roV = vec3(eye, camDist);
     // viewRot maps object to view; its transpose maps back.
     vec3 ro = roV * viewRot;
     vec3 rd = rdV * viewRot;
@@ -1323,6 +1321,15 @@ function clampInt(v: number, lo: number, hi: number, fallback: number): number {
  * the output is opaque where the backdrop is seen and premultiplied over
  * transparency elsewhere.
  *
+ * The camera ({@link OrbitCameraParams}: `yaw`, `pitch`, `orbit`, `fov`,
+ * …) works as in {@link SwirlParticleEffect}, with angles in degrees.
+ * Its defaults here: the glass turned by `yaw` 29 and `pitch` 14, a
+ * faster wobble (`orbitSpeed` 3.3), and `zoom` 0.7, so the glass is a
+ * little smaller than the element. Set `drag: true` to orbit it with
+ * pointer drags that start on the element. The default
+ * `pad: "fullscreen"` leaves room for an off-centre element to lean out
+ * of its rect with `cameraOrigin: "viewport"`.
+ *
  * All params are read every frame, so you can mutate `params` live.
  */
 export class GlassEffect implements Effect {
@@ -1368,11 +1375,8 @@ export class GlassEffect implements Effect {
     #backdropDirty = false;
 
     #time = 0;
-    #dragYaw = 0;
-    #dragPitch = 0;
-    #dragging = false;
-    #lastPointer: [number, number] = [0, 0];
-    #unlisten: (() => void) | null = null;
+    // Drags, and the window listeners while `drag` is on.
+    readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
     #unsubRestored: (() => void) | null = null;
     #disposed = false;
 
@@ -1407,42 +1411,6 @@ export class GlassEffect implements Effect {
             this.#pending = this.#pending ?? this.#shape;
             this.#backdropDirty = true;
         });
-
-        if (!this.#still && typeof window !== "undefined") {
-            const down = (e: PointerEvent) => {
-                if (!this.params.drag) {
-                    return;
-                }
-                this.#dragging = true;
-                this.#lastPointer = [e.clientX, e.clientY];
-            };
-            const move = (e: PointerEvent) => {
-                if (!this.#dragging) {
-                    return;
-                }
-                const dx = e.clientX - this.#lastPointer[0];
-                const dy = e.clientY - this.#lastPointer[1];
-                this.#lastPointer = [e.clientX, e.clientY];
-                this.#dragYaw += dx * 0.006;
-                this.#dragPitch = Math.max(
-                    -1.2,
-                    Math.min(1.2, this.#dragPitch + dy * 0.006),
-                );
-            };
-            const up = () => {
-                this.#dragging = false;
-            };
-            window.addEventListener("pointerdown", down);
-            window.addEventListener("pointermove", move);
-            window.addEventListener("pointerup", up);
-            window.addEventListener("pointercancel", up);
-            this.#unlisten = () => {
-                window.removeEventListener("pointerdown", down);
-                window.removeEventListener("pointermove", move);
-                window.removeEventListener("pointerup", up);
-                window.removeEventListener("pointercancel", up);
-            };
-        }
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
@@ -1472,7 +1440,18 @@ export class GlassEffect implements Effect {
             this.#time += Math.min(ctx.deltaTime, 0.1);
         }
 
-        const scene = this.#drawGlass(ctx);
+        const cam = this.#camera.update(this.params, {
+            time: this.#time,
+            dt: this.#still ? 0 : ctx.deltaTime,
+            dims: ctx.dims,
+            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            mouse: ctx.mouse,
+            mouseViewport: ctx.mouseViewport,
+            pixelRatio: ctx.pixelRatio,
+            live: !this.#still,
+            tilt: 0,
+        });
+        const scene = this.#drawGlass(ctx, cam);
         const debug = this.#debugView() !== 0;
         // FXAA reads the tone-mapped image, so it gets its own target.
         const [, , ow, oh] = padOutputRect(this.params.pad, ctx.dims);
@@ -1513,15 +1492,17 @@ export class GlassEffect implements Effect {
         return DEBUG_VIEWS[this.params.debug] ?? 0;
     }
 
-    #drawGlass(ctx: EffectContext): EffectRenderTarget | null {
+    #drawGlass(
+        ctx: EffectContext,
+        cam: OrbitCameraView,
+    ): EffectRenderTarget | null {
         const shape = this.#shape;
         const sdfTex = this.#sdfTex;
         if (!shape || !sdfTex) {
             return null;
         }
         const p = this.params;
-        const dims = ctx.dims;
-        const [ox, oy, ow, oh] = padOutputRect(p.pad, dims);
+        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
         if (ow <= 0 || oh <= 0) {
             return null;
         }
@@ -1546,18 +1527,6 @@ export class GlassEffect implements Effect {
         const scene = this.#scene;
 
         const t = this.#time;
-        const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
-        const yaw = p.yaw + orbit * Math.sin(t * 0.43) + this.#dragYaw;
-        const pitch =
-            p.pitch +
-            orbit * PITCH_WOBBLE * Math.sin(t * 0.31 + 1.3) +
-            this.#dragPitch;
-        // Distance so that the long side (2 world units) spans `fov`.
-        const fov = Math.min(Math.max(p.fov, 1), 150);
-        const camDist = 1 / Math.tan((fov * Math.PI) / 360);
-        const [ew, eh] = dims.elementPixel;
-        const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
-
         const halfDepth = Math.max(p.depth / 2, 0.005);
         const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
         const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
@@ -1599,10 +1568,11 @@ export class GlassEffect implements Effect {
                     capLipschitz(bulgeSlope) /
                     capLipschitz(bulgeSlope + reliefSlope),
                 shapeHalf: shape.shapeHalf,
-                viewRot: viewMatrix(yaw, pitch),
-                camDist,
-                focalPx: camDist * unitPx,
-                centerPx: [ew / 2 - ox, eh / 2 - oy],
+                viewRot: cam.viewRot,
+                camDist: cam.camDist,
+                focalPx: cam.focalPx,
+                eye: [cam.eye[0], cam.eye[1]],
+                principalPx: cam.principalPx,
                 bufferPx: [ow, oh],
                 pixelSize: ow / sw,
                 ior: Math.max(p.ior, 1.0001),
@@ -1913,8 +1883,7 @@ export class GlassEffect implements Effect {
 
     dispose(): void {
         this.#disposed = true;
-        this.#unlisten?.();
-        this.#unlisten = null;
+        this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
         if (this.#gl && this.#sdfRaw) {

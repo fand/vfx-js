@@ -1,0 +1,494 @@
+// The orbit camera shared by the 3D shape effects (GlassEffect,
+// SwirlParticleEffect): the shape's rotation from the camera params, the
+// wobble, pointer drags and the hover tilt, and the perspective that maps
+// the shape's z = 0 plane onto the element's rect.
+//
+// Inputs in, camera out: `OrbitCamera.update` takes the params and this
+// frame's inputs and returns an `OrbitCameraView`; it keeps only the
+// pointer state (drag, tilt, pointer in the page) between frames, and the
+// window listeners that feed it.
+//
+// View space: +x right, +y up, +z towards the viewer, in world units (the
+// element's long side is 2 at zoom 1). The shape's centre is the origin;
+// `viewRot` turns the shape about it. The eye is at `eye`, looking down
+// -z, and the screen is parallel to the z = 0 plane. A point q in view
+// space lands on the output at
+//
+//   principalPx + (q.xy - eye.xy) * focalPx / (eye.z - q.z)
+//
+// in output px (bottom-left origin), and eye.z - q.z is its depth. With
+// principalPx = centerPx + eye.xy * unitPx and focalPx = eye.z * unitPx,
+// the z = 0 plane lands on centerPx + q.xy * unitPx wherever the eye is:
+// moving the eye sideways only moves the vanishing point.
+
+import type { EffectDims } from "@vfx-js/core";
+
+/**
+ * The camera params of the 3D shape effects ({@link GlassEffect},
+ * {@link SwirlParticleEffect}). Angles are in degrees.
+ */
+export type OrbitCameraParams = {
+    /**
+     * Camera yaw in degrees. 0 looks straight at the front cap; positive
+     * turns the front cap to the right.
+     */
+    yaw: number;
+    /**
+     * Camera pitch in degrees. 0 looks straight at the front cap;
+     * positive turns the front cap down, showing the top.
+     */
+    pitch: number;
+    /**
+     * Amplitude of the slow camera wobble, in degrees of yaw (the pitch
+     * wobbles 0.3 times as far). 0 keeps the camera still (pointer drags
+     * still orbit it when {@link drag} is on).
+     */
+    orbit: number;
+    /**
+     * Speed of the {@link orbit} wobble, as a multiple of the base speed:
+     * at 1, a yaw swing takes about 48 seconds. 0 stops the wobble where
+     * it is at the start.
+     */
+    orbitSpeed: number;
+    /**
+     * Field of view in degrees, measured across the element's long side.
+     * The camera moves so the z = 0 plane keeps the element's size, so this
+     * only changes the strength of the perspective (like a dolly zoom).
+     */
+    fov: number;
+    /** Camera zoom. 1 = the z = 0 plane matches the element size. */
+    zoom: number;
+    /**
+     * Orbit the camera by dragging the pointer. A drag starts on the
+     * element's box and can then leave it. While on, it listens for
+     * pointer events on `window`; UI on top of the element that should
+     * not orbit can stop `pointerdown` propagation.
+     */
+    drag: boolean;
+    /**
+     * Where the camera stands:
+     *
+     * - `"element"` (default): in front of the element's centre, so the
+     *   shape looks the same wherever the element is on the page.
+     * - `"viewport"`: in front of the centre of the viewport, at the
+     *   same distance. The z = 0 plane still lands on the element's rect,
+     *   but the perspective converges on the viewport's centre: an
+     *   element away from the centre is seen from the side, shows its
+     *   side walls (those facing the centre), and changes as the page
+     *   scrolls. Its front draws further out from the centre than the
+     *   element, so a small `pad` can clip it.
+     *
+     * The rotations ({@link yaw}, {@link pitch}, the wobble, drags)
+     * turn the shape about its own centre in both cases.
+     */
+    cameraOrigin: "element" | "viewport";
+};
+
+type NumKey = "yaw" | "pitch" | "orbit" | "orbitSpeed" | "fov" | "zoom";
+
+/**
+ * [min, max] of each numeric camera param. A finite value is clamped
+ * into it; anything else falls back to the effect's default.
+ */
+export const ORBIT_CAMERA_RANGE: Readonly<
+    Record<NumKey, readonly [number, number]>
+> = {
+    yaw: [-36000, 36000],
+    pitch: [-36000, 36000],
+    orbit: [-720, 720],
+    orbitSpeed: [0, 100],
+    fov: [1, 150],
+    zoom: [0.01, 100],
+};
+const NUM_KEYS = Object.keys(ORBIT_CAMERA_RANGE) as NumKey[];
+
+// The wobble at orbitSpeed 1: angular speeds of the yaw and pitch swings
+// (rad/s of the sine's argument), and the pitch's phase.
+export const WOBBLE_YAW_SPEED = 0.13;
+export const WOBBLE_PITCH_SPEED = 0.09;
+const WOBBLE_PITCH_PHASE = 1.3;
+// Pitch wobble relative to the yaw wobble.
+const PITCH_WOBBLE = 0.3;
+// Pointer drags: radians per CSS px, and the pitch they can reach.
+export const DRAG_RAD_PER_PX = 0.006;
+export const DRAG_PITCH_MAX = 1.2;
+// Time constant of the hover tilt's easing, seconds.
+export const TILT_TAU = 0.25;
+// Degrees to radians: the camera angles in params are degrees.
+const DEG = Math.PI / 180;
+
+/** Params checked: finite and in range, or the default. */
+export function resolveOrbitCamera(
+    p: OrbitCameraParams,
+    defaults: OrbitCameraParams,
+    out: OrbitCameraParams = { ...defaults },
+): OrbitCameraParams {
+    for (const k of NUM_KEYS) {
+        const v = p[k];
+        const [lo, hi] = ORBIT_CAMERA_RANGE[k];
+        out[k] =
+            typeof v === "number" && Number.isFinite(v)
+                ? Math.min(Math.max(v, lo), hi)
+                : defaults[k];
+    }
+    out.drag = !!p.drag;
+    out.cameraOrigin =
+        p.cameraOrigin === "viewport" || p.cameraOrigin === "element"
+            ? p.cameraOrigin
+            : defaults.cameraOrigin;
+    return out;
+}
+
+/** What the camera needs from a frame. */
+export type OrbitCameraInput = {
+    /** Clock of the wobble, in seconds. */
+    time: number;
+    /** Seconds since the last update, for easing the tilt. 0 holds it. */
+    dt: number;
+    /** The effect's layout (`ctx.dims`). */
+    dims: Pick<EffectDims, "elementPixel" | "canvasPixel" | "canvasRect">;
+    /**
+     * The rect the effect draws into, element-local px (its
+     * `outputRect`). Positions in the returned view are relative to it.
+     */
+    outputRect: readonly [number, number, number, number];
+    /** `ctx.mouse`: the pointer, element-local px, bottom-left origin. */
+    mouse: readonly [number, number];
+    /** `ctx.mouseViewport`: the pointer, viewport px, bottom-left origin. */
+    mouseViewport: readonly [number, number];
+    pixelRatio: number;
+    /**
+     * Whether the camera may listen for the pointer: false for still
+     * frames, which then get no drags and no tilt.
+     */
+    live: boolean;
+    /**
+     * Largest hover tilt in degrees, reached when the pointer is half a
+     * viewport from the element's centre. 0 is off.
+     */
+    tilt: number;
+    /**
+     * Keep {@link OrbitCamera.pointerIn} up to date even with the tilt
+     * off, for an effect's own pointer interaction.
+     */
+    trackPointer?: boolean;
+};
+
+/** The camera of a frame. Positions are output px, bottom-left origin. */
+export type OrbitCameraView = {
+    /** Rotation from the shape to view space: column-major mat3. */
+    viewRot: number[];
+    /** Distance from the eye to the z = 0 plane, world units. */
+    camDist: number;
+    /** Output px per world unit on the z = 0 plane. */
+    unitPx: number;
+    /** `camDist * unitPx`: the focal length, output px. */
+    focalPx: number;
+    /** Where the shape's centre (the element's centre) is drawn. */
+    centerPx: [number, number];
+    /** The eye in view space: x, y (0 with `"element"`) and `camDist`. */
+    eye: [number, number, number];
+    /** The vanishing point: where the eye's axis meets the output. */
+    principalPx: [number, number];
+    /** The output rect's origin, element-local px. */
+    origin: [number, number];
+};
+
+// Column-major rotation: pitch (around X) after yaw (around Y). Radians.
+export function viewMatrix(yaw: number, pitch: number): number[] {
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+    // R = Rx(pitch) * Ry(yaw)
+    // Ry = [cy 0 sy; 0 1 0; -sy 0 cy], Rx = [1 0 0; 0 cp -sp; 0 sp cp]
+    const r00 = cy;
+    const r01 = 0;
+    const r02 = sy;
+    const r10 = sp * sy;
+    const r11 = cp;
+    const r12 = -sp * cy;
+    const r20 = -cp * sy;
+    const r21 = sp;
+    const r22 = cp * cy;
+    return [r00, r10, r20, r01, r11, r21, r02, r12, r22];
+}
+
+/**
+ * The centre of the viewport, element-local px. The canvas is the
+ * viewport plus the same scroll padding on each side, so the canvas's
+ * centre is the viewport's.
+ */
+export function viewportCenter(
+    dims: Pick<EffectDims, "canvasRect">,
+): [number, number] {
+    const [x, y, w, h] = dims.canvasRect;
+    return [x + w / 2, y + h / 2];
+}
+
+/**
+ * The orbit camera: params and a frame's inputs in, the camera out. Owns
+ * the pointer drag, the hover tilt and whether the pointer is in the
+ * page, and the window listeners for them, which are there only while
+ * `drag`, the tilt or `trackPointer` is on and the input is `live`.
+ * Call {@link dispose} when the effect is removed.
+ */
+export class OrbitCamera {
+    readonly #defaults: OrbitCameraParams;
+    readonly #p: OrbitCameraParams;
+
+    #dragYaw = 0;
+    #dragPitch = 0;
+    #dragging = false;
+    #lastPointer: [number, number] = [0, 0];
+    #unlistenDrag: (() => void) | null = null;
+    // As of the last update: the map from viewport to element-local px
+    // (add to (clientX, innerHeight - clientY) × pr), for where drags
+    // start.
+    #toElement: [number, number] = [0, 0];
+    #pixelRatio = 1;
+    #elementPx: [number, number] = [0, 0];
+
+    // The core has no "pointer left" signal: window listeners tell.
+    #pointerIn = false;
+    #unlistenHover: (() => void) | null = null;
+    // Smoothed tilt, radians.
+    #tiltYaw = 0;
+    #tiltPitch = 0;
+
+    /** `defaults` replace params that are not finite numbers. */
+    constructor(defaults: OrbitCameraParams) {
+        this.#defaults = { ...defaults };
+        this.#p = { ...defaults };
+    }
+
+    /** Whether the pointer is over the page (tracked while listening). */
+    get pointerIn(): boolean {
+        return this.#pointerIn;
+    }
+
+    /** Whether a drag is in progress. */
+    get dragging(): boolean {
+        return this.#dragging;
+    }
+
+    /** Drag and tilt offsets so far, radians. */
+    get offsets(): {
+        dragYaw: number;
+        dragPitch: number;
+        tiltYaw: number;
+        tiltPitch: number;
+    } {
+        return {
+            dragYaw: this.#dragYaw,
+            dragPitch: this.#dragPitch,
+            tiltYaw: this.#tiltYaw,
+            tiltPitch: this.#tiltPitch,
+        };
+    }
+
+    /**
+     * Sync the listeners, ease the tilt over `dt`, and return this
+     * frame's camera.
+     */
+    update(
+        params: OrbitCameraParams,
+        input: OrbitCameraInput,
+    ): OrbitCameraView {
+        const p = resolveOrbitCamera(params, this.#defaults, this.#p);
+        const { dims } = input;
+        const [ew, eh] = dims.elementPixel;
+        const pr = input.pixelRatio;
+        this.#toElement[0] = input.mouse[0] - input.mouseViewport[0];
+        this.#toElement[1] = input.mouse[1] - input.mouseViewport[1];
+        this.#pixelRatio = pr;
+        this.#elementPx[0] = ew;
+        this.#elementPx[1] = eh;
+
+        const tilt = Number.isFinite(input.tilt) ? Math.max(input.tilt, 0) : 0;
+        const live = input.live && typeof window !== "undefined";
+        this.#syncListeners(
+            live && p.drag,
+            live && (tilt > 0 || !!input.trackPointer),
+        );
+
+        // Tilt: the pointer relative to the element's centre, over half
+        // the viewport. Positive yaw turns the front cap to the right,
+        // positive pitch down, so the shape faces the pointer.
+        let yawT = 0;
+        let pitchT = 0;
+        if (live && tilt > 0 && this.#pointerIn) {
+            const [mx, my] = input.mouse;
+            const vw = window.innerWidth * pr || dims.canvasPixel[0];
+            const vh = window.innerHeight * pr || dims.canvasPixel[1];
+            const nx = clamp((mx - ew / 2) / Math.max(vw / 2, 1), -1, 1);
+            const ny = clamp((my - eh / 2) / Math.max(vh / 2, 1), -1, 1);
+            const max = tilt * DEG;
+            yawT = max * nx;
+            pitchT = -max * ny;
+        }
+        const dt = Number.isFinite(input.dt) ? Math.max(input.dt, 0) : 0;
+        const k = 1 - Math.exp(-dt / TILT_TAU);
+        this.#tiltYaw += (yawT - this.#tiltYaw) * k;
+        this.#tiltPitch += (pitchT - this.#tiltPitch) * k;
+
+        // Base angles and the wobble (params, degrees), drag and tilt
+        // (radians).
+        const t = input.time;
+        const s = p.orbitSpeed;
+        const yaw =
+            (p.yaw + p.orbit * Math.sin(t * (WOBBLE_YAW_SPEED * s))) * DEG +
+            this.#dragYaw +
+            this.#tiltYaw;
+        const pitch =
+            (p.pitch +
+                p.orbit *
+                    PITCH_WOBBLE *
+                    Math.sin(
+                        t * (WOBBLE_PITCH_SPEED * s) + WOBBLE_PITCH_PHASE,
+                    )) *
+                DEG +
+            this.#dragPitch +
+            this.#tiltPitch;
+
+        // Distance so that the long side (2 world units) spans `fov`.
+        const camDist = 1 / Math.tan((p.fov * Math.PI) / 360);
+        const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
+        const [ox, oy] = input.outputRect;
+        const cx = ew / 2;
+        const cy = eh / 2;
+        let ex = 0;
+        let ey = 0;
+        let px = cx;
+        let py = cy;
+        if (p.cameraOrigin === "viewport" && unitPx > 0) {
+            [px, py] = viewportCenter(dims);
+            ex = (px - cx) / unitPx;
+            ey = (py - cy) / unitPx;
+        }
+        return {
+            viewRot: viewMatrix(yaw, pitch),
+            camDist,
+            unitPx,
+            focalPx: camDist * unitPx,
+            centerPx: [cx - ox, cy - oy],
+            eye: [ex, ey, camDist],
+            principalPx: [px - ox, py - oy],
+            origin: [ox, oy],
+        };
+    }
+
+    /** Remove the listeners and forget the pointer state. */
+    dispose(): void {
+        this.#syncListeners(false, false);
+        this.#dragYaw = 0;
+        this.#dragPitch = 0;
+        this.#tiltYaw = 0;
+        this.#tiltPitch = 0;
+        this.#toElement = [0, 0];
+        this.#elementPx = [0, 0];
+    }
+
+    #syncListeners(drag: boolean, hover: boolean): void {
+        if (drag) {
+            this.#listenDrag();
+        } else if (this.#unlistenDrag) {
+            this.#unlistenDrag();
+            this.#unlistenDrag = null;
+            this.#dragging = false;
+        }
+        if (hover) {
+            this.#listenHover();
+        } else if (this.#unlistenHover) {
+            this.#unlistenHover();
+            this.#unlistenHover = null;
+            this.#pointerIn = false;
+        }
+    }
+
+    #listenDrag(): void {
+        if (this.#unlistenDrag) {
+            return;
+        }
+        const down = (e: PointerEvent) => {
+            if (!this.#onElement(e.clientX, e.clientY)) {
+                return;
+            }
+            this.#dragging = true;
+            this.#lastPointer = [e.clientX, e.clientY];
+        };
+        const move = (e: PointerEvent) => {
+            if (!this.#dragging) {
+                return;
+            }
+            const dx = e.clientX - this.#lastPointer[0];
+            const dy = e.clientY - this.#lastPointer[1];
+            this.#lastPointer = [e.clientX, e.clientY];
+            this.#dragYaw += dx * DRAG_RAD_PER_PX;
+            this.#dragPitch = clamp(
+                this.#dragPitch + dy * DRAG_RAD_PER_PX,
+                -DRAG_PITCH_MAX,
+                DRAG_PITCH_MAX,
+            );
+        };
+        const up = () => {
+            this.#dragging = false;
+        };
+        window.addEventListener("pointerdown", down);
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", up);
+        this.#unlistenDrag = () => {
+            window.removeEventListener("pointerdown", down);
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", up);
+        };
+    }
+
+    // Whether a client point is on the element's box, as of the last
+    // update. Same mapping as `ctx.mouse`.
+    #onElement(clientX: number, clientY: number): boolean {
+        const pr = this.#pixelRatio;
+        const x = clientX * pr + this.#toElement[0];
+        const y = (window.innerHeight - clientY) * pr + this.#toElement[1];
+        const [ew, eh] = this.#elementPx;
+        return x >= 0 && y >= 0 && x <= ew && y <= eh;
+    }
+
+    #listenHover(): void {
+        if (this.#unlistenHover) {
+            return;
+        }
+        // A move inside the viewport means the pointer is over the page;
+        // leaving the document (relatedTarget null: out of the window,
+        // or a touch that ended) or losing focus means it is gone.
+        const move = (e: PointerEvent) => {
+            this.#pointerIn =
+                e.clientX >= 0 &&
+                e.clientY >= 0 &&
+                e.clientX < window.innerWidth &&
+                e.clientY < window.innerHeight;
+        };
+        const out = (e: PointerEvent) => {
+            if (!e.relatedTarget) {
+                this.#pointerIn = false;
+            }
+        };
+        const blur = () => {
+            this.#pointerIn = false;
+        };
+        window.addEventListener("pointermove", move, { passive: true });
+        window.addEventListener("pointerout", out, { passive: true });
+        window.addEventListener("blur", blur);
+        this.#unlistenHover = () => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerout", out);
+            window.removeEventListener("blur", blur);
+        };
+    }
+}
+
+function clamp(x: number, lo: number, hi: number): number {
+    return Math.min(Math.max(x, lo), hi);
+}
