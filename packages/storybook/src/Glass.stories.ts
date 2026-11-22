@@ -44,7 +44,6 @@ type SourceKey = keyof typeof SOURCES;
 const PATTERNS: readonly GlassPatternName[] = [
     "stripes",
     "grid",
-    "checker",
     "marble",
     "flow",
     "none",
@@ -242,7 +241,7 @@ export const studio: StoryObj<Args> = {
 export const bands: StoryObj<Args> = {
     args: {
         source: "amagi",
-        backdrop: "checker",
+        backdrop: "grid",
         params: { paths: 3, samples: 3, dispersion: 0.2 },
     },
 };
@@ -268,7 +267,7 @@ export const frosted: StoryObj<Args> = {
 export const bumpy: StoryObj<Args> = {
     args: {
         source: "amagi",
-        backdrop: "checker",
+        backdrop: "grid",
         params: {
             depth: 0.3,
             bevel: 0.06,
@@ -310,7 +309,7 @@ export const flow: StoryObj<Args> = {
         backdrop: "flow",
         params: {
             backdropColors: "pastel",
-            backdropSoftness: 0.6,
+            backdropSoftness: 1,
             depth: 0.3,
             bevel: 0.06,
             bevelShape: "chamfer",

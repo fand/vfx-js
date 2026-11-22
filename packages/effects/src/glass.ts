@@ -40,13 +40,7 @@ import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
  * marble. `"flow"` follows the direction of a slow noise vector, so every
  * colour of the palette shows in smooth, swirling patches.
  */
-export type GlassPatternName =
-    | "none"
-    | "stripes"
-    | "grid"
-    | "checker"
-    | "marble"
-    | "flow";
+export type GlassPatternName = "none" | "stripes" | "grid" | "marble" | "flow";
 
 /** A preset for {@link GlassParams.backdropColors}, see {@link GLASS_PALETTES}. */
 export type GlassPaletteName = "mono" | "pastel" | "redblue";
@@ -56,7 +50,7 @@ export const GLASS_PALETTES: Readonly<
     Record<GlassPaletteName, readonly string[]>
 > = {
     mono: ["#000000", "#ffffff"],
-    pastel: ["#ffc4dc", "#ffd9b8", "#fff3b0", "#c4f2d4", "#bfe4ff", "#d8ccff"],
+    pastel: ["#ff9f9f", "#dfdf80", "#9fff9f", "#80dfdf", "#9f9fff", "#df80df"],
     redblue: ["#e8102a", "#1a3fe0"],
 };
 
@@ -190,15 +184,14 @@ export type GlassParams = {
      * The palette of a procedural pattern: a {@link GlassPaletteName} or
      * two or more `#rrggbb` colours in order, each with an equal share of
      * the area. One colour is a flat fill. Stripes and marble bands go
-     * through the colours and back; the checker and the grid nest them
-     * as concentric squares.
+     * through the colours and back; the grid nests them as concentric
+     * squares.
      */
     backdropColors: GlassPaletteName | readonly string[];
     /**
      * Share of the area that the second colour covers when the palette
      * has two colours, 0 to 1: the width of the stripes and marble bands,
-     * of the grid's lines, the size of the checker's squares. Ignored for
-     * three or more colours.
+     * of the grid's lines. Ignored for three or more colours.
      */
     backdropRatio: number;
     /**
@@ -301,11 +294,10 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
     none: 0,
     stripes: 1,
     grid: 2,
-    checker: 3,
-    marble: 4,
-    flow: 5,
+    marble: 3,
+    flow: 4,
 };
-const IMAGE_MODE = 6;
+const IMAGE_MODE = 5;
 // The palette texture is at least this wide, so a hard edge stays sharp
 // when the pattern is magnified.
 const PALETTE_MIN_TEXELS = 4096;
@@ -539,9 +531,9 @@ vec3 backdrop(vec2 p, float fw) {
     // length of its gradient in pattern units. u is area-equalised: equal
     // slices of it cover equal areas, so equal shares of the palette get
     // equal areas and the pattern's mean is the palette's. k scales the
-    // softness: the bands keep it along u; the checker and the grid,
-    // whose u is not proportional to distance, keep it as a distance (k
-    // follows gu), so all their edges are equally soft at any ratio.
+    // softness: the bands keep it along u; the grid, whose u is not
+    // proportional to distance, keeps it as a distance (k follows gu),
+    // so all its edges are equally soft at any ratio.
     float u;
     float gu;
     float k = 1.0;
@@ -559,18 +551,6 @@ vec3 backdrop(vec2 p, float fw) {
         gu = 4.0 * a;
         k = 0.5 * gu;
     } else if (backdropMode == 3) {
-        // Signed Chebyshev distance v from the cells' edges, -0.5 at the
-        // middle of the first colour's cells, 0.5 at the other's. Within
-        // a cell, the area further than |v| from its edge is (1 - 2|v|)^2.
-        vec2 x = q + vec2(backdropOffset + 0.5, 0.5);
-        vec2 cell = floor(x);
-        vec2 c = abs(fract(x) - 0.5);
-        float sgn = mod(cell.x + cell.y, 2.0) < 0.5 ? -1.0 : 1.0;
-        float a = 2.0 * max(c.x, c.y);
-        u = 0.5 + sgn * (0.5 - 0.5 * a * a);
-        gu = 2.0 * a;
-        k = gu;
-    } else if (backdropMode == 4) {
         // "marble": contour bands of a slow noise field: closed loops
         // round its peaks, bands crowding where it is steep. A weaker
         // second octave makes the widths irregular. u is a triangle wave
