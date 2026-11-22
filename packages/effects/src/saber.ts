@@ -372,19 +372,34 @@ uniform sampler2D arcTex;
 uniform int reveal;
 uniform float revealStart;
 uniform float revealEnd;
+uniform float segments;
 ${GLSL_JAG}
 
-const float MAIN_SHARE = 0.45;
+const float MAIN_SHARE = 0.25;
 const float ARC_LEAN = 0.25;
 const float ARC_WIDTH = 0.6;
+const float ARC_WEIGHT = 0.6;
+// Size of the active spots, in units of scale.
+const float ACTIVITY_SIZE = 3.0;
 const float TOWARDS_PIXEL = 0.6;
 const float SNAPS_PER_SECOND = 16.0;
 // Length of the soft cut at each end of the reveal, and of the bright head, in CSS px.
 const float CUT_SOFTNESS = 3.0;
 const float HEAD_LENGTH = 12.0;
 const float HEAD_GAIN = 1.5;
+// Shortest reveal segment, in CSS px.
+const float MIN_SEGMENT = 160.0;
 // Noise time per second at speed 1.
-const float PACE = 2.5;
+const float PACE = 4.0;
+
+// Where the lines are active along the outline, 0..1.
+// Spots come and go and wander along the outline; burst makes them sparse.
+float activity(vec2 q, float t, float seed) {
+    vec2 drift = vec2(0.12, 0.05) * t;
+    float n = snoise(vec3(q / (scale * ACTIVITY_SIZE) + drift + seed, t * 0.3)) * 0.5 + 0.5;
+    float low = burst * 0.7;
+    return smoothstep(low, low + 0.2, n);
+}
 
 // Keep the displacement inside the room on each side of the contour.
 // Past the limit the line folds back, so it bounces off with a kink instead of running flat.
@@ -422,7 +437,9 @@ void main() {
     vec2 x = q + n * d * TOWARDS_PIXEL;
 
     // The main line, which the arcs leave from and return to.
-    float mainAmp = amplitude * MAIN_SHARE;
+    // It kinks only in active spots; elsewhere it lies straight on the outline.
+    float mainOn = activity(q, t, 0.0);
+    float mainAmp = amplitude * MAIN_SHARE * mainOn;
     float mainCell = scale * MAIN_SHARE;
     float mainDisp = fit(mainAmp * jag(x, t, mainCell), mainAmp, room);
     float mainNext = fit(mainAmp * jag(x + tangent, t, mainCell), mainAmp, roomNext);
@@ -438,11 +455,10 @@ void main() {
         float weight = 1.0;
         if (i > 0) {
             float fi = float(i);
-            // Arcs switch on in short stretches along the contour; burst makes them rarer.
+            // Arcs lift off in short stretches inside the main line's active spots.
             // They need room outside the element to jump into.
-            float env = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
-            float low = burst * 0.75;
-            float on = smoothstep(low, low + 0.25, env);
+            float own = snoise(vec3(q / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
+            float on = mainOn * smoothstep(0.35, 0.6, own);
             vec2 xArc = x + fi * vec2(311.7, 173.3);
             float tArc = t * (1.0 + fi * 0.15);
             float arc = fit(amplitude * mix(jag(xArc, tArc, scale), 1.0, ARC_LEAN), amplitude, room);
@@ -451,7 +467,7 @@ void main() {
             dispNext = mix(mainNext, arcNext, on);
             width = thickness * ARC_WIDTH;
             // Fade out where the arc lies on the main line, so it does not double it.
-            weight = on * smoothstep(2.0, 8.0, room.x / pixelRatio);
+            weight = ARC_WEIGHT * on * smoothstep(2.0, 8.0, room.x / pixelRatio);
             weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
         }
         float g = d - disp;
@@ -468,16 +484,20 @@ void main() {
     if (reveal == 1) {
         // Keep the lines whose contour point lies between start and end along its loop.
         vec2 arc = texelFetch(arcTex, ivec2(q), 0).rg;
+        // Split each loop into segments that reveal together; short loops get fewer.
+        float count = clamp(floor(arc.y / (MIN_SEGMENT * pixelRatio)), 1.0, segments);
+        float along = fract(arc.x * count);
+        float segmentLength = arc.y / count;
         float soft = CUT_SOFTNESS * pixelRatio;
-        float fromStart = (arc.x - revealStart) * arc.y;
-        float toEnd = (revealEnd - arc.x) * arc.y;
+        float fromStart = (along - revealStart) * segmentLength;
+        float toEnd = (revealEnd - along) * segmentLength;
         float shown = smoothstep(0.0, soft, fromStart) * smoothstep(0.0, soft, toEnd);
         // A loop the tracer missed has no length; hide it rather than show it whole.
         shown *= step(0.5, arc.y);
         // A bright head at the growing end, which fades out as the loop closes.
         float headLength = HEAD_LENGTH * pixelRatio;
         float head = exp(-max(toEnd, 0.0) / headLength);
-        head *= clamp((1.0 - revealEnd) * arc.y / headLength, 0.0, 1.0);
+        head *= clamp((1.0 - revealEnd) * segmentLength / headLength, 0.0, 1.0);
         light *= shown * (1.0 + HEAD_GAIN * head);
     }
     outColor = vec4(vec3(light), 1.0);
@@ -562,7 +582,10 @@ export type SaberParams = {
     scale: number;
     /** 0 = smooth bends, 1 = straight runs with sharp kinks. */
     sharpness: number;
-    /** 0 = arcs all along the outline, 1 = arcs only in a few places. */
+    /**
+     * 0 = the lines kink and arc all along the outline.
+     * 1 = only in a few spots that wander, with the line straight and still elsewhere.
+     */
     burst: number;
     /** Animation rate. 0 freezes the lines. */
     speed: number;
@@ -596,6 +619,11 @@ export type SaberParams = {
      */
     end: number;
     /**
+     * Number of pieces each outline loop is split into for `start` and `end`, so several heads grow at once.
+     * Short loops use fewer. 1 draws each loop from a single point.
+     */
+    segments: number;
+    /**
      * Room for the lines and glow around the element, in CSS px.
      * `"fullscreen"` fills the canvas.
      */
@@ -618,13 +646,13 @@ const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
     thickness: 1.5,
-    amplitude: 28,
-    scale: 28,
+    amplitude: 24,
+    scale: 24,
     sharpness: 0.8,
-    burst: 0.6,
+    burst: 0.5,
     speed: 1,
     flicker: 0,
-    lines: 2,
+    lines: 3,
     glow: 1,
     glowFalloff: 0.6,
     edge: "alpha",
@@ -633,12 +661,13 @@ const DEFAULT_PARAMS: SaberParams = {
     dynamic: false,
     start: 0,
     end: 1,
+    segments: 3,
     pad: 80,
 };
 
 /**
  * Electric lines along the outline of an element, with a glow.
- * A jagged main line hugs the outline, and arcs jump out from it and back.
+ * A main line hugs the outline; in spots that come and go it kinks, and thin arcs lift off it and fall back.
  *
  * ```ts
  * vfx.add(img, { effect: new SaberEffect({ color: "#ff7a1a" }) });
@@ -651,6 +680,7 @@ const DEFAULT_PARAMS: SaberParams = {
  * For video, set `dynamic: true` to follow the outline every frame.
  *
  * Animate `end` from 0 to 1 to draw the outline on along each loop, and `start` from 0 to 1 to wipe it out.
+ * With `segments`, each loop grows from several points at once.
  * The reveal traces the outline on the CPU once, so the lines show a few frames after it is first used.
  *
  * The lines and glow draw outside the element, within `pad` CSS px.
@@ -784,6 +814,7 @@ export class SaberEffect implements Effect {
                 // Until the traced contours land, show nothing rather than the whole outline.
                 revealStart: usePayload ? start : 1,
                 revealEnd: usePayload ? end : 0,
+                segments: Math.max(1, Math.round(this.params.segments)),
             },
             target: core,
         });

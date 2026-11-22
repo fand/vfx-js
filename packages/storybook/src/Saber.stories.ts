@@ -32,6 +32,7 @@ type Args = {
     | "dynamic"
     | "start"
     | "end"
+    | "segments"
 >;
 
 const DEFAULTS = new SaberEffect().params;
@@ -61,6 +62,7 @@ export default {
         dynamic: DEFAULTS.dynamic,
         start: DEFAULTS.start,
         end: DEFAULTS.end,
+        segments: DEFAULTS.segments,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
@@ -88,6 +90,7 @@ export default {
         dynamic: { control: { type: "boolean" } },
         start: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
         end: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
+        segments: { control: { type: "range", min: 1, max: 8, step: 1 } },
     },
 } satisfies Meta<Args>;
 
