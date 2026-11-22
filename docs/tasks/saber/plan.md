@@ -43,12 +43,15 @@ Check that a render target with `persistent: false` keeps its content between fr
 
 4. **Core pass** → `core` (float, linear, full buffer size).
    - Read `d` and the normal `n` from `field`. Foot point `q = p - d * n` (continuous in `p`, in px).
-   - Early out when `abs(d) > amplitude + thickness + 2.0`.
+   - Early out per 2×2 quad when `abs(d) > amplitude * 1.2 + thickness + 4.0`, so derivatives stay valid in drawn quads.
    - For each line `i < lines` (max 4):
      - `disp = amplitude * envelope(q, t) * jag(q / scale + seed_i, t)`.
-     - `f = d - disp`. Line distance `dist = abs(f) / max(length(vec2(dFdx(f), dFdy(f))), 1e-3)`. This keeps the line width even on steep spikes.
+     - `f = d - disp`. Line distance `dist = abs(f) / min(screenGrad, slopeGrad)`. This keeps the line width even on steep spikes.
+       - `screenGrad = length(vec2(dFdx(f), dFdy(f)))`.
+       - `slopeGrad = sqrt(1 + slope^2)`, with `slope` from one more `jag` call one px along the tangent.
+       - `screenGrad` alone jumps on the medial axis and draws false lines there.
      - `core += weight_i * smoothstep(thickness * 0.5 + 0.75, thickness * 0.5 - 0.75, dist)`.
-   - `jag`: 4 octaves of 3D simplex noise (`xy` = contour point, `z` = time), lacunarity 2, gain ~0.55. Blend plain fbm with ridged fbm (`1 - abs(n)`, recentred) by `sharpness`, so 1 gives sharp V corners.
+   - `jag`: 4 octaves of 3D simplex noise (`xy` = contour point, `z` = time), lacunarity 2, gain ~0.55. Blend plain fbm with ridged fbm by `sharpness`, so 1 gives sharp V corners. The ridged term is `0.9 - 2 * abs(n)` (zero mean), and its sign flips every other octave so kinks point both ways.
    - `envelope`: low-frequency noise raised to a power, so some parts of the contour burst out and others stay calm. `burst` 0 gives envelope 1 everywhere.
    - Time: `t = time * speed`. `flicker` mixes smooth time with stepped time (`floor(t * 16) / 16` plus a hash jump per step) so the bolts snap between shapes.
    - Line 0 is the main line with full weight and a smaller amplitude (`amplitude * 0.35`). The other lines are thinner arcs with the full amplitude, their own seed and envelope.
@@ -140,5 +143,5 @@ Tune the defaults by eye in Storybook; the values above are starting points.
 ## Risks
 
 - The line breaks where the displacement crosses the medial axis (thin strokes, tight gaps). This reads as sparks. If it looks wrong, clamp `disp` to a share of the local feature size.
-- `dFdx/dFdy` on `f` spikes on the medial axis. The early out and the `max(..., 1e-3)` guard keep it from making bright pixels; check concave corners.
+- With a large `amplitude`, spikes from two edges cross in concave corners and make a small hatch patch. Clamping `disp` to the local feature size is the likely fix.
 - JFA at full resolution costs ~12 passes. It is cached, so only `dynamic` pays per frame. If video is too slow, build the field at half size.

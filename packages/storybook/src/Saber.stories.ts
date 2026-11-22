@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import { SaberEffect } from "@vfx-js/effects";
+import { SaberEffect, type SaberParams } from "@vfx-js/effects";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
 import { attachSaberPane, initVFX } from "./utils";
@@ -7,14 +7,24 @@ import { attachSaberPane, initVFX } from "./utils";
 type Args = {
     /** VFX pixel ratio. 0 uses the device pixel ratio. */
     pixelRatio: number;
-};
+} & Pick<SaberParams, "amplitude" | "scale" | "sharpness">;
+
+const DEFAULTS = new SaberEffect().params;
 
 export default {
     title: "Effect/Saber",
     parameters: { layout: "fullscreen" },
-    args: { pixelRatio: 0 },
+    args: {
+        pixelRatio: 0,
+        amplitude: DEFAULTS.amplitude,
+        scale: DEFAULTS.scale,
+        sharpness: DEFAULTS.sharpness,
+    },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
+        amplitude: { control: { type: "range", min: 0, max: 60, step: 0.5 } },
+        scale: { control: { type: "range", min: 5, max: 300, step: 1 } },
+        sharpness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
     },
 } satisfies Meta<Args>;
 
@@ -22,7 +32,8 @@ async function mount(el: HTMLElement, args: Args): Promise<void> {
     const vfx = initVFX(
         args.pixelRatio > 0 ? { pixelRatio: args.pixelRatio } : undefined,
     );
-    const effect = new SaberEffect();
+    const { amplitude, scale, sharpness } = args;
+    const effect = new SaberEffect({ amplitude, scale, sharpness });
     await vfx.add(el, { effect });
     attachSaberPane("Saber", effect);
 }

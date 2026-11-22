@@ -4,6 +4,7 @@ import type {
     EffectDims,
     EffectRenderTarget,
 } from "@vfx-js/core";
+import { SNOISE3D } from "./_noise.js";
 import { padOutputRect } from "./_pad.js";
 
 // Edge value of the source, zero outside the valid src rect.
@@ -124,32 +125,83 @@ void main() {
 }
 `;
 
-// Temporary debug view of the signed distance.
-// Orange inside, blue outside, a line every 6 CSS px, white contour.
-const FRAG_DEBUG = `#version 300 es
+// Jagged noise along the contour.
+// Blends plain fbm with ridged fbm, so sharpness 1 gives sharp V corners.
+const GLSL_JAG = `
+${SNOISE3D}
+
+uniform float sharpness;
+
+float jag(vec2 x, float t) {
+    float plain = 0.0;
+    float ridged = 0.0;
+    float amp = 1.0;
+    float norm = 0.0;
+    for (int i = 0; i < 4; i++) {
+        float n = snoise(vec3(x, t * (1.0 + float(i) * 0.5) + float(i) * 7.31));
+        plain += n * amp;
+        // Recentred ridges, flipped every other octave so kinks point both ways.
+        ridged += (0.9 - 2.0 * abs(n)) * (i % 2 == 0 ? amp : -amp);
+        norm += amp;
+        x = x * 2.0 + vec2(13.7, -5.3);
+        amp *= 0.55;
+    }
+    return mix(plain, ridged, sharpness) / norm;
+}
+`;
+
+// Core line: the contour pushed along its normal by the jag noise.
+// Writes one HDR intensity channel.
+const FRAG_CORE = `#version 300 es
 precision highp float;
-in vec2 uv;
 out vec4 outColor;
 uniform sampler2D field;
-uniform float pixelRatio;
+uniform float amplitude;
+uniform float scale;
+uniform float thickness;
+uniform float time;
+${GLSL_JAG}
 
 void main() {
-    vec4 f = texture(field, uv);
-    if (f.a < 0.5) {
-        outColor = vec4(0.0);
+    // Decide per 2x2 quad, so derivatives stay valid in drawn quads.
+    vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
+    if (quad.a < 0.5 || abs(quad.r) > amplitude * 1.2 + thickness + 4.0) {
+        outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    float d = f.r / pixelRatio;
-    float pxPerUnit = max(fwidth(d), 1e-4);
-    vec3 col = d < 0.0 ? vec3(1.0, 0.55, 0.2) : vec3(0.25, 0.55, 1.0);
-    col *= 0.25 + 0.55 * exp(-abs(d) / 80.0);
-    col *= mod(floor(d / 6.0), 2.0) == 0.0 ? 1.0 : 0.85;
-    float band = abs(fract(d / 6.0 + 0.5) - 0.5) * 6.0;
-    float iso = 1.0 - smoothstep(0.5, 1.5, band / pxPerUnit);
-    col = mix(col, col * 2.0 + 0.1, iso * 0.6);
-    float zero = 1.0 - smoothstep(0.75, 1.75, abs(d) / pxPerUnit);
-    col = mix(col, vec3(1.0), zero);
-    outColor = vec4(col, 1.0);
+    vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
+    float d = f.r;
+    vec2 q = gl_FragCoord.xy - d * f.gb;
+    float jagHere = jag(q / scale, time);
+    float g = d - amplitude * jagHere;
+    // Slope of the line along the contour, from one step along the tangent.
+    vec2 tangent = vec2(-f.b, f.g);
+    float slope = amplitude * (jag((q + tangent) / scale, time) - jagHere);
+    float slopeGrad = sqrt(1.0 + slope * slope);
+    // Screen derivatives jump where q flips sides across the medial axis.
+    // Take the smaller estimate so the jump does not draw a false line.
+    float screenGrad = length(vec2(dFdx(g), dFdy(g)));
+    float dist = abs(g) / max(min(screenGrad, slopeGrad), 1e-3);
+    float halfWidth = thickness * 0.5;
+    float line = 1.0 - smoothstep(halfWidth - 0.75, halfWidth + 0.75, dist);
+    outColor = vec4(vec3(line), 1.0);
+}
+`;
+
+// Temporary view: the core line over the dimmed source.
+const FRAG_VIEW = `#version 300 es
+precision highp float;
+in vec2 uv;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform sampler2D core;
+
+void main() {
+    vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * inside.x * inside.y;
+    vec3 light = texture(core, uv).rgb;
+    outColor = vec4(min(base.rgb * 0.3 + light, vec3(1.0)), 1.0);
 }
 `;
 
@@ -226,6 +278,7 @@ export class SaberEffect implements Effect {
     #seedA: EffectRenderTarget | null = null;
     #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
+    #core: EffectRenderTarget | null = null;
     #dirty = true;
     #builtW = 0;
     #builtH = 0;
@@ -252,12 +305,14 @@ export class SaberEffect implements Effect {
         // The host only clears the stage output.
         // So this keeps the field between frames without `persistent`.
         this.#field = ctx.createRenderTarget({ float: true });
+        this.#core = ctx.createRenderTarget({ float: true });
         this.#dirty = true;
     }
 
     render(ctx: EffectContext): void {
         const field = this.#field;
-        if (!field) {
+        const core = this.#core;
+        if (!field || !core) {
             return;
         }
         const { edge, edgeThreshold, dynamic } = this.params;
@@ -272,9 +327,23 @@ export class SaberEffect implements Effect {
             this.#buildField(ctx);
         }
 
+        const { pixelRatio } = ctx.dims;
+        const { amplitude, scale, sharpness, speed, thickness } = this.params;
         ctx.draw({
-            frag: FRAG_DEBUG,
-            uniforms: { field, pixelRatio: ctx.dims.pixelRatio },
+            frag: FRAG_CORE,
+            uniforms: {
+                field,
+                amplitude: amplitude * pixelRatio,
+                scale: Math.max(scale, 1e-3) * pixelRatio,
+                thickness: thickness * pixelRatio,
+                sharpness,
+                time: ctx.time * speed,
+            },
+            target: core,
+        });
+        ctx.draw({
+            frag: FRAG_VIEW,
+            uniforms: { src: ctx.src, core },
             target: ctx.target,
         });
     }
@@ -287,6 +356,7 @@ export class SaberEffect implements Effect {
         this.#seedA = null;
         this.#seedB = null;
         this.#field = null;
+        this.#core = null;
         this.#dirty = true;
         this.#builtW = 0;
         this.#builtH = 0;
