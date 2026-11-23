@@ -232,8 +232,9 @@ export type HoloSceneParams = {
     pointer: HoloPointer | null;
     /**
      * How far the pointer tilts the card, in degrees, 5–35: `motion.tiltRange`. It is reached at the element's edge
-     * and applies only while the pointer is over the element, unlike `tiltRange` in `GlassEffect` and
-     * `SwirlParticleEffect` (reached half a viewport from the element's centre, wherever the pointer is on the page).
+     * and applies only while the pointer is over the element, unlike the tilt of `GlassEffect` and
+     * `SwirlParticleEffect` (`pointer: "tilt"`: 20° × `pointerStrength`, reached half a viewport from the element's
+     * centre, wherever the pointer is on the page).
      */
     tiltRange: number | null;
     /** Slow automatic tilt while the pointer is away: `motion.wobble`. */

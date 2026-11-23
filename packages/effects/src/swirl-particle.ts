@@ -257,11 +257,15 @@ export type SwirlParticleParams = OrbitCameraParams & {
      *
      * - `"none"` (default): they don't.
      * - `"repel"`: particles near the pointer on screen (within
-     *   {@link repelRadius}) are pushed away from it, opening a hole the
-     *   flow goes around. The hole stays while the pointer rests and
-     *   refills once it leaves the page.
+     *   {@link pointerRadius}) are pushed away from it, opening a hole the
+     *   flow goes around. {@link OrbitCameraParams.pointerStrength |
+     *   pointerStrength} scales the push: at 1 the hole opens to about
+     *   `pointerRadius` at the default `speed`. The hole stays while the
+     *   pointer rests and refills once it leaves the page.
      * - `"tilt"`: hover parallax. The shape turns to face the pointer,
-     *   up to {@link OrbitCameraParams.tiltRange | tiltRange} degrees.
+     *   up to 20° × {@link OrbitCameraParams.pointerStrength |
+     *   pointerStrength} (capped at 90°), reached when the pointer is
+     *   half a viewport away from the element's centre.
      *
      * Both ease in and out. Ignored by still frames. While not `"none"`,
      * it listens for pointer events on `window` to tell when the pointer
@@ -269,18 +273,13 @@ export type SwirlParticleParams = OrbitCameraParams & {
      */
     pointer: SwirlParticlePointer;
     /** Radius of the `pointer: "repel"` hole, in CSS px on screen. */
-    repelRadius: number;
-    /**
-     * Strength of the `pointer: "repel"` push. At 1 the hole opens to
-     * about {@link repelRadius} at the default `speed`.
-     */
-    repelStrength: number;
+    pointerRadius: number;
     /**
      * Extra pad around the element in CSS px for the particles, bloom and
      * shadow to draw into, or `"fullscreen"` to draw over the whole
      * canvas. The default, 200, holds the wisps and the drop shadow of
      * the default look on elements up to about 1000 px wide. A smaller
-     * pad, a larger element, `zoom`, a large `tiltRange`, a long
+     * pad, a larger element, `zoom`, a large tilt, a long
      * `shadowDistance` or `cameraOrigin: "viewport"` on an element away
      * from the viewport's centre clip them.
      */
@@ -339,16 +338,15 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     shadowColor: "#1c2233",
     yaw: 0,
     pitch: 0,
-    orbit: 23,
+    orbitAnimation: 23,
     orbitSpeed: 1,
     fov: 35,
     zoom: 1.0,
     drag: false,
     cameraOrigin: "element",
-    tiltRange: 20,
     pointer: "none",
-    repelRadius: 120,
-    repelStrength: 1,
+    pointerRadius: 120,
+    pointerStrength: 1,
     pad: 200,
     antialias: false,
 };
@@ -408,7 +406,7 @@ const REPEL_FADE = 0.15;
 // Time constant of the smoothed pointer that "repel" pushes from, seconds.
 const REPEL_POS_TAU = 0.06;
 // Push speed at the pointer, in radii (at the particle's depth) per
-// second, at repelStrength 1.
+// second, at pointerStrength 1.
 const REPEL_K = 4;
 
 // ---------------------------------------------------------------------------
@@ -1285,8 +1283,7 @@ const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
     shadowSoftness: [0, 500],
     shadowDistance: [0, 100],
     ...ORBIT_CAMERA_RANGE,
-    repelRadius: [0, 10000],
-    repelStrength: [0, 100],
+    pointerRadius: [0, 10000],
 };
 const NUM_KEYS = Object.keys(NUM_RANGE) as NumKey[];
 const MAX_PAD = 10000;
@@ -1788,7 +1785,7 @@ export class SwirlParticleEffect implements Effect {
                 keyChanged
             ) {
                 // Capped like the sim, so a stall doesn't teleport the
-                // particles; the camera wobble and fireflies follow the
+                // particles; the orbit animation and fireflies follow the
                 // sim time.
                 const dt = clampDt(ctx.deltaTime) || 0;
                 this.#updateRepel(ctx, dt);
@@ -2279,12 +2276,12 @@ export class SwirlParticleEffect implements Effect {
         const cam = this.#cam ?? this.#updateCamera(ctx, 0);
         return {
             repelForce:
-                r.repelRadius > 0 ? this.#repelAmount * r.repelStrength : 0,
+                r.pointerRadius > 0 ? this.#repelAmount * r.pointerStrength : 0,
             repelPx: [
                 this.#repelPos[0] - cam.origin[0],
                 this.#repelPos[1] - cam.origin[1],
             ],
-            repelRadiusPx: Math.max(r.repelRadius * ctx.pixelRatio, 1),
+            repelRadiusPx: Math.max(r.pointerRadius * ctx.pixelRatio, 1),
             viewRot: cam.viewRot,
             camDist: cam.camDist,
             focalPx: cam.focalPx,

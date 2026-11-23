@@ -7,6 +7,8 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
     resolveOrbitCamera,
+    TILT_DEG,
+    TILT_MAX_DEG,
     TILT_TAU,
     viewMatrix,
 } from "./_orbit-camera.js";
@@ -16,13 +18,13 @@ const DEG = Math.PI / 180;
 const PARAMS: OrbitCameraParams = {
     yaw: 0,
     pitch: 0,
-    orbit: 0,
+    orbitAnimation: 0,
     orbitSpeed: 1,
     fov: 35,
     zoom: 1,
     drag: false,
     cameraOrigin: "element",
-    tiltRange: 20,
+    pointerStrength: 1,
 };
 
 // The matrix as it was built before the camera moved here, radians.
@@ -121,7 +123,13 @@ describe("viewMatrix", () => {
 
 describe("OrbitCamera, element origin", () => {
     test("reproduces the old camera", () => {
-        const p = { ...PARAMS, yaw: 10, pitch: -5, orbit: 23, fov: 35 };
+        const p = {
+            ...PARAMS,
+            yaw: 10,
+            pitch: -5,
+            orbitAnimation: 23,
+            fov: 35,
+        };
         const t = 3.7;
         const cam = new OrbitCamera(PARAMS).update(p, input({ time: t }));
         // As SwirlParticleEffect computed it.
@@ -138,15 +146,24 @@ describe("OrbitCamera, element origin", () => {
         expect(cam.origin).toEqual([-50, -50]);
     });
 
-    test("orbitSpeed scales the wobble's clock; 0 stops it", () => {
+    test("orbitSpeed scales the orbit animation's clock; 0 stops it", () => {
         const c = new OrbitCamera(PARAMS);
-        const p = { ...PARAMS, orbit: 20 };
+        const p = { ...PARAMS, orbitAnimation: 20 };
         const a = c.update({ ...p, orbitSpeed: 2 }, input({ time: 1.5 }));
         const b = c.update({ ...p, orbitSpeed: 1 }, input({ time: 3 }));
         expectClose(a.viewRot, b.viewRot, 12);
         const still = c.update({ ...p, orbitSpeed: 0 }, input({ time: 9 }));
         const start = c.update(p, input({ time: 0 }));
         expect(still.viewRot).toEqual(start.viewRot);
+    });
+
+    test("orbitAnimation 0 holds the camera still", () => {
+        const c = new OrbitCamera(PARAMS);
+        const p = { ...PARAMS, yaw: 12, pitch: 5, orbitAnimation: 0 };
+        const a = c.update(p, input({ time: 0 }));
+        const b = c.update(p, input({ time: 17.3 }));
+        expect(b.viewRot).toEqual(a.viewRot);
+        expect(a.viewRot).toEqual(viewMatrix(12 * DEG, 5 * DEG));
     });
 
     test("zoom scales the px per unit; fov sets the distance", () => {
@@ -167,12 +184,12 @@ describe("OrbitCamera, element origin", () => {
                 yaw: Number.NaN,
                 zoom: -1,
                 cameraOrigin: "nope" as "element",
-                tiltRange: 400,
+                pointerStrength: 400,
             },
             defaults,
         );
         expect(r.fov).toBe(150);
-        expect(r.tiltRange).toBe(90);
+        expect(r.pointerStrength).toBe(100);
         expect(r.yaw).toBe(7);
         expect(r.zoom).toBe(0.01);
         expect(r.cameraOrigin).toBe("element");
@@ -352,9 +369,9 @@ describe("OrbitCamera, pointer", () => {
         );
         c.update(PARAMS, input({ live: true, trackPointer: true }));
         expect(w.added).toHaveLength(3);
-        // A tilt of 0° is off.
+        // pointerStrength 0 turns the tilt off.
         c.update(
-            { ...PARAMS, tiltRange: 0 },
+            { ...PARAMS, pointerStrength: 0 },
             input({ live: true, tilt: true }),
         );
         expect(w.added).toEqual([]);
@@ -452,12 +469,23 @@ describe("OrbitCamera, pointer", () => {
         c.update(PARAMS, at(100, { mouse: [200, 100 + 400] }));
         expect(c.offsets.tiltPitch).toBeCloseTo(-20 * DEG, 12);
         expect(c.offsets.tiltYaw).toBeCloseTo(0, 12);
-        // tiltRange is the largest angle.
+        // 20° × pointerStrength is the largest angle, capped at 90°.
+        expect(TILT_DEG).toBe(20);
         c.update(
-            { ...PARAMS, tiltRange: 8 },
+            { ...PARAMS, pointerStrength: 0.4 },
             at(100, { mouse: [200, 100 + 400] }),
         );
         expect(c.offsets.tiltPitch).toBeCloseTo(-8 * DEG, 12);
+        c.update(
+            { ...PARAMS, pointerStrength: 2 },
+            at(100, { mouse: [200, 100 + 400] }),
+        );
+        expect(c.offsets.tiltPitch).toBeCloseTo(-40 * DEG, 12);
+        c.update(
+            { ...PARAMS, pointerStrength: 10 },
+            at(100, { mouse: [200, 100 + 400] }),
+        );
+        expect(c.offsets.tiltPitch).toBeCloseTo(-TILT_MAX_DEG * DEG, 12);
         // Not live (a still frame): eases to 0.
         c.update(PARAMS, at(100, { live: false }));
         expect(c.offsets.tiltPitch).toBeCloseTo(0, 12);

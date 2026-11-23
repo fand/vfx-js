@@ -958,7 +958,7 @@ export function attachSwirlParticlePane(
     const camera = pane.addFolder({ title: "Camera" });
     bind(camera, "yaw", range(-180, 180, 0.5));
     bind(camera, "pitch", range(-85, 85, 0.5));
-    bind(camera, "orbit", range(0, 90, 0.5));
+    bind(camera, "orbitAnimation", range(0, 90, 0.5));
     bind(camera, "orbitSpeed", range(0, 10, 0.1));
     bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
@@ -969,9 +969,8 @@ export function attachSwirlParticlePane(
     bind(pointer, "pointer", {
         options: { none: "none", repel: "repel", tilt: "tilt" },
     });
-    bind(pointer, "repelRadius", range(10, 400, 1));
-    bind(pointer, "repelStrength", range(0, 3, 0.01));
-    bind(pointer, "tiltRange", range(0, 90, 0.5));
+    bind(pointer, "pointerRadius", range(10, 400, 1));
+    bind(pointer, "pointerStrength", range(0, 4, 0.01));
 
     // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
     const padState = {
@@ -1155,14 +1154,14 @@ export function attachGlassPane(
     const view = pane.addFolder({ title: "View" });
     bind(view, "yaw", range(-180, 180, 0.5));
     bind(view, "pitch", range(-85, 85, 0.5));
-    bind(view, "orbit", range(0, 90, 0.5));
+    bind(view, "orbitAnimation", range(0, 90, 0.5));
     bind(view, "orbitSpeed", range(0, 10, 0.1));
     bind(view, "fov", range(5, 90, 1));
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
     bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
     bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
-    bind(view, "tiltRange", range(0, 90, 0.5));
+    bind(view, "pointerStrength", range(0, 4, 0.01));
     bind(view, "resolution", range(0.25, 2, 0.05));
     bind(view, "antialias");
     bind(view, "debug", {

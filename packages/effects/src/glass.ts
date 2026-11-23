@@ -250,7 +250,9 @@ export type GlassParams = OrbitCameraParams & {
      *
      * - `"none"` (default): it doesn't.
      * - `"tilt"`: hover parallax. The shape turns to face the pointer,
-     *   up to {@link OrbitCameraParams.tiltRange | tiltRange} degrees.
+     *   up to 20° × {@link OrbitCameraParams.pointerStrength | pointerStrength}
+     *   (capped at 90°), reached when the pointer is half a viewport
+     *   away from the element's centre.
      *
      * Ignored by still frames. While `"tilt"`, it listens for pointer
      * events on `window` to tell when the pointer leaves the page.
@@ -307,14 +309,14 @@ const DEFAULT_PARAMS: GlassParams = {
     lightSoftness: 0.15,
     yaw: 29,
     pitch: 14,
-    orbit: 20,
+    orbitAnimation: 20,
     orbitSpeed: 3.3,
     fov: 30,
     zoom: 0.7,
     drag: false,
     cameraOrigin: "element",
-    tiltRange: 20,
     pointer: "none",
+    pointerStrength: 1,
     resolution: 1,
     antialias: true,
     pad: "fullscreen",
@@ -1340,11 +1342,11 @@ function clampInt(v: number, lo: number, hi: number, fallback: number): number {
  * the output is opaque where the backdrop is seen and premultiplied over
  * transparency elsewhere.
  *
- * The camera ({@link OrbitCameraParams}: `yaw`, `pitch`, `orbit`, `fov`,
- * …) works as in {@link SwirlParticleEffect}, with angles in degrees.
- * Its defaults here: the glass turned by `yaw` 29 and `pitch` 14, a
- * faster wobble (`orbitSpeed` 3.3), and `zoom` 0.7, so the glass is a
- * little smaller than the element. Set `drag: true` to orbit it with
+ * The camera ({@link OrbitCameraParams}: `yaw`, `pitch`,
+ * `orbitAnimation`, `fov`, …) works as in {@link SwirlParticleEffect},
+ * with angles in degrees. Its defaults here: the glass turned by `yaw` 29
+ * and `pitch` 14, a faster orbit animation (`orbitSpeed` 3.3), and
+ * `zoom` 0.7, so the glass is a little smaller than the element. Set `drag: true` to orbit it with
  * pointer drags that start on the element, and `pointer: "tilt"` to turn
  * it towards the pointer. The default
  * `pad: "fullscreen"` leaves room for an off-centre element to lean out

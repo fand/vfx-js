@@ -47,7 +47,7 @@ const BACKDROP = [
     "linear-gradient(to bottom, #5f6b80, #707d90)",
 ].join(", ");
 
-// Base setup of the stories: front-on (the default `orbit` wobble still
+// Base setup of the stories: front-on (the default `orbitAnimation` still
 // turns it a little), drag to orbit, the pointer repels the particles, and
 // a drop shadow on the backdrop. The demo draws more particles than the
 // default, over the whole canvas.
@@ -221,8 +221,11 @@ export const heading: StoryObj<Args> = {
 
         const h1 = document.createElement("h1");
         h1.textContent = "Swirl";
+        // `fit-content`: the box hugs the text, left in the column, so its
+        // centre is off the viewport's and `cameraOrigin` "element" and
+        // "viewport" differ. A block-wide box would centre it.
         h1.style.cssText =
-            "margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
+            "width: fit-content; margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
 
         article.append(kicker, h1);
         for (let i = 0; i < 3; i++) {

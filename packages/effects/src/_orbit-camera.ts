@@ -1,7 +1,7 @@
 // The orbit camera shared by the 3D shape effects (GlassEffect,
 // SwirlParticleEffect): the shape's rotation from the camera params, the
-// wobble, pointer drags and the hover tilt, and the perspective that maps
-// the shape's z = 0 plane onto the element's rect.
+// orbit animation, pointer drags and the hover tilt, and the perspective
+// that maps the shape's z = 0 plane onto the element's rect.
 //
 // Inputs in, camera out: `OrbitCamera.update` takes the params and this
 // frame's inputs and returns an `OrbitCameraView`; it keeps only the
@@ -39,15 +39,16 @@ export type OrbitCameraParams = {
      */
     pitch: number;
     /**
-     * Amplitude of the slow camera wobble, in degrees of yaw (the pitch
-     * wobbles 0.3 times as far). 0 keeps the camera still (pointer drags
-     * still orbit it when {@link drag} is on).
+     * Amplitude of the orbit animation, a slow back-and-forth swing of
+     * the camera, in degrees of yaw (the pitch swings 0.3 times as far).
+     * 0 keeps the camera still (pointer drags still orbit it when
+     * {@link drag} is on).
      */
-    orbit: number;
+    orbitAnimation: number;
     /**
-     * Speed of the {@link orbit} wobble, as a multiple of the base speed:
-     * at 1, a yaw swing takes about 48 seconds. 0 stops the wobble where
-     * it is at the start.
+     * Speed of the {@link orbitAnimation}, as a multiple of the base
+     * speed: at 1, a yaw swing takes about 48 seconds. 0 stops the
+     * animation where it is at the start.
      */
     orbitSpeed: number;
     /**
@@ -80,29 +81,32 @@ export type OrbitCameraParams = {
      *   scrolls. Its front draws further out from the centre than the
      *   element, so a small `pad` can clip it.
      *
-     * The rotations ({@link yaw}, {@link pitch}, the wobble, drags, the
-     * hover tilt) turn the shape about its own centre in both cases.
+     * The rotations ({@link yaw}, {@link pitch}, the
+     * {@link orbitAnimation}, drags, the hover tilt) turn the shape about
+     * its own centre in both cases.
      */
     cameraOrigin: "element" | "viewport";
     /**
-     * Largest hover tilt in degrees, 0 to 90, used only while the
-     * effect's `pointer` is `"tilt"`: the shape turns to face the
-     * pointer, reaching this angle when the pointer is half a viewport
-     * away from the element's centre, and eases back to the rest pose
-     * once the pointer leaves the page. Adds to {@link yaw} /
-     * {@link pitch}, the wobble and drags.
+     * Strength of the pointer interaction, 0 to 100 (default 1). With
+     * the effect's `pointer` at `"tilt"`, the shape turns to face the
+     * pointer by up to 20° × `pointerStrength` (capped at 90°), reached
+     * when the pointer is half a viewport away from the element's
+     * centre, and eases back to the rest pose once the pointer leaves
+     * the page; 0 turns it off. The tilt adds to {@link yaw} /
+     * {@link pitch}, the {@link orbitAnimation} and drags. Other
+     * `pointer` modes say what it does for them.
      */
-    tiltRange: number;
+    pointerStrength: number;
 };
 
 type NumKey =
     | "yaw"
     | "pitch"
-    | "orbit"
+    | "orbitAnimation"
     | "orbitSpeed"
     | "fov"
     | "zoom"
-    | "tiltRange";
+    | "pointerStrength";
 
 /**
  * [min, max] of each numeric camera param. A finite value is clamped
@@ -113,26 +117,29 @@ export const ORBIT_CAMERA_RANGE: Readonly<
 > = {
     yaw: [-36000, 36000],
     pitch: [-36000, 36000],
-    orbit: [-720, 720],
+    orbitAnimation: [-720, 720],
     orbitSpeed: [0, 100],
     fov: [1, 150],
     zoom: [0.01, 100],
-    tiltRange: [0, 90],
+    pointerStrength: [0, 100],
 };
 const NUM_KEYS = Object.keys(ORBIT_CAMERA_RANGE) as NumKey[];
 
-// The wobble at orbitSpeed 1: angular speeds of the yaw and pitch swings
-// (rad/s of the sine's argument), and the pitch's phase.
-export const WOBBLE_YAW_SPEED = 0.13;
-export const WOBBLE_PITCH_SPEED = 0.09;
-const WOBBLE_PITCH_PHASE = 1.3;
-// Pitch wobble relative to the yaw wobble.
-const PITCH_WOBBLE = 0.3;
+// The orbit animation at orbitSpeed 1: angular speeds of the yaw and
+// pitch swings (rad/s of the sine's argument), and the pitch's phase.
+export const ORBIT_YAW_SPEED = 0.13;
+export const ORBIT_PITCH_SPEED = 0.09;
+const ORBIT_PITCH_PHASE = 1.3;
+// Pitch swing relative to the yaw swing.
+const ORBIT_PITCH_RATIO = 0.3;
 // Pointer drags: radians per CSS px, and the pitch they can reach.
 export const DRAG_RAD_PER_PX = 0.006;
 export const DRAG_PITCH_MAX = 1.2;
 // Time constant of the hover tilt's easing, seconds.
 export const TILT_TAU = 0.25;
+// Largest hover tilt at pointerStrength 1, degrees, and the cap.
+export const TILT_DEG = 20;
+export const TILT_MAX_DEG = 90;
 // Degrees to radians: the camera angles in params are degrees.
 const DEG = Math.PI / 180;
 
@@ -160,7 +167,7 @@ export function resolveOrbitCamera(
 
 /** What the camera needs from a frame. */
 export type OrbitCameraInput = {
-    /** Clock of the wobble, in seconds. */
+    /** Clock of the orbit animation, in seconds. */
     time: number;
     /** Seconds since the last update, for easing the tilt. 0 holds it. */
     dt: number;
@@ -183,7 +190,7 @@ export type OrbitCameraInput = {
     live: boolean;
     /**
      * Whether the hover tilt is on (the effect's `pointer` is `"tilt"`).
-     * Its angle is the params' `tiltRange`.
+     * Its largest angle is 20° × the params' `pointerStrength`.
      */
     tilt: boolean;
     /**
@@ -324,7 +331,10 @@ export class OrbitCamera {
         this.#elementPx[0] = ew;
         this.#elementPx[1] = eh;
 
-        const tilt = input.tilt ? p.tiltRange : 0;
+        // Largest tilt, degrees.
+        const tilt = input.tilt
+            ? Math.min(TILT_DEG * p.pointerStrength, TILT_MAX_DEG)
+            : 0;
         const live = input.live && typeof window !== "undefined";
         this.#syncListeners(
             live && p.drag,
@@ -351,21 +361,20 @@ export class OrbitCamera {
         this.#tiltYaw += (yawT - this.#tiltYaw) * k;
         this.#tiltPitch += (pitchT - this.#tiltPitch) * k;
 
-        // Base angles and the wobble (params, degrees), drag and tilt
-        // (radians).
+        // Base angles and the orbit animation (params, degrees), drag and
+        // tilt (radians).
         const t = input.time;
         const s = p.orbitSpeed;
+        const amp = p.orbitAnimation;
         const yaw =
-            (p.yaw + p.orbit * Math.sin(t * (WOBBLE_YAW_SPEED * s))) * DEG +
+            (p.yaw + amp * Math.sin(t * (ORBIT_YAW_SPEED * s))) * DEG +
             this.#dragYaw +
             this.#tiltYaw;
         const pitch =
             (p.pitch +
-                p.orbit *
-                    PITCH_WOBBLE *
-                    Math.sin(
-                        t * (WOBBLE_PITCH_SPEED * s) + WOBBLE_PITCH_PHASE,
-                    )) *
+                amp *
+                    ORBIT_PITCH_RATIO *
+                    Math.sin(t * (ORBIT_PITCH_SPEED * s) + ORBIT_PITCH_PHASE)) *
                 DEG +
             this.#dragPitch +
             this.#tiltPitch;
