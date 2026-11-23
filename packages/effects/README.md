@@ -44,6 +44,7 @@ await vfx.add(img, {
 | ------------------------ | --------------------------------------------------------------- |
 | `AsciiEffect`            | ASCII / glyph mosaic from a dark→light character ramp           |
 | `BloomEffect`            | COD:AW-style bloom pyramid with soft-knee threshold             |
+| `BubbleEffect`           | Soap bubbles with thin-film colour filling the 3D silhouette    |
 | `FluidEffect`            | Stable-Fluids advection driven by pointer events                |
 | `GlassEffect`            | Dispersive glass in the shape of the extruded 3D silhouette     |
 | `HalftoneEffect`         | RGB / CMYK halftone screen with configurable ink presets        |

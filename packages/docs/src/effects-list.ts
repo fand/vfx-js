@@ -3,6 +3,7 @@ import {
     AsciiEffect,
     BadJpegEffect,
     BloomEffect,
+    BubbleEffect,
     ChromaticEffect,
     ColoredEdgesEffect,
     DatamoshEffect,
@@ -146,6 +147,15 @@ export const effectDemos: EffectDemo[] = [
         text: "Bloom with a soft threshold. Draws outside the element.",
         media: "jellyfish",
         create: () => new BloomEffect({ threshold: 0.2, intensity: 4 }),
+    },
+    {
+        name: "BubbleEffect",
+        text: "Soap bubbles filling the silhouette.",
+        media: "logo",
+        // A small pad keeps the tile cheap; packed bubbles fill thin
+        // strokes best.
+        create: () =>
+            new BubbleEffect({ pad: 40, zoom: 0.9, packing: "packed" }),
     },
     {
         name: "ChromaticEffect",
