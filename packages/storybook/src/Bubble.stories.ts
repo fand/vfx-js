@@ -186,10 +186,24 @@ export default {
     },
 } satisfies Meta<Args>;
 
-// The VFX-JS logo as a cluster of soap bubbles: overlapping spheres on a
-// lattice, cut by flat shared walls where they meet.
+// The VFX-JS logo as a cluster of soap bubbles: big bubbles on a
+// jittered lattice, smaller ones filling the gaps between them and along
+// the outline, cut by flat shared walls where they meet.
 export const logo: StoryObj<Args> = {
     args: { source: "VFX-JS logo" },
+};
+
+// The same big bubbles without the fill (minSize 1), for comparison.
+export const noFill: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", params: { minSize: 1 } },
+};
+
+// Large cells: few big bubbles, the fill does the rest.
+export const bigCells: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { cellSize: 0.16, depth: 0.18, minSize: 0.18 },
+    },
 };
 
 // The same with radii that vary more.
@@ -211,8 +225,8 @@ export const htmlText: StoryObj<Args> = {
     args: {
         source: "HTML text",
         params: {
-            cellSize: 0.045,
-            depth: 0.12,
+            cellSize: 0.08,
+            depth: 0.14,
             roundness: 0.3,
             yaw: 0.2,
             pitch: 0.12,
@@ -233,14 +247,14 @@ export const image: StoryObj<Args> = {
             backdropColors: "pastel",
             backdropSoftness: 1,
             backdropScale: 0.5,
-            cellSize: 0.1,
+            cellSize: 0.14,
             depth: 0.25,
         },
     },
 };
 
 // A close-up of large bubbles on a pale page: a bubble cluster, flat
-// walls where the bubbles meet.
+// walls where the bubbles meet, small bubbles between the big ones.
 export const closeUp: StoryObj<Args> = {
     args: {
         source: "cloud",
@@ -250,6 +264,7 @@ export const closeUp: StoryObj<Args> = {
             depth: 0.4,
             roundness: 0.5,
             cellSizeRandomness: 0.3,
+            minSize: 0.3,
             iridescence: 0.2,
             tint: "#3d5fc4",
             tintStrength: 0.6,

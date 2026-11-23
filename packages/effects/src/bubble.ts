@@ -4,19 +4,21 @@
 // 1. The silhouette is read back from the element (`ctx.src` alpha) and
 //    turned into a 2D signed distance field; the 3D volume is its
 //    extrusion (see `_silhouette.ts`).
-// 2. Each cell of a jittered lattice inside the volume holds a sphere,
-//    sized by `cellSize`, `roundness` and `cellSizeRandomness`. Where
-//    spheres overlap, they are cut by their radical plane and share one
-//    flat film there (a power diagram); where a sphere is exposed, its
-//    own round surface is the film.
+// 2. The bubbles are placed on the CPU (`_bubble-fill.ts`): a sphere per
+//    cell of a jittered lattice inside the volume, sized by `cellSize`,
+//    `roundness` and `cellSizeRandomness`, then smaller spheres in the
+//    gaps left between them and along the outline, down to `minSize`.
+//    Where spheres overlap, they are cut by their radical plane and share
+//    one flat film there (a power diagram); where a sphere is exposed,
+//    its own round surface is the film.
 // 3. A soap film is thin, so it does not bend light: each camera ray is
 //    straight. Along it, the power of every sphere is t² + b t + k, and
 //    t² is the same for all of them, so the cell that owns a point is the
 //    lower envelope of the lines b t + k. The films are found exactly,
 //    with no marching inside the foam (see `_sphere-foam.ts`, which
 //    mirrors the solver in TypeScript, and `sphereSegment` below). The
-//    ray walks the lattice with a window of the 27 seeds round it, and
-//    loads only the 9 that come in at each step.
+//    ray walks a uniform grid over the spheres; each grid cell lists
+//    every sphere that can reach into it.
 // 4. A film's colour is thin-film interference: a LUT of reflectance by
 //    thickness and angle, baked once from the CIE colour matching
 //    functions (`_thin-film.ts`). It reflects the same backdrop and box
@@ -29,6 +31,16 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import {
+    BUBBLE_LIST_MAX,
+    BUBBLE_TEX_W,
+    type BubbleFill,
+    buildSphereGrid,
+    type FillOptions,
+    JITTER_MAX,
+    placeBubbles,
+    type SphereGrid,
+} from "./_bubble-fill.js";
 import { captureContent } from "./_capture.js";
 import { padOutputRect } from "./_pad.js";
 import {
@@ -64,44 +76,64 @@ import {
  */
 export type BubbleDebugView = "off" | "cost" | "layers" | "cells";
 
+/**
+ * Params of {@link BubbleEffect}. All are read every frame. The
+ * placement params (`depth`, `cellSize`, `cellSizeRandomness`,
+ * `roundness`, `jitter`, `seed`, `skin`, `minSize`) place the bubbles
+ * again on the CPU when they change, which takes a few to a few tens of
+ * milliseconds.
+ */
 export type BubbleParams = {
-    /** Extrusion depth, relative to the long side of the element (= 2). */
+    /**
+     * Extrusion depth, relative to the long side of the element (= 2).
+     * Placement param.
+     */
     depth: number;
 
     /**
-     * Size of the bubbles: the spacing of the lattice they sit on, in the
-     * same units as `depth`. Several bubbles across a stroke make it read
-     * as foam.
+     * Size of the big bubbles: the spacing of the lattice they sit on, in
+     * the same units as `depth`. Smaller bubbles fill the gaps between
+     * them (see `minSize`). Placement param.
      */
     cellSize: number;
     /**
-     * How much the bubbles' radii vary, 0 (all alike) to 1 (each shrunk
-     * by a random share, up to all of it).
+     * How much the big bubbles' radii vary, 0 (all alike) to 1 (each
+     * shrunk by a random share, up to all of it). Placement param.
      */
     cellSizeRandomness: number;
     /**
-     * How round the bubbles are, 0 to 1: their radius, from a whole
-     * `cellSize` at 0 (heavy overlap: a flat-walled foam with shallow
-     * round caps) to about half of it at 1 (nearly separate spheres that
-     * just touch).
+     * How round the bubbles are, 0 to 1: a big bubble's radius goes from
+     * a whole `cellSize` at 0 (heavy overlap: a flat-walled foam with
+     * shallow round caps) to about half of it at 1 (nearly separate
+     * spheres that just touch); the filling bubbles cut into their
+     * neighbours alike. Placement param.
      */
     roundness: number;
     /**
-     * How far each bubble's centre wanders from its lattice cell's
-     * centre, 0 (a regular lattice) to 0.9.
+     * How far each big bubble's centre wanders from its lattice cell's
+     * centre, 0 (a regular lattice) to 0.9. Placement param.
      */
     jitter: number;
-    /** Seed of the random placement. */
+    /** Seed of the random placement. Placement param. */
     seed: number;
     /**
      * Moves the foam's outside in (positive) or out (negative) from the
-     * silhouette, world units. At 0, bubbles poke out of the silhouette
-     * by half a `cellSize` at most.
+     * silhouette, world units. At 0, big bubbles poke out of the
+     * silhouette by 0.3 `cellSize` at most, small ones by less.
+     * Placement param.
      */
     skin: number;
     /**
-     * Amplitude of the bubbles' slow drift, relative to `cellSize`, 0 to
-     * 0.15: the walls breathe.
+     * The smallest bubbles, as a share of `cellSize`, 0.05 to 1: gaps
+     * between the big bubbles, and along the outline, are filled with
+     * smaller ones while an empty ball of this size fits. Smaller gives
+     * more, smaller bubbles; 1 turns the fill off. Placement param.
+     */
+    minSize: number;
+    /**
+     * Amplitude of the bubbles' slow drift, relative to each bubble's
+     * radius, 0 to 0.15: the walls breathe. Changing it rebuilds the
+     * grid the shader walks (cheap).
      */
     wobble: number;
     /** Speed of the drift, in cycles per second. */
@@ -216,13 +248,14 @@ export type BubbleEffectOptions = {
 
 const DEFAULT_PARAMS: BubbleParams = {
     depth: 0.1,
-    cellSize: 0.05,
+    cellSize: 0.1,
     cellSizeRandomness: 0.25,
-    roundness: 0.45,
+    roundness: 0.3,
     jitter: 0.6,
     seed: 1,
     skin: 0,
-    wobble: 0.05,
+    minSize: 0.25,
+    wobble: 0.06,
     speed: 0.15,
     maxLayers: 6,
     iridescence: 0.5,
@@ -265,7 +298,6 @@ const DEBUG_VIEWS: Record<BubbleDebugView, number> = {
     cells: 3,
 };
 const MAX_LAYERS = 16;
-const JITTER_MAX = 0.9;
 const WOBBLE_MAX = 0.15;
 // Long side of the silhouette read back from the element, in px, and
 // the smoothing of its field. The field only places the bubbles, so it
@@ -273,17 +305,6 @@ const WOBBLE_MAX = 0.15;
 const BUBBLE_MASK_LONG = 512;
 const SMOOTH_RADIUS = 2;
 const SMOOTH_PASSES = 2;
-// Radius per lattice spacing at roundness 0 and 1.
-const SPHERE_R_FLAT = 1.0;
-const SPHERE_R_ROUND = 0.52;
-// How far a bubble may poke out of the silhouette, and how much further
-// out of the front and back, per cell size.
-const SPHERE_PROTRUDE = 0.5;
-const SPHERE_BULGE_Z = 0.3;
-// Seeds near the outline are pulled in to this depth, and at most this
-// far (seeds farther out are dropped), per cell size.
-const PULL_DEPTH = 0.1;
-const PULL_MAX = 0.6;
 
 const FRAG_BUBBLE = `#version 300 es
 precision highp float;
@@ -305,25 +326,22 @@ uniform float pixelSize;
 
 uniform int maxLayers;
 uniform float time;
-uniform float wobbleAmp;
+// Drift amplitude per radius, and its speed.
+uniform float wobble;
 uniform float wobbleSpeed;
 uniform uint seed;
-
-// The lattice (cell size per axis, origin, layers in z) and its seeds.
 uniform float cellSize;
-uniform vec3 latCell;
-uniform vec3 latOrigin;
-uniform int latLayers;
-uniform float jitter;
-uniform float pullDepth;
-uniform float pullMax;
-// The base radius, its random share, how far a sphere may poke out of
-// the shape (and out of its front and back, further), and how far any
-// can reach out of it.
-uniform float sphereR;
-uniform float radiusVar;
-uniform float protrude;
-uniform float bulgeZ;
+
+// The spheres (x, y, z, r per texel) and the grid over them: per cell an
+// offset into the index list and a count; the index list holds four
+// sphere indices per texel. All in rows of BUBBLE_TEX_W texels.
+uniform highp sampler2D sphereTex;
+uniform highp sampler2D cellTex;
+uniform highp sampler2D indexTex;
+uniform vec3 gridOrigin;
+uniform float gridCell;
+uniform ivec3 gridDims;
+// How far any sphere can reach out of the shape, drift included.
 uniform float reachMax;
 
 uniform sampler2D filmLut;
@@ -340,8 +358,9 @@ uniform float opacity;
 uniform vec3 bodyColor;
 uniform int debugView;
 
-// Spheres the ray passes through in one lattice cell, at most.
-const int MAX_CAND = 12;
+// Spheres a grid cell lists, at most: the ray passes through some of them.
+const int MAX_CAND = ${BUBBLE_LIST_MAX};
+const int TEX_W = ${BUBBLE_TEX_W};
 const int MAX_LAYERS = ${MAX_LAYERS};
 const float THICKNESS_MAX = ${THIN_FILM_THICKNESS_MAX.toFixed(1)};
 const float TAU = 6.2831853;
@@ -378,13 +397,13 @@ vec4 hash4(uvec3 v) {
     return vec4(a, w ^ (w >> 16u)) * (1.0 / 4294967295.0);
 }
 
-// A slow drift of length <= wobbleAmp, from a random phase.
-vec3 drift(vec4 h) {
-    if (wobbleAmp <= 0.0) {
+// A slow drift of length <= amp, from a random phase.
+vec3 drift(vec4 h, float amp) {
+    if (amp <= 0.0) {
         return vec3(0.0);
     }
     vec3 f = (0.6 + 0.8 * h.yzw) * (wobbleSpeed * TAU);
-    return wobbleAmp * 0.5774 * sin(time * f + h.zwx * TAU);
+    return amp * 0.5774 * sin(time * f + h.zwx * TAU);
 }
 
 // ---- shading ----
@@ -467,95 +486,62 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
     films++;
 }
 
-// ---- the foam: a power diagram of spheres on a jittered lattice ----
+// ---- the foam: a power diagram of spheres, found through a grid ----
 
-// The 27 seeds round the lattice cell the ray is in (index x + 3 y + 9 z,
-// offsets -1..1): centre and radius (radius 0: none), id, and the ray's
-// power line b t + k for each.
-vec4 win[27];
-float winId[27];
-vec2 winBK[27];
-// Where the ray is inside each sphere (empty when it misses).
-vec2 winHit[27];
+// The spheres of the grid cell the ray is in that it passes through on
+// the segment: centre (drifted) and radius, id, and the ray's power line
+// b t + k for each.
+vec4 cand[MAX_CAND];
+float candId[MAX_CAND];
+vec2 candBK[MAX_CAND];
+int nCand = 0;
 
-// The sphere of lattice cell L. Its seed is pulled into the shape (or
-// dropped) at rest, so the drift never makes one appear or vanish. Its
-// radius pokes out of the shape by \`protrude\` at most, and stays within
-// one lattice cell of its own, so the 27 round a point hold every sphere
-// that can own it.
-void sphereSeed(ivec3 L, out vec4 sph, out float id) {
-    sph = vec4(0.0);
-    id = 0.0;
-    if (L.z < 0 || L.z >= latLayers) {
+ivec2 texel(int i) {
+    return ivec2(i % TEX_W, i / TEX_W);
+}
+
+// Load the spheres of grid cell C that the ray passes through on
+// [t0, t1]. The cell's list holds every sphere that can reach into it,
+// drift included, so none that owns a point of the segment is missed.
+void loadCell(ivec3 C, float t0, float t1) {
+    nCand = 0;
+    if (any(lessThan(C, ivec3(0))) || any(greaterThanEqual(C, gridDims))) {
         return;
     }
-    vec4 h = hash4(uvec3(L + 4096));
-    vec3 cell = latOrigin + (vec3(L) + 0.5) * latCell;
-    vec3 c = cell + jitter * (h.xyz - 0.5) * vec3(1.0, 1.0, 0.5) * latCell;
-    vec3 s = sd2(c.xy);
+    vec4 head = texelFetch(cellTex, texel(C.x + gridDims.x * (C.y + gridDims.y * C.z)), 0);
     cost += 1.0;
-    float depthIn = -s.x;
-    if (s.x > -pullDepth) {
-        // Pulled in along the field to pullDepth (one lookup: the field
-        // is close enough to linear over the pull).
-        float move = s.x + pullDepth;
-        if (move > pullMax) {
-            return;
+    int off = int(head.x);
+    int count = min(int(head.y), MAX_CAND);
+    vec4 idx = vec4(0.0);
+    for (int j = 0; j < MAX_CAND; j++) {
+        if (j >= count) {
+            break;
         }
-        c.xy -= s.yz * move;
-        depthIn = pullDepth;
-    }
-    float r = sphereR * (1.0 - radiusVar * fract(h.w * 7.31));
-    // The outline stays readable: a sphere pokes out of the silhouette by
-    // protrude at most. Out of the front and back it may bulge more.
-    r = min(r, min(depthIn, halfDepth - abs(c.z) + bulgeZ) + protrude);
-    vec3 room = (1.5 - abs(c - cell) / latCell) * latCell - wobbleAmp;
-    r = min(r, min(room.x, min(room.y, room.z)));
-    if (r <= 0.0) {
-        return;
-    }
-    sph = vec4(c + drift(h), r);
-    id = h.w * 251.0;
-}
-
-void loadSlot(int i, ivec3 L) {
-    vec4 sph;
-    float id;
-    sphereSeed(L, sph, id);
-    win[i] = sph;
-    winId[i] = id;
-    vec3 oc = ro - sph.xyz;
-    vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
-    winBK[i] = bk;
-    float disc = bk.x * bk.x - 4.0 * bk.y;
-    winHit[i] = sph.w > 0.0 && disc > 0.0
-        ? 0.5 * (-bk.x + vec2(-1.0, 1.0) * sqrt(disc))
-        : vec2(1e30, -1e30);
-}
-
-// A lattice cell's slot in the window: its coordinates mod 3, so a step
-// only overwrites the 9 slots of the slab it leaves.
-int slotOf(ivec3 L) {
-    ivec3 m = ((L % 3) + 3) % 3;
-    return m.x + 3 * m.y + 9 * m.z;
-}
-
-void loadWindow(ivec3 C) {
-    for (int i = 0; i < 27; i++) {
-        ivec3 L = C + ivec3(i % 3, (i / 3) % 3, i / 9) - 1;
-        loadSlot(slotOf(L), L);
-    }
-}
-
-// Step the window to cell C, one cell along an axis (0 x, 1 y, 2 z) in
-// direction dir: load the 9 seeds of the slab that comes in.
-void shiftWindow(ivec3 C, int axis, int dir) {
-    for (int i = 0; i < 9; i++) {
-        ivec3 L = C;
-        L[axis] += dir;
-        L[(axis + 1) % 3] += i % 3 - 1;
-        L[(axis + 2) % 3] += i / 3 - 1;
-        loadSlot(slotOf(L), L);
+        int e = off + j;
+        if (j == 0 || (e & 3) == 0) {
+            idx = texelFetch(indexTex, texel(e >> 2), 0);
+            cost += 1.0;
+        }
+        int i = int(idx[e & 3]);
+        vec4 sph = texelFetch(sphereTex, texel(i), 0);
+        cost += 1.0;
+        vec4 h = hash4(uvec3(uint(i), 977u, 31u));
+        sph.xyz += drift(h, wobble * sph.w);
+        vec3 oc = ro - sph.xyz;
+        vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
+        float disc = bk.x * bk.x - 4.0 * bk.y;
+        if (disc <= 0.0) {
+            continue;
+        }
+        vec2 hit = 0.5 * (-bk.x + vec2(-1.0, 1.0) * sqrt(disc));
+        // Only spheres the ray passes through on the segment can own a
+        // point inside the foam; the others are left out of the envelope.
+        if (hit.x < t1 && hit.y > t0) {
+            cand[nCand] = sph;
+            candId[nCand] = h.w * 251.0;
+            candBK[nCand] = bk;
+            nCand++;
+        }
     }
 }
 
@@ -564,36 +550,25 @@ bool sphereInside = false;
 // Shade a sphere's own surface at t.
 void sphereFilm(int i, float t, bool entering, float cover) {
     vec3 p = ro + rd * t;
-    shadeFilm(p, (p - win[i].xyz) / win[i].w, win[i].xyz, winId[i], 1.0, entering, cover);
+    shadeFilm(p, (p - cand[i].xyz) / cand[i].w, cand[i].xyz, candId[i], 1.0, entering, cover);
 }
 
-// The films of the foam on [t0, t1] with this window: the lower envelope
-// of the power lines, as in \`_sphere-foam.ts\`.
+// The films of the foam on [t0, t1] with the spheres loaded: the lower
+// envelope of the power lines, as in \`_sphere-foam.ts\`.
 void sphereSegment(float t0, float t1, float cone, int layers) {
-    // Only spheres the ray passes through on the segment can own a point
-    // inside the foam; the others are left out of the envelope.
-    int cand[MAX_CAND];
-    int n = 0;
-    for (int i = 0; i < 27; i++) {
-        vec2 h = winHit[i];
-        if (h.x < t1 && h.y > t0 && n < MAX_CAND) {
-            cand[n] = i;
-            n++;
-        }
-    }
+    int n = nCand;
     if (n == 0) {
         sphereInside = false;
         return;
     }
-    int own = cand[0];
-    float lo = winBK[own].x * t0 + winBK[own].y;
-    for (int c = 1; c < MAX_CAND; c++) {
-        if (c >= n) {
+    int own = 0;
+    float lo = candBK[0].x * t0 + candBK[0].y;
+    for (int i = 1; i < MAX_CAND; i++) {
+        if (i >= n) {
             break;
         }
-        int i = cand[c];
-        float l = winBK[i].x * t0 + winBK[i].y;
-        if (l < lo || (l == lo && winBK[i].x < winBK[own].x)) {
+        float l = candBK[i].x * t0 + candBK[i].y;
+        if (l < lo || (l == lo && candBK[i].x < candBK[own].x)) {
             lo = l;
             own = i;
         }
@@ -603,15 +578,14 @@ void sphereSegment(float t0, float t1, float cone, int layers) {
         if (films >= layers) {
             return;
         }
-        vec2 bo = winBK[own];
+        vec2 bo = candBK[own];
         float ts = 1e30;
         int next = -1;
-        for (int c = 0; c < MAX_CAND; c++) {
-            if (c >= n) {
+        for (int j = 0; j < MAX_CAND; j++) {
+            if (j >= n) {
                 break;
             }
-            int j = cand[c];
-            vec2 bj = winBK[j];
+            vec2 bj = candBK[j];
             if (bj.x < bo.x) {
                 float tj = max((bj.y - bo.y) / (bo.x - bj.x), ta);
                 if (tj < ts) {
@@ -644,8 +618,8 @@ void sphereSegment(float t0, float t1, float cone, int layers) {
         if (sphereInside && films < layers) {
             // One flat wall on the radical plane, shared by both cells.
             vec3 p = ro + rd * ts;
-            vec3 c = 0.5 * (win[own].xyz + win[next].xyz);
-            shadeFilm(p, normalize(win[next].xyz - win[own].xyz), c, winId[own] + winId[next], 0.0, false, 1.0);
+            vec3 c = 0.5 * (cand[own].xyz + cand[next].xyz);
+            shadeFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0);
         }
         own = next;
         ta = ts;
@@ -659,7 +633,7 @@ void traceSpheres(vec2 tb, float cone, int layers) {
     vec3 tMax = vec3(0.0);
     vec3 tDelta = vec3(0.0);
     ivec3 stp = ivec3(0);
-    for (int i = 0; i < 160; i++) {
+    for (int i = 0; i < 256; i++) {
         if (t > tb.y || films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
             break;
         }
@@ -672,30 +646,34 @@ void traceSpheres(vec2 tb, float cone, int layers) {
                 t += s - reachMax;
                 continue;
             }
-            vec3 q = (ro + rd * t - latOrigin) / latCell;
-            C = ivec3(floor(q));
+            vec3 q = (ro + rd * t - gridOrigin) / gridCell;
+            C = clamp(ivec3(floor(q)), ivec3(0), gridDims - 1);
             vec3 d = mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
             vec3 inv = 1.0 / d;
             stp = ivec3(sign(d));
-            tMax = t + (floor(q) + step(0.0, d) - q) * latCell * inv;
-            tDelta = latCell * abs(inv);
-            loadWindow(C);
+            tMax = t + (vec3(C) + step(0.0, d) - q) * gridCell * inv;
+            tDelta = gridCell * abs(inv);
             sphereInside = false;
             walking = true;
         }
         float tn = min(tMax.x, min(tMax.y, tMax.z));
-        sphereSegment(t, min(tn, tb.y), cone, layers);
+        float te = min(tn, tb.y);
+        loadCell(C, t, te);
+        sphereSegment(t, te, cone, layers);
         t = tn;
         int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
         C[axis] += stp[axis];
         tMax[axis] += tDelta[axis];
-        shiftWindow(C, axis, stp[axis]);
+        if (C[axis] < 0 || C[axis] >= gridDims[axis]) {
+            // Out of the grid: no sphere is left ahead.
+            break;
+        }
         // Out of every sphere and well away from the shape: back to
         // tracing, which skips the empty cells faster than stepping.
         if (!sphereInside) {
             float s = sdf3(ro + rd * t).x;
             cost += 1.0;
-            if (s > reachMax + 2.0 * cellSize) {
+            if (s > reachMax + 2.0 * gridCell) {
                 walking = false;
             }
         }
@@ -729,6 +707,14 @@ void main() {
     }
 
     vec2 tb = boundsHit();
+    // Every sphere, drift included, is inside the grid's box.
+    vec3 gInv = 1.0 / mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
+    vec3 g0 = (gridOrigin - ro) * gInv;
+    vec3 g1 = (gridOrigin + vec3(gridDims) * gridCell - ro) * gInv;
+    vec3 gLo = min(g0, g1);
+    vec3 gHi = max(g0, g1);
+    tb.x = max(tb.x, max(max(gLo.x, gLo.y), gLo.z));
+    tb.y = min(tb.y, min(min(gHi.x, gHi.y), gHi.z));
     if (tb.x > tb.y || tb.y < 0.0) {
         outColor = debugView != 0 ? (debugView == 3 ? vec4(0.0, 0.0, 0.0, 1.0) : heat(0.0)) : vec4(miss, missA);
         return;
@@ -777,6 +763,49 @@ function colorOf(hex: string, fallback: string): [number, number, number] {
     return hexToRgb(typeof hex === "string" ? hex : fallback);
 }
 
+// A data texture read with texelFetch: RGBA32F, nearest.
+function uploadDataTexture(
+    gl: WebGL2RenderingContext,
+    w: number,
+    h: number,
+    data: Float32Array,
+): WebGLTexture | null {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA32F,
+        w,
+        h,
+        0,
+        gl.RGBA,
+        gl.FLOAT,
+        data,
+    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return tex;
+}
+
+// The bubbles and the grid over them, as uploaded.
+type Foam = {
+    placeKey: string;
+    gridKey: string;
+    fill: BubbleFill;
+    grid: SphereGrid;
+    raw: WebGLTexture[];
+    sphereTex: EffectTexture;
+    cellTex: EffectTexture;
+    indexTex: EffectTexture;
+};
+
 /**
  * Fills the element's silhouette, extruded into 3D, with a foam of
  * transparent soap bubbles in thin-film colours.
@@ -785,18 +814,22 @@ function colorOf(hex: string, fallback: string): [number, number, number] {
  * vfx.add(img, { effect: new BubbleEffect({ roundness: 0.7 }) });
  * ```
  *
- * The volume is filled with spheres on a jittered lattice. Where they
- * overlap, they are cut by a flat wall they share (a power diagram);
- * where they are exposed, they keep their round outside. `roundness`
- * goes from a flat-walled foam to nearly separate spheres. The films are
- * found exactly along each ray.
+ * The volume is filled with big spheres on a jittered lattice
+ * (`cellSize`), and the gaps they leave, between them and along the
+ * outline, with smaller ones down to `minSize`. Where spheres overlap,
+ * they are cut by a flat wall they share (a power diagram); where they
+ * are exposed, they keep their round outside. `roundness` goes from a
+ * flat-walled foam to nearly separate spheres. The films are found
+ * exactly along each ray.
  *
  * The silhouette is read once when the effect starts. Films do not bend
  * light, so the page shows through the foam, dimmed by what the films
  * reflect; the output is premultiplied over it. With `backdropVisible`,
  * a backdrop is drawn behind the foam instead.
  *
- * All params are read every frame, so you can mutate `params` live.
+ * All params are read every frame, so you can mutate `params` live. The
+ * bubbles are placed on the CPU, again whenever a placement param
+ * changes (see {@link BubbleParams}).
  */
 export class BubbleEffect implements Effect {
     params: BubbleParams;
@@ -813,6 +846,7 @@ export class BubbleEffect implements Effect {
     #raw: WebGLTexture[] = [];
     #sdfTex: EffectTexture | null = null;
     #lutTex: EffectTexture | null = null;
+    #foamData: Foam | null = null;
     readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
 
     #time = 0;
@@ -839,6 +873,7 @@ export class BubbleEffect implements Effect {
             this.#raw = [];
             this.#sdfTex = null;
             this.#lutTex = null;
+            this.#foamData = null;
             this.#backdrop.contextRestored();
             this.#pending = this.#shape;
         });
@@ -884,31 +919,94 @@ export class BubbleEffect implements Effect {
         const d = DEFAULT_PARAMS;
         const halfDepth = Math.max(finite(p.depth, d.depth) / 2, 0.005);
         const cellSize = Math.max(finite(p.cellSize, d.cellSize), 0.02);
-        const skin = clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin);
-        const roundness = clamp(p.roundness, 0, 1, d.roundness);
-        const wobbleAmp = clamp(p.wobble, 0, WOBBLE_MAX, d.wobble) * cellSize;
-        const protrude = Math.max(SPHERE_PROTRUDE * cellSize - skin, 0);
-        const bulgeZ = SPHERE_BULGE_Z * cellSize;
-        // The lattice: whole layers through the depth, each about a cell
-        // size thick.
-        const layers = Math.max(1, Math.round((2 * halfDepth) / cellSize));
+        const fill: FillOptions = {
+            halfDepth,
+            cellSize,
+            jitter: clamp(p.jitter, 0, JITTER_MAX, d.jitter),
+            roundness: clamp(p.roundness, 0, 1, d.roundness),
+            cellSizeRandomness: clamp(
+                p.cellSizeRandomness,
+                0,
+                1,
+                d.cellSizeRandomness,
+            ),
+            seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
+            skin: clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin),
+            minSize: clamp(p.minSize, 0.05, 1, d.minSize),
+        };
         return {
             halfDepth,
             cellSize,
-            wobbleAmp,
-            layers,
-            zCell: (2 * halfDepth) / layers,
-            // Heavy overlap at roundness 0, nearly kissing at 1.
-            radius:
-                cellSize *
-                (SPHERE_R_FLAT + (SPHERE_R_ROUND - SPHERE_R_FLAT) * roundness),
-            protrude,
-            bulgeZ,
-            // How far any sphere reaches out of the shape: out of the
-            // outline by `protrude`, out of the front and back by `bulgeZ`
-            // more, plus the drift.
-            reach: protrude + bulgeZ + wobbleAmp + 0.01 * cellSize,
+            fill,
+            wobble: clamp(p.wobble, 0, WOBBLE_MAX, d.wobble),
         };
+    }
+
+    // The bubbles for the params: placed again when a placement param
+    // changes, the grid built again when the drift's reach does.
+    #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
+        const r = this.#resolved();
+        const placeKey = JSON.stringify(r.fill);
+        const gridKey = `${placeKey}|${r.wobble}`;
+        const old = this.#foamData;
+        if (old && old.gridKey === gridKey) {
+            return old;
+        }
+        const fill =
+            old && old.placeKey === placeKey
+                ? old.fill
+                : placeBubbles(shape, r.fill);
+        const grid = buildSphereGrid(fill.spheres, r.wobble, r.cellSize);
+        this.#freeFoam();
+        const gl = ctx.gl;
+        const raw: WebGLTexture[] = [];
+        const textures: EffectTexture[] = [];
+        for (const [data, h] of [
+            [grid.sphereData, grid.sphereTexH],
+            [grid.cellData, grid.cellTexH],
+            [grid.index, grid.indexTexH],
+        ] as const) {
+            const tex = uploadDataTexture(gl, BUBBLE_TEX_W, h, data);
+            if (!tex) {
+                break;
+            }
+            raw.push(tex);
+            textures.push(
+                ctx.wrapTexture(tex, {
+                    size: [BUBBLE_TEX_W, h],
+                    filter: "nearest",
+                    wrap: "clamp",
+                }),
+            );
+        }
+        ctx.resetState();
+        if (textures.length < 3) {
+            for (const tex of raw) {
+                gl.deleteTexture(tex);
+            }
+            return null;
+        }
+        this.#foamData = {
+            placeKey,
+            gridKey,
+            fill,
+            grid,
+            raw,
+            sphereTex: textures[0],
+            cellTex: textures[1],
+            indexTex: textures[2],
+        };
+        return this.#foamData;
+    }
+
+    #freeFoam(): void {
+        const f = this.#foamData;
+        if (f && this.#gl) {
+            for (const tex of f.raw) {
+                this.#gl.deleteTexture(tex);
+            }
+        }
+        this.#foamData = null;
     }
 
     #draw(ctx: EffectContext): EffectRenderTarget | null {
@@ -916,6 +1014,10 @@ export class BubbleEffect implements Effect {
         const sdfTex = this.#sdfTex;
         const lutTex = this.#lutTex;
         if (this.#phase !== "ready" || !shape || !sdfTex || !lutTex) {
+            return null;
+        }
+        const foam = this.#foam(ctx, shape);
+        if (!foam) {
             return null;
         }
         const p = this.params;
@@ -927,6 +1029,14 @@ export class BubbleEffect implements Effect {
         const t = this.#time;
         const cam = cameraUniforms(p, t, this.#drag, ctx.dims);
         const r = this.#resolved();
+        const grid = foam.grid;
+        let maxR = 0;
+        for (let i = 0; i < grid.count; i++) {
+            maxR = Math.max(maxR, grid.spheres[i * 4 + 3]);
+        }
+        // How far any sphere reaches out of the shape, drift included,
+        // with a margin for the field's filtering.
+        const reach = foam.fill.reach + r.wobble * maxR + 0.02 * r.cellSize;
 
         ctx.draw({
             frag: FRAG_BUBBLE,
@@ -937,31 +1047,22 @@ export class BubbleEffect implements Effect {
                 // The shape is only used to skip empty space: sharp edges.
                 rounding: 0,
                 shapeHalf: shape.shapeHalf,
-                boxMargin: r.reach,
+                boxMargin: reach,
                 ...cam,
                 pixelSize: cam.bufferPx[0] / scene.width,
                 maxLayers: clampInt(p.maxLayers, 1, MAX_LAYERS, d.maxLayers),
                 time: t,
-                wobbleAmp: r.wobbleAmp,
+                wobble: r.wobble,
                 wobbleSpeed: Math.max(finite(p.speed, d.speed), 0),
-                seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
+                seed: r.fill.seed,
                 cellSize: r.cellSize,
-                latCell: [r.cellSize, r.cellSize, r.zCell],
-                latOrigin: [0, 0, -r.halfDepth],
-                latLayers: r.layers,
-                jitter: clamp(p.jitter, 0, JITTER_MAX, d.jitter),
-                pullDepth: PULL_DEPTH * r.cellSize,
-                pullMax: PULL_MAX * r.cellSize,
-                sphereR: r.radius,
-                radiusVar: clamp(
-                    p.cellSizeRandomness,
-                    0,
-                    1,
-                    d.cellSizeRandomness,
-                ),
-                protrude: r.protrude,
-                bulgeZ: r.bulgeZ,
-                reachMax: r.reach,
+                sphereTex: foam.sphereTex,
+                cellTex: foam.cellTex,
+                indexTex: foam.indexTex,
+                gridOrigin: grid.origin,
+                gridCell: grid.cell,
+                gridDims: grid.dims,
+                reachMax: reach,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),
@@ -979,7 +1080,7 @@ export class BubbleEffect implements Effect {
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),
                 opacity: clamp(p.opacity, 0, 1, d.opacity),
                 bodyColor: colorOf(p.color, d.color),
-                ...this.#backdrop.uniforms(p, t, r.halfDepth + r.reach, sdfTex),
+                ...this.#backdrop.uniforms(p, t, r.halfDepth + reach, sdfTex),
                 debugView: this.#debugView(),
             },
             target: scene,
@@ -1047,6 +1148,7 @@ export class BubbleEffect implements Effect {
         this.#raw = [];
         this.#sdfTex = null;
         this.#lutTex = null;
+        this.#freeFoam();
         const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
         const lut = uploadFloatTexture(
             gl,
@@ -1085,6 +1187,7 @@ export class BubbleEffect implements Effect {
         this.#raw = [];
         this.#sdfTex = null;
         this.#lutTex = null;
+        this.#freeFoam();
         this.#backdrop.dispose(this.#gl);
         this.#gl = null;
         this.#mask?.dispose();
