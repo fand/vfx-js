@@ -1222,17 +1222,18 @@ void traceContained(vec2 tb, float cone, int layers) {
     float t = max(tb.x, 0.0);
     float eps = 1e-3;
     for (int iv = 0; iv < 6; iv++) {
-        // To the container.
+        // Into the container. A ray that only grazes it is not in it: it
+        // goes on, so a run of grazing points does not use up the stretches.
         float g = clipField(t);
-        for (int i = 0; i < 64 && g > eps && t <= tb.y; i++) {
+        for (int i = 0; i < 64 && g > 0.0 && t <= tb.y; i++) {
             t += max(g, eps);
             g = clipField(t);
         }
         if (t > tb.y || films >= layers) {
             return;
         }
-        if (g > eps) {
-            // Out of steps, grazing the container: go on from here.
+        if (g > 0.0) {
+            // Out of steps: go on from here.
             continue;
         }
         for (int k = 0; k < 4; k++) {
