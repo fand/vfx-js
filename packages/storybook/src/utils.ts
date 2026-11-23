@@ -7,9 +7,11 @@ import {
     type HalftoneEffect,
     type HalftoneInkPresetName,
     type LightStreakEffect,
+    type OrbitCameraParams,
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
+    type SourceChannel,
     SWIRL_PARTICLE_PALETTES,
     type SwirlParticleColorStop,
     type SwirlParticlePaletteName,
@@ -813,6 +815,19 @@ export function attachClockPane(
     return pane;
 }
 
+// Options for a `cameraOrigin` dropdown (GlassEffect, SwirlParticleEffect).
+const CAMERA_ORIGIN_OPTIONS = {
+    element: "element",
+    viewport: "viewport",
+} satisfies Record<OrbitCameraParams["cameraOrigin"], string>;
+
+// Options for a `sourceChannel` dropdown (GlassEffect, SwirlParticleEffect).
+const SOURCE_CHANNEL_OPTIONS = {
+    alpha: "alpha",
+    luminance: "luminance",
+    none: "none",
+} satisfies Record<SourceChannel, SourceChannel>;
+
 /** Source picker for {@link attachSwirlParticlePane}. */
 export type SwirlSourceSelector = {
     keys: readonly string[];
@@ -868,6 +883,12 @@ export function attachSwirlParticlePane(
     const particles = pane.addFolder({ title: "Particles" });
     bind(particles, "count", {
         options: {
+            "1k": 1024,
+            "2k": 2048,
+            "4k": 4096,
+            "8k": 8192,
+            "16k": 16384,
+            "32k": 32768,
             "65k": 65536,
             "131k": 131072,
             "262k": 262144,
@@ -884,6 +905,7 @@ export function attachSwirlParticlePane(
     bind(particles, "streak", range(0, 1.5, 0.01));
 
     const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
     bind(shape, "depth", range(0.02, 1, 0.01));
 
     const flow = pane.addFolder({ title: "Flow" });
@@ -942,17 +964,19 @@ export function attachSwirlParticlePane(
     const camera = pane.addFolder({ title: "Camera" });
     bind(camera, "yaw", range(-180, 180, 0.5));
     bind(camera, "pitch", range(-85, 85, 0.5));
-    bind(camera, "orbit", range(0, 90, 0.5));
+    bind(camera, "orbitAnimation", range(0, 90, 0.5));
+    bind(camera, "orbitSpeed", range(0, 10, 0.1));
     bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");
+    bind(camera, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
 
-    const mouse = pane.addFolder({ title: "Mouse" });
-    bind(mouse, "mouse", {
+    const pointer = pane.addFolder({ title: "Pointer" });
+    bind(pointer, "pointer", {
         options: { none: "none", repel: "repel", tilt: "tilt" },
     });
-    bind(mouse, "mouseRadius", range(10, 400, 1));
-    bind(mouse, "mouseStrength", range(0, 3, 0.01));
+    bind(pointer, "pointerRadius", range(10, 400, 1));
+    bind(pointer, "pointerStrength", range(0, 4, 0.01));
 
     // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
     const padState = {
@@ -1088,6 +1112,7 @@ export function attachGlassPane(
     pick(pane, "source", pickers.source);
 
     const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
     bind(shape, "depth", range(0.02, 1.5, 0.01));
     bind(shape, "bevel", range(0, 0.4, 0.005));
     bind(shape, "bevelShape", {
@@ -1133,14 +1158,18 @@ export function attachGlassPane(
     bind(light, "lightSoftness", range(0, 1, 0.01));
 
     const view = pane.addFolder({ title: "View" });
-    bind(view, "yaw", range(-3.15, 3.15, 0.01));
-    bind(view, "pitch", range(-1.5, 1.5, 0.01));
-    bind(view, "orbit", range(0, 1.5, 0.01));
+    bind(view, "yaw", range(-180, 180, 0.5));
+    bind(view, "pitch", range(-85, 85, 0.5));
+    bind(view, "orbitAnimation", range(0, 90, 0.5));
+    bind(view, "orbitSpeed", range(0, 10, 0.1));
     bind(view, "fov", range(5, 90, 1));
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
+    bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
+    bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
+    bind(view, "pointerStrength", range(0, 4, 0.01));
     bind(view, "resolution", range(0.25, 2, 0.05));
-    bind(view, "fxaa");
+    bind(view, "antialias");
     bind(view, "debug", {
         options: { off: "off", outer: "outer", inner: "inner", total: "total" },
     });

@@ -47,8 +47,8 @@ const BACKDROP = [
     "linear-gradient(to bottom, #5f6b80, #707d90)",
 ].join(", ");
 
-// Base setup of the stories: front-on (the default `orbit` wobble still
-// turns it a little), drag to orbit, the cursor repels the particles, and
+// Base setup of the stories: front-on (the default `orbitAnimation` still
+// turns it a little), drag to orbit, the pointer repels the particles, and
 // a drop shadow on the backdrop. The demo draws more particles than the
 // default, over the whole canvas.
 const STORY_VIEW: Partial<SwirlParticleParams> = {
@@ -57,7 +57,7 @@ const STORY_VIEW: Partial<SwirlParticleParams> = {
     yaw: 0,
     pitch: 0,
     drag: true,
-    mouse: "repel",
+    pointer: "repel",
     shadow: true,
 };
 
@@ -184,7 +184,8 @@ export const logo: StoryObj<Args> = {
 };
 
 export const amagi: StoryObj<Args> = {
-    args: { source: "amagi", params: { depth: 0.3 } },
+    // shadowDistance: the page where the default puts it at depth 0.22.
+    args: { source: "amagi", params: { depth: 0.3, shadowDistance: 0.3 } },
 };
 
 export const photo: StoryObj<Args> = {
@@ -221,8 +222,11 @@ export const heading: StoryObj<Args> = {
 
         const h1 = document.createElement("h1");
         h1.textContent = "Swirl";
+        // `fit-content`: the box hugs the text, left in the column, so its
+        // centre is off the viewport's and `cameraOrigin` "element" and
+        // "viewport" differ. A block-wide box would centre it.
         h1.style.cssText =
-            "margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
+            "width: fit-content; margin: 0 0 48px; font: 900 clamp(72px, 14vw, 180px)/1 system-ui, 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; color: #222";
 
         article.append(kicker, h1);
         for (let i = 0; i < 3; i++) {
@@ -241,7 +245,8 @@ export const heading: StoryObj<Args> = {
             ...new SwirlParticleEffect({
                 depth: 0.3,
                 shadow: true,
-                mouse: "repel",
+                shadowDistance: 0.3,
+                pointer: "repel",
             }).params,
         };
         let effect: SwirlParticleEffect | null = null;

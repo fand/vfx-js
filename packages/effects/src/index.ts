@@ -1,5 +1,7 @@
 export type { HoloSettingId } from "./_holo/data/params.js";
 export type { HoloStartingPointNames } from "./_holo/data/starting-points.js";
+export type { OrbitCameraParams } from "./_orbit-camera.js";
+export type { SourceChannel } from "./_source.js";
 export {
     ASCII_PRESETS,
     type AsciiCharRamp,
@@ -35,6 +37,7 @@ export {
     type GlassPaletteName,
     type GlassParams,
     type GlassPatternName,
+    type GlassPointer,
 } from "./glass.js";
 export { GlitchEffect, type GlitchParams } from "./glitch.js";
 export {
@@ -117,6 +120,7 @@ export {
     type SwirlParticleEffectOptions,
     type SwirlParticlePaletteName,
     type SwirlParticleParams,
+    type SwirlParticlePointer,
 } from "./swirl-particle.js";
 export {
     TilePixelateEffect,
