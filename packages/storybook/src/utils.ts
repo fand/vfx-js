@@ -883,6 +883,12 @@ export function attachSwirlParticlePane(
     const particles = pane.addFolder({ title: "Particles" });
     bind(particles, "count", {
         options: {
+            "1k": 1024,
+            "2k": 2048,
+            "4k": 4096,
+            "8k": 8192,
+            "16k": 16384,
+            "32k": 32768,
             "65k": 65536,
             "131k": 131072,
             "262k": 262144,
