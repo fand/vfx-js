@@ -184,7 +184,8 @@ export const logo: StoryObj<Args> = {
 };
 
 export const amagi: StoryObj<Args> = {
-    args: { source: "amagi", params: { depth: 0.3 } },
+    // shadowDistance: the page where the default puts it at depth 0.22.
+    args: { source: "amagi", params: { depth: 0.3, shadowDistance: 0.3 } },
 };
 
 export const photo: StoryObj<Args> = {

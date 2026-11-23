@@ -303,7 +303,8 @@ export type SwirlParticleEffectOptions = {
     /**
      * Render a still frame: simulate a fixed number of steps once, then
      * stop. The frame is drawn again only when params or the element's
-     * size change, so a video source's colours stay as they were. For
+     * size change (or, with `cameraOrigin: "viewport"`, its position in
+     * the viewport), so a video source's colours stay as they were. For
      * visual tests and `prefers-reduced-motion`.
      */
     still?: boolean;
@@ -1461,10 +1462,6 @@ function smoothstep(e0: number, e1: number, x: number): number {
 // ---------------------------------------------------------------------------
 // Effect
 // ---------------------------------------------------------------------------
-
-// Silhouette capture: waiting to capture, a readback in flight, or
-// nothing to do. Drawing only needs a shape, so a recapture keeps the
-// current one on screen.
 
 type ShadowLevel = {
     a: EffectRenderTarget;

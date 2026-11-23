@@ -47,8 +47,9 @@ export type OrbitCameraParams = {
     orbitAnimation: number;
     /**
      * Speed of the {@link orbitAnimation}, as a multiple of the base
-     * speed: at 1, a yaw swing takes about 48 seconds. 0 stops the
-     * animation where it is at the start.
+     * speed: at 1, a yaw swing takes about 48 seconds. 0 holds the
+     * animation where it is. A change while it runs carries on from
+     * there.
      */
     orbitSpeed: number;
     /**
@@ -282,6 +283,11 @@ export class OrbitCamera {
     #tiltYaw = 0;
     #tiltPitch = 0;
 
+    // The orbit animation's phase (seconds at orbitSpeed 1), and the
+    // clock it was advanced to; null before the first update.
+    #orbitPhase = 0;
+    #orbitTime: number | null = null;
+
     /** `defaults` replace params that are not finite numbers. */
     constructor(defaults: OrbitCameraParams) {
         this.#defaults = { ...defaults };
@@ -363,18 +369,26 @@ export class OrbitCamera {
 
         // Base angles and the orbit animation (params, degrees), drag and
         // tilt (radians).
-        const t = input.time;
-        const s = p.orbitSpeed;
+        // The animation's phase advances by the clock's step times
+        // orbitSpeed, so a change of speed carries on from where it is
+        // instead of jumping. It starts at time × orbitSpeed.
+        const t = Number.isFinite(input.time) ? input.time : 0;
+        this.#orbitPhase =
+            this.#orbitTime === null
+                ? t * p.orbitSpeed
+                : this.#orbitPhase + (t - this.#orbitTime) * p.orbitSpeed;
+        this.#orbitTime = t;
+        const ph = this.#orbitPhase;
         const amp = p.orbitAnimation;
         const yaw =
-            (p.yaw + amp * Math.sin(t * (ORBIT_YAW_SPEED * s))) * DEG +
+            (p.yaw + amp * Math.sin(ph * ORBIT_YAW_SPEED)) * DEG +
             this.#dragYaw +
             this.#tiltYaw;
         const pitch =
             (p.pitch +
                 amp *
                     ORBIT_PITCH_RATIO *
-                    Math.sin(t * (ORBIT_PITCH_SPEED * s) + ORBIT_PITCH_PHASE)) *
+                    Math.sin(ph * ORBIT_PITCH_SPEED + ORBIT_PITCH_PHASE)) *
                 DEG +
             this.#dragPitch +
             this.#tiltPitch;
@@ -413,6 +427,8 @@ export class OrbitCamera {
         this.#dragPitch = 0;
         this.#tiltYaw = 0;
         this.#tiltPitch = 0;
+        this.#orbitPhase = 0;
+        this.#orbitTime = null;
         this.#toElement = [0, 0];
         this.#elementPx = [0, 0];
     }

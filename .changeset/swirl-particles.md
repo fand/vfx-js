@@ -18,5 +18,5 @@ Add `SwirlParticleEffect`: particles flow over the element's silhouette, extrude
 - `count` (default 65536, at most 1,048,576) and `fireflyRatio` are live like every other param: lowering `count` draws fewer particles, raising it past what is allocated reallocates the particle state. Numbers that are not finite fall back to their defaults.
 - Output is premultiplied over transparency, in `pad` CSS px around the element (default 200) or `"fullscreen"`.
 - `antialias: true` smooths the fibres' edges with 4× MSAA, at about 5× the memory of the particle buffer (10× with its depth). Off by default.
-- `new SwirlParticleEffect(params, { still: true })` renders one still frame, drawn again only when params or the element's size change.
+- `new SwirlParticleEffect(params, { still: true })` renders one still frame, drawn again only when params or the element's size change (or, with `cameraOrigin: "viewport"`, its position in the viewport).
 - New types: `SwirlParticleParams`, `SwirlParticleColorStop`, `SwirlParticlePaletteName`, `SwirlParticleEffectOptions`, `SwirlParticlePointer`.

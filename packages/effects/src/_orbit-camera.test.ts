@@ -147,14 +147,20 @@ describe("OrbitCamera, element origin", () => {
     });
 
     test("orbitSpeed scales the orbit animation's clock; 0 stops it", () => {
+        // Each camera runs at one speed from the start.
+        const at = (orbitSpeed: number, time: number) =>
+            new OrbitCamera(PARAMS).update(
+                { ...PARAMS, orbitAnimation: 20, orbitSpeed },
+                input({ time }),
+            );
+        expectClose(at(2, 1.5).viewRot, at(1, 3).viewRot, 12);
+        expect(at(0, 9).viewRot).toEqual(at(1, 0).viewRot);
+        // 0 holds a running animation where it is.
         const c = new OrbitCamera(PARAMS);
-        const p = { ...PARAMS, orbitAnimation: 20 };
-        const a = c.update({ ...p, orbitSpeed: 2 }, input({ time: 1.5 }));
-        const b = c.update({ ...p, orbitSpeed: 1 }, input({ time: 3 }));
-        expectClose(a.viewRot, b.viewRot, 12);
-        const still = c.update({ ...p, orbitSpeed: 0 }, input({ time: 9 }));
-        const start = c.update(p, input({ time: 0 }));
-        expect(still.viewRot).toEqual(start.viewRot);
+        const p = { ...PARAMS, orbitAnimation: 20, orbitSpeed: 1 };
+        const running = c.update(p, input({ time: 4 }));
+        const held = c.update({ ...p, orbitSpeed: 0 }, input({ time: 9 }));
+        expectClose(held.viewRot, running.viewRot, 12);
     });
 
     test("orbitAnimation 0 holds the camera still", () => {
@@ -164,6 +170,34 @@ describe("OrbitCamera, element origin", () => {
         const b = c.update(p, input({ time: 17.3 }));
         expect(b.viewRot).toEqual(a.viewRot);
         expect(a.viewRot).toEqual(viewMatrix(12 * DEG, 5 * DEG));
+    });
+
+    test("a live change of orbitSpeed carries on from where it is", () => {
+        const c = new OrbitCamera(PARAMS);
+        const p = { ...PARAMS, orbitAnimation: 20, orbitSpeed: 1 };
+        c.update(p, input({ time: 0 }));
+        const at600 = c.update(p, input({ time: 600 }));
+        // Same instant, new speed: no jump.
+        const fast = { ...p, orbitSpeed: 3 };
+        expectClose(
+            c.update(fast, input({ time: 600 })).viewRot,
+            at600.viewRot,
+        );
+        // One second later the phase is 600 + 3 s, not 601 × 3.
+        const ph = 603;
+        expectClose(
+            c.update(fast, input({ time: 601 })).viewRot,
+            viewMatrix(
+                20 * Math.sin(ph * 0.13) * DEG,
+                20 * 0.3 * Math.sin(ph * 0.09 + 1.3) * DEG,
+            ),
+        );
+        // A new instance (or one disposed) starts at time × orbitSpeed.
+        c.dispose();
+        expectClose(
+            c.update(fast, input({ time: 10 })).viewRot,
+            new OrbitCamera(PARAMS).update(fast, input({ time: 10 })).viewRot,
+        );
     });
 
     test("zoom scales the px per unit; fov sets the distance", () => {
