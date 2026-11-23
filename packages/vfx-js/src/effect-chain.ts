@@ -164,6 +164,9 @@ export class EffectChain {
      */
     #ownedPassthroughHost: EffectHost | null = null;
 
+    /** See `elementGeometry`. */
+    #elementGeometry: ArrayLike<number> | null = null;
+
     constructor(
         glCtx: GLContext,
         quad: Quad,
@@ -258,6 +261,14 @@ export class EffectChain {
         }
     }
 
+    /**
+     * The element geometry an effect reported in the last frame that ran
+     * (`ctx.setElementGeometry`), or null when none did.
+     */
+    get elementGeometry(): ArrayLike<number> | null {
+        return this.#elementGeometry;
+    }
+
     /** One frame. No-op when `!isVisible`. */
     run(input: ChainFrameInput): void {
         if (this.#disposed) {
@@ -266,6 +277,8 @@ export class EffectChain {
         if (!input.isVisible) {
             return;
         }
+        // Effects report it again every frame; the last call wins.
+        this.#elementGeometry = null;
 
         // Recompute the active render stages each frame so toggling
         // `effect.enabled` takes effect immediately (no restructuring).
@@ -526,6 +539,11 @@ export class EffectChain {
             this.#capture,
             this.#vfxProps,
             this.#programCache,
+            this.#isPostEffect
+                ? null
+                : (m) => {
+                      this.#elementGeometry = m;
+                  },
         );
     }
 

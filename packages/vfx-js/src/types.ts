@@ -1244,6 +1244,30 @@ export type EffectContext = {
      * Returns an unsubscribe function; auto-unsubscribed on dispose.
      */
     onContextRestored(cb: () => void): () => void;
+
+    /**
+     * Tell the browser where this frame draws the element, so its hit
+     * testing (clicks, `:hover`, the cursor) and accessibility bounds
+     * follow the picture instead of the element's flat box.
+     *
+     * `matrix` is 16 numbers, column-major like `DOMMatrix` and CSS
+     * `matrix3d()`. It maps the element's border box, in CSS px with the
+     * origin at its top-left and y down, to where it is drawn, in the same
+     * space. Perspective (a non-zero bottom row) works.
+     * `null` keeps the flat box.
+     *
+     * Call it in `update()` or `render()` every frame the geometry
+     * applies: a frame where no effect of the element calls it puts the
+     * flat box back. When several effects call it, the last call wins.
+     * The element's own `getBoundingClientRect()` follows the geometry;
+     * the rect VFX-JS draws into does not.
+     *
+     * It only does something for an element added with
+     * `VFX.addHTML` in a browser with
+     * `HTMLCanvasElement.updateElementGeometry` (Chrome 157+). Otherwise,
+     * and in post effects, it is a no-op.
+     */
+    setElementGeometry(matrix: ArrayLike<number> | null): void;
 };
 
 /**

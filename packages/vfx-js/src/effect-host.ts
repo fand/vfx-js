@@ -305,6 +305,8 @@ export class EffectHost {
     #warnedDrawInUpdate = false;
     #warnedDepthWithoutBuffer = false;
     #warnedInvalidSamples = false;
+    #warnedElementGeometry = false;
+    #onElementGeometry: ((m: ArrayLike<number> | null) => void) | null;
     #warnedDrawKeys = new Set<string>();
     #textureUnitCount: number | undefined;
     #maxDrawBuffers: number | undefined;
@@ -326,8 +328,12 @@ export class EffectHost {
         initialSrc: EffectTexture,
         initialVfxProps: EffectVFXProps,
         programCache: ProgramCache,
+        onElementGeometry:
+            | ((m: ArrayLike<number> | null) => void)
+            | null = null,
     ) {
         this.#glCtx = glCtx;
+        this.#onElementGeometry = onElementGeometry;
         this.#gl = glCtx.gl;
         this.#pixelRatio = pixelRatio;
         this.#programCache = programCache;
@@ -384,6 +390,7 @@ export class EffectHost {
                 this.#restoredUnsubs.push(unsub);
                 return unsub;
             },
+            setElementGeometry: (m) => this.#setElementGeometry(m),
         };
         this.#mutCtx = ctx as Mutable<EffectContext>;
     }
@@ -639,6 +646,29 @@ export class EffectHost {
             }
         }
         owned.resolver.dispose?.();
+    }
+
+    // -- element geometry ---------------------------------------------------
+
+    #setElementGeometry(m: ArrayLike<number> | null): void {
+        if (
+            !this.#onElementGeometry ||
+            this.#phase === "init" ||
+            this.#phase === "disposed"
+        ) {
+            return;
+        }
+        if (m !== null && !isMatrix4(m)) {
+            if (!this.#warnedElementGeometry) {
+                this.#warnedElementGeometry = true;
+                console.warn(
+                    "[VFX-JS] setElementGeometry() takes 16 finite numbers or null; using null.",
+                );
+            }
+            this.#onElementGeometry(null);
+            return;
+        }
+        this.#onElementGeometry(m);
     }
 
     // -- readPixels ---------------------------------------------------------
@@ -1379,6 +1409,24 @@ export class EffectHost {
 
 // ---------------------------------------------------------------------------
 // Helpers
+
+/** 16 finite numbers. */
+function isMatrix4(m: unknown): m is ArrayLike<number> {
+    if (
+        typeof m !== "object" ||
+        m === null ||
+        (m as ArrayLike<number>).length !== 16
+    ) {
+        return false;
+    }
+    for (let i = 0; i < 16; i++) {
+        const v = (m as ArrayLike<number>)[i];
+        if (typeof v !== "number" || !Number.isFinite(v)) {
+            return false;
+        }
+    }
+    return true;
+}
 // ---------------------------------------------------------------------------
 
 function isWebGLTextureHandle(

@@ -24,6 +24,7 @@ import {
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { isHicCanvas } from "./hic-canvas.js";
+import { setElementGeometry } from "./html-in-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
 import {
     createIntersectionState,
@@ -981,6 +982,9 @@ export class VFXPlayer {
                 e.backbuffer?.dispose();
             }
             e.srcTexture.dispose();
+            if (e.type === "hic") {
+                setElementGeometry(e.element as HTMLCanvasElement, null);
+            }
 
             // Recover the original state
             element.style.setProperty("opacity", e.originalOpacity.toString());
@@ -1695,6 +1699,12 @@ export class VFXPlayer {
             finalTarget,
             isVisible: hit.isVisible,
         });
+        if (e.type === "hic") {
+            setElementGeometry(
+                e.element as HTMLCanvasElement,
+                chain.elementGeometry,
+            );
+        }
     }
 
     #shouldUsePostEffect(): boolean {

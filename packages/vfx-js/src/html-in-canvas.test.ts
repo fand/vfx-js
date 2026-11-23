@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
+    lockCanvasSize,
     moveNode,
+    setElementGeometry,
     setupCapture,
     teardownCapture,
     unwrapElement,
@@ -699,5 +701,178 @@ describe("setupCapture", () => {
         expect(afterFirst).toEqual(["clear", "draw"]);
         expect(afterLater).toEqual(["clear", "draw"]);
         expect(onCapture).toHaveBeenCalledOnce();
+    });
+});
+
+// A DOMMatrix that keeps its 16 numbers, for node.
+class FakeDOMMatrix {
+    values: number[];
+    constructor(init?: number[]) {
+        this.values = init ?? [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    }
+    static fromFloat64Array(a: Float64Array) {
+        return new FakeDOMMatrix([...a]);
+    }
+}
+
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const TURNED = [0.8, 0.1, 0, 0.001, 0, 1, 0, 0, 0, 0, 1, 0, 12, 3, 0, 1];
+
+function geometryCanvas(withApi = true) {
+    const props = new Map<string, [string, string]>([
+        ["overflow", ["hidden", "important"]],
+    ]);
+    const calls: number[][] = [];
+    const ops: string[] = [];
+    const child = {
+        hasAttribute: (k: string): boolean => k === "drawable",
+        setAttribute: () => {},
+        getClientRects: () => [{}],
+        querySelectorAll: () => [],
+        getBoundingClientRect: () => {
+            ops.push(`rect:${calls.at(-1)?.join(",") ?? "none"}`);
+            return { height: 20 };
+        },
+    };
+    const ctx = {
+        clearRect: () => {},
+        drawElementImage: () => {
+            // A plain draw puts the flat box back.
+            calls.push(IDENTITY);
+            ops.push("draw");
+        },
+    };
+    const canvas = {
+        width: 10,
+        height: 10,
+        firstElementChild: child,
+        style: {
+            getPropertyValue: (k: string) => props.get(k)?.[0] ?? "",
+            getPropertyPriority: (k: string) => props.get(k)?.[1] ?? "",
+            setProperty: (k: string, v: string, prio = "") => {
+                props.set(k, [v, prio]);
+            },
+        },
+        onpaint: null as ((e?: Event) => void) | null,
+        setAttribute: () => {},
+        getContext: () => ctx,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        requestPaint: () => {},
+        getBoundingClientRect: () => ({ width: 10, height: 10 }),
+        updateElementGeometry: withApi
+            ? (el: unknown, opts: { canvasTransform: FakeDOMMatrix }) => {
+                  expect(el).toBe(child);
+                  calls.push(opts.canvasTransform.values);
+                  ops.push("geometry");
+              }
+            : undefined,
+    };
+    return {
+        canvas,
+        el: canvas as unknown as HTMLCanvasElement,
+        child,
+        props,
+        calls,
+        ops,
+    };
+}
+
+describe("setElementGeometry", () => {
+    beforeEach(() => {
+        vi.stubGlobal("DOMMatrix", FakeDOMMatrix);
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    test("is a no-op without the browser API", () => {
+        const g = geometryCanvas(false);
+        setElementGeometry(g.el, TURNED);
+        setElementGeometry(g.el, null);
+        expect(g.props.get("overflow")).toEqual(["hidden", "important"]);
+    });
+
+    test("is a no-op without a drawable child", () => {
+        const g = geometryCanvas();
+        g.child.hasAttribute = () => false;
+        setElementGeometry(g.el, TURNED);
+        expect(g.calls).toEqual([]);
+    });
+
+    test("sets the transform once, and null puts the flat box and overflow back", () => {
+        const g = geometryCanvas();
+        setElementGeometry(g.el, null);
+        expect(g.calls).toEqual([]);
+        setElementGeometry(g.el, TURNED);
+        expect(g.calls).toEqual([TURNED]);
+        // The hit region may leave the canvas's box.
+        expect(g.props.get("overflow")).toEqual(["visible", ""]);
+        // Same numbers: not sent again.
+        setElementGeometry(g.el, [...TURNED]);
+        expect(g.calls).toHaveLength(1);
+        const other = [...TURNED];
+        other[12] = 40;
+        setElementGeometry(g.el, other);
+        expect(g.calls).toEqual([TURNED, other]);
+        setElementGeometry(g.el, null);
+        expect(g.calls.at(-1)).toEqual(IDENTITY);
+        expect(g.props.get("overflow")).toEqual(["hidden", "important"]);
+        setElementGeometry(g.el, null);
+        expect(g.calls).toHaveLength(3);
+    });
+
+    test("a capture draws flat, then the geometry is put back", async () => {
+        vi.stubGlobal(
+            "OffscreenCanvas",
+            class {
+                constructor(
+                    public width: number,
+                    public height: number,
+                ) {}
+                getContext() {
+                    return { clearRect: () => {}, drawImage: () => {} };
+                }
+            },
+        );
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                observe() {}
+                disconnect() {}
+            },
+        );
+        const g = geometryCanvas();
+        const first = setupCapture(g.el, { onCapture: () => {} });
+        g.canvas.onpaint?.();
+        await first;
+        setElementGeometry(g.el, TURNED);
+        g.ops.length = 0;
+        g.canvas.onpaint?.();
+        expect(g.ops).toEqual(["draw", "geometry"]);
+        expect(g.calls.at(-1)).toEqual(TURNED);
+        // Teardown puts the flat box back.
+        teardownCapture(g.el);
+        expect(g.calls.at(-1)).toEqual(IDENTITY);
+        expect(g.props.get("overflow")).toEqual(["hidden", "important"]);
+    });
+
+    test("unlocking measures the child flat", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            width: "10px",
+            height: "10px",
+        }));
+        const g = geometryCanvas();
+        const unlock = lockCanvasSize(g.el);
+        setElementGeometry(g.el, TURNED);
+        g.ops.length = 0;
+        unlock();
+        expect(g.ops).toEqual([
+            "geometry",
+            `rect:${IDENTITY.join(",")}`,
+            "geometry",
+        ]);
+        expect(g.calls.at(-1)).toEqual(TURNED);
+        expect(g.props.get("height")).toEqual(["20px", ""]);
     });
 });

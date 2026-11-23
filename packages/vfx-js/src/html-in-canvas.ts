@@ -161,6 +161,15 @@ const lockedCanvases = new WeakSet<HTMLCanvasElement>();
 // Canvases whose height comes from top/bottom insets, not the child.
 const insetHeightCanvases = new WeakSet<HTMLCanvasElement>();
 
+// Geometry an effect reported for a wrapper's child (see
+// `setElementGeometry`), and the canvas's inline overflow from before.
+type ElementGeometry = {
+    matrix: DOMMatrix;
+    values: Float64Array;
+    overflow: [string, string];
+};
+const elementGeometries = new WeakMap<HTMLCanvasElement, ElementGeometry>();
+
 const CAPTURE_TIMEOUT_MS = 300;
 
 const PX_LENGTH = /^[\d.e+-]+px$/;
@@ -274,11 +283,109 @@ export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
         const child = canvas.firstElementChild;
         if (child && !insetHeightCanvases.has(canvas)) {
             const childHeight = Math.round(
-                child.getBoundingClientRect().height,
+                withFlatGeometry(
+                    canvas,
+                    child,
+                    () => child.getBoundingClientRect().height,
+                ),
             );
             canvas.style.setProperty("height", `${childHeight}px`);
         }
     };
+}
+
+/** The drawable child whose geometry can be set, or null. */
+function geometryChild(canvas: HTMLCanvasElement): Element | null {
+    const child = canvas.firstElementChild;
+    return typeof canvas.updateElementGeometry === "function" &&
+        child?.hasAttribute("drawable")
+        ? child
+        : null;
+}
+
+function applyGeometry(
+    canvas: HTMLCanvasElement,
+    child: Element,
+    matrix: DOMMatrixInit,
+): boolean {
+    try {
+        canvas.updateElementGeometry?.(child, { canvasTransform: matrix });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Tell the browser where the wrapper's child is drawn, so hit testing
+ * (clicks, `:hover`, the cursor) and accessibility bounds follow it.
+ *
+ * `matrix` is 16 numbers, column-major (like `DOMMatrix`): it maps the
+ * child's border box (CSS px, origin at its top-left, y down) to where it
+ * is drawn, in the same space. The child fills the canvas, so that is the
+ * `canvasTransform` of `updateElementGeometry`. `null` puts back the flat
+ * box. No-op without the browser API or a drawable child.
+ *
+ * The capture is unchanged: `drawElementImage` always draws the child flat.
+ * While a matrix is set, the canvas gets `overflow: visible`, or the
+ * browser clips the hit region to its box.
+ */
+export function setElementGeometry(
+    canvas: HTMLCanvasElement,
+    matrix: ArrayLike<number> | null,
+): void {
+    const prev = elementGeometries.get(canvas);
+    const child = geometryChild(canvas);
+    if (matrix?.length !== 16 || !child) {
+        if (!prev) {
+            return;
+        }
+        elementGeometries.delete(canvas);
+        canvas.style.setProperty("overflow", ...prev.overflow);
+        // The flat box, as `drawElementImage(child, 0, 0)` sets it.
+        if (child) {
+            applyGeometry(canvas, child, new DOMMatrix());
+        }
+        return;
+    }
+    if (prev?.values.every((v, i) => v === matrix[i])) {
+        return;
+    }
+    const values = Float64Array.from(matrix);
+    const m = DOMMatrix.fromFloat64Array(values);
+    if (!applyGeometry(canvas, child, m)) {
+        setElementGeometry(canvas, null);
+        return;
+    }
+    const st = canvas.style;
+    const overflow: [string, string] = prev
+        ? prev.overflow
+        : [st.getPropertyValue("overflow"), st.getPropertyPriority("overflow")];
+    if (!prev) {
+        st.setProperty("overflow", "visible");
+    }
+    elementGeometries.set(canvas, { matrix: m, values, overflow });
+}
+
+/**
+ * Run `fn` with the child's geometry flat, so its rects are the layout
+ * ones, then put the reported geometry back.
+ */
+function withFlatGeometry<T>(
+    canvas: HTMLCanvasElement,
+    child: Element,
+    fn: () => T,
+): T {
+    const g = elementGeometries.get(canvas);
+    if (!g) {
+        return fn();
+    }
+    applyGeometry(canvas, child, new DOMMatrix());
+    try {
+        return fn();
+    } finally {
+        applyGeometry(canvas, child, g.matrix);
+    }
 }
 
 function removeStillCover(canvas: HTMLCanvasElement): void {
@@ -362,11 +469,18 @@ export async function setupCapture(
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         // Returns a DOMMatrix in older Chrome and nothing in newer; unused.
+        // It also resets the child's geometry to the flat box, so the
+        // nested canvas rects below are the layout ones.
         ctx.drawElementImage(child, 0, 0);
         // Chrome 156-159 draw nested canvases at the wrong size and clip
         // them. A probe for this said "no bug" on a real Chrome 156 page
         // load, so always redraw them.
         redrawNestedCanvases(ctx, child);
+        // Put back the geometry an effect reported.
+        const geometry = elementGeometries.get(canvas);
+        if (geometry) {
+            applyGeometry(canvas, child, geometry.matrix);
+        }
 
         // Copy to OffscreenCanvas (with maxSize clamp)
         let w = canvas.width;
@@ -453,6 +567,7 @@ export async function setupCapture(
  * Tear down onpaint handler + ResizeObservers set up by setupCapture.
  */
 export function teardownCapture(canvas: HTMLCanvasElement): void {
+    setElementGeometry(canvas, null);
     canvas.onpaint = null;
     flushWaiters(captureWaiters.get(canvas));
     captureWaiters.delete(canvas);

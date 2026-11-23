@@ -35,6 +35,7 @@ import {
 } from "./_bloom-common.js";
 import { parseHexColor } from "./_figma-common.js";
 import {
+    elementGeometryMatrix,
     ORBIT_CAMERA_RANGE,
     OrbitCamera,
     type OrbitCameraParams,
@@ -348,6 +349,7 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     fov: 35,
     zoom: 1.0,
     drag: false,
+    hitGeometry: false,
     cameraOrigin: "element",
     pointer: "none",
     pointerRadius: 120,
@@ -1300,6 +1302,7 @@ type Resolved = Record<NumKey, number> & {
     pad: number | "fullscreen";
     shadow: boolean;
     drag: boolean;
+    hitGeometry: boolean;
     cameraOrigin: SwirlParticleParams["cameraOrigin"];
     antialias: boolean;
     pointer: SwirlParticlePointer;
@@ -1373,6 +1376,7 @@ function resolveParams(p: SwirlParticleParams, out?: Resolved): Resolved {
     r.pad = padOf(p.pad);
     r.shadow = !!p.shadow;
     r.drag = !!p.drag;
+    r.hitGeometry = !!p.hitGeometry;
     r.cameraOrigin = p.cameraOrigin === "viewport" ? "viewport" : "element";
     r.antialias = !!p.antialias;
     r.pointer =
@@ -1801,6 +1805,18 @@ export class SwirlParticleEffect implements Effect {
                     shadowAmount: shadow ? shadow.amount : 0,
                 };
             }
+        }
+        // Every frame, also while a still frame is held: a frame without
+        // it puts the flat box back.
+        if (r.hitGeometry && ready && this.#cam) {
+            ctx.setElementGeometry(
+                elementGeometryMatrix(
+                    this.#cam,
+                    ctx.dims.elementPixel,
+                    ctx.pixelRatio,
+                    r.depth / 2,
+                ),
+            );
         }
         const layers = this.#layers;
         ctx.draw({

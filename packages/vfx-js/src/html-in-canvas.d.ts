@@ -17,4 +17,10 @@ interface CanvasRenderingContext2D {
 interface HTMLCanvasElement {
     requestPaint(): void;
     onpaint: ((ev?: Event) => void) | null;
+    // Chrome 157+. Maps a drawable child's border box to the canvas, in
+    // CSS px, for hit testing and accessibility.
+    updateElementGeometry?(
+        element: Element,
+        options?: { canvasTransform?: DOMMatrixInit },
+    ): void;
 }

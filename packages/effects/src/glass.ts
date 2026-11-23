@@ -24,6 +24,7 @@ import type {
 } from "@vfx-js/core";
 import { parseHexColor } from "./_figma-common.js";
 import {
+    elementGeometryMatrix,
     OrbitCamera,
     type OrbitCameraParams,
     type OrbitCameraView,
@@ -314,6 +315,7 @@ const DEFAULT_PARAMS: GlassParams = {
     fov: 30,
     zoom: 0.7,
     drag: false,
+    hitGeometry: false,
     cameraOrigin: "element",
     pointer: "none",
     pointerStrength: 1,
@@ -1474,6 +1476,20 @@ export class GlassEffect implements Effect {
             live: !this.#still,
             tilt: this.params.pointer === "tilt",
         });
+        if (this.params.hitGeometry) {
+            // The front cap, as #drawGlass places it.
+            const depth = Number.isFinite(this.params.depth)
+                ? this.params.depth
+                : DEFAULT_PARAMS.depth;
+            ctx.setElementGeometry(
+                elementGeometryMatrix(
+                    cam,
+                    ctx.dims.elementPixel,
+                    ctx.pixelRatio,
+                    Math.max(depth / 2, 0.005),
+                ),
+            );
+        }
         const scene = this.#drawGlass(ctx, cam);
         const debug = this.#debugView() !== 0;
         // FXAA reads the tone-mapped image, so it gets its own target.

@@ -20,6 +20,12 @@
 // principalPx = centerPx + eye.xy * unitPx and focalPx = eye.z * unitPx,
 // the z = 0 plane lands on centerPx + q.xy * unitPx wherever the eye is:
 // moving the eye sideways only moves the vanishing point.
+//
+// Hit geometry: the DOM element stays flat where it was, so the browser
+// hit tests its untransformed box. With `hitGeometry` on, the effect
+// reports the matrix that lays the box over the drawn front face
+// (`elementGeometryMatrix`) with `ctx.setElementGeometry`, and VFX-JS
+// hands it to the browser for elements added with `addHTML`.
 
 import type { EffectDims } from "@vfx-js/core";
 
@@ -98,6 +104,22 @@ export type OrbitCameraParams = {
      * `pointer` modes say what it does for them.
      */
     pointerStrength: number;
+    /**
+     * Make the browser's hit testing (clicks, `:hover`, the cursor) and
+     * accessibility bounds follow the drawn shape instead of the
+     * element's flat box. Default `false`.
+     *
+     * Each frame the effect reports where the front face of the shape is
+     * drawn (the flat cap at `depth / 2` in front of the mid-plane; a
+     * `bulge` or `relief` is not followed), and while the face points
+     * away from the camera, a box that catches nothing. The element's
+     * own `getBoundingClientRect()` follows it too.
+     *
+     * Works only for an element added with `vfx.addHTML()`, in a browser
+     * with `HTMLCanvasElement.updateElementGeometry` (Chrome 157+); a
+     * no-op otherwise (see `EffectContext.setElementGeometry`).
+     */
+    hitGeometry: boolean;
 };
 
 type NumKey =
@@ -159,6 +181,7 @@ export function resolveOrbitCamera(
                 : defaults[k];
     }
     out.drag = !!p.drag;
+    out.hitGeometry = !!p.hitGeometry;
     out.cameraOrigin =
         p.cameraOrigin === "viewport" || p.cameraOrigin === "element"
             ? p.cameraOrigin
@@ -251,6 +274,115 @@ function viewportCenter(
 ): [number, number] {
     const [x, y, w, h] = dims.canvasRect;
     return [x + w / 2, y + h / 2];
+}
+
+/**
+ * The CSS transform that lays an element's box over the shape's plane
+ * z = `faceZ` as drawn: 16 numbers (column-major, like `matrix3d()`),
+ * with the transform origin at the element's centre.
+ *
+ * The element's box is the source element's (`elementPx`, physical px):
+ * its CSS point (x, y) from the centre, y down, is the shape point
+ * ((x, -y) * pixelRatio / (long side / 2), faceZ), which the camera
+ * projects as in the header comment. That is a homography in (x, y, 1);
+ * the matrix is it in rows x, y and w, with z passed through so it stays
+ * invertible, scaled so w = 1 at the centre when the centre is in front
+ * of the eye.
+ *
+ * Null when the plane faces away from the eye or passes through it, or
+ * when a number is not finite.
+ */
+export function hitAreaMatrix(
+    view: OrbitCameraView,
+    elementPx: readonly [number, number],
+    pixelRatio: number,
+    faceZ: number,
+): number[] | null {
+    const half = Math.max(elementPx[0], elementPx[1]) / 2;
+    const pr = pixelRatio;
+    if (!(half > 0) || !(pr > 0)) {
+        return null;
+    }
+    const R = view.viewRot;
+    const [ex, ey, ez] = view.eye;
+    // The face's normal in view space is R's third column; its centre is
+    // faceZ along it. It faces the eye if the eye is on its front side.
+    const facing = ex * R[6] + ey * R[7] + ez * R[8] - faceZ;
+    if (!(facing > 1e-6)) {
+        return null;
+    }
+    // Shape units per CSS px, and the face's axes per CSS px (y down).
+    const k = pr / half;
+    const ax = [k * R[0], k * R[1], k * R[2]];
+    const ay = [-k * R[3], -k * R[4], -k * R[5]];
+    // The face's centre relative to the eye's xy (z as is).
+    const c = [faceZ * R[6] - ex, faceZ * R[7] - ey, faceZ * R[8]];
+    // Depth: w = eye.z - q.z, affine in (x, y).
+    const w = [-ax[2], -ay[2], ez - c[2]];
+    // Output px from the drawn centre, y up, times w:
+    //   (principalPx - centerPx) * w + (q.xy - eye.xy) * focalPx
+    // then CSS px, y down.
+    const f = view.focalPx;
+    const dx = view.principalPx[0] - view.centerPx[0];
+    const dy = view.principalPx[1] - view.centerPx[1];
+    const X = [
+        (dx * w[0] + f * ax[0]) / pr,
+        (dx * w[1] + f * ay[0]) / pr,
+        (dx * w[2] + f * c[0]) / pr,
+    ];
+    const Y = [
+        -(dy * w[0] + f * ax[1]) / pr,
+        -(dy * w[1] + f * ay[1]) / pr,
+        -(dy * w[2] + f * c[1]) / pr,
+    ];
+    const s = 1 / (w[2] > 1e-6 ? w[2] : ez);
+    // biome-ignore format: a 4 × 4 matrix, one column per row
+    const m = [
+        X[0] * s, Y[0] * s, 0, w[0] * s,
+        X[1] * s, Y[1] * s, 0, w[1] * s,
+        0, 0, s, 0,
+        X[2] * s, Y[2] * s, 0, w[2] * s,
+    ];
+    return m.every(Number.isFinite) ? m : null;
+}
+
+/**
+ * The element geometry for `ctx.setElementGeometry`: the matrix that maps
+ * the element's box (CSS px, origin at its top-left, y down) onto the
+ * shape's plane z = `faceZ` as drawn. {@link hitAreaMatrix} moved from
+ * the box's centre to its top-left.
+ *
+ * While the plane faces away (or a number is broken), the box squashed
+ * to a point at its centre, which the browser hit tests as nothing.
+ */
+export function elementGeometryMatrix(
+    view: OrbitCameraView,
+    elementPx: readonly [number, number],
+    pixelRatio: number,
+    faceZ: number,
+): number[] {
+    const cx = elementPx[0] / pixelRatio / 2 || 0;
+    const cy = elementPx[1] / pixelRatio / 2 || 0;
+    const m = hitAreaMatrix(view, elementPx, pixelRatio, faceZ);
+    if (!m) {
+        // biome-ignore format: a 4 × 4 matrix, one column per row
+        return [
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 1, 0,
+            cx, cy, 0, 1,
+        ];
+    }
+    // T(c) · m · T(-c): the last column first, then the rows x and y.
+    for (let i = 0; i < 4; i++) {
+        m[12 + i] -= cx * m[i] + cy * m[4 + i];
+    }
+    for (let col = 0; col < 4; col++) {
+        const w = m[col * 4 + 3];
+        m[col * 4] += cx * w;
+        m[col * 4 + 1] += cy * w;
+    }
+    return m;
 }
 
 /**
