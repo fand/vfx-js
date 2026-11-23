@@ -1,6 +1,7 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import {
     type BloomEffect,
+    type BubbleParams,
     type DatamoshEffect,
     type FluidEffect,
     type GlassParams,
@@ -1143,6 +1144,125 @@ export function attachGlassPane(
     bind(view, "fxaa");
     bind(view, "debug", {
         options: { off: "off", outer: "outer", inner: "inner", total: "total" },
+    });
+
+    trackPane(pane);
+    return pane;
+}
+
+/** Params of {@link attachBubblePane} that Tweakpane edits. */
+export type BubblePaneParams = Omit<
+    BubbleParams,
+    "backdrop" | "backdropColors"
+>;
+
+/**
+ * Tweakpane for BubbleEffect. Binds to a story-owned `params` object and
+ * calls `apply` on every edit. `source` and `backdrop` are keys of the
+ * story's own lists.
+ */
+export function attachBubblePane(
+    title: string,
+    params: BubblePaneParams,
+    apply: () => void,
+    pickers: {
+        source: SwirlSourceSelector;
+        backdrop: SwirlSourceSelector;
+        palette: SwirlSourceSelector;
+    },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    // The effect orbits on window pointer drags; keep panel drags out.
+    container.addEventListener("pointerdown", (e) => e.stopPropagation());
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+    const bind = (
+        folder: FolderApi | Pane,
+        key: keyof BubblePaneParams,
+        opts: BindingParams = {},
+    ) => {
+        folder.addBinding(params, key, opts).on("change", apply);
+    };
+    const pick = (
+        folder: FolderApi | Pane,
+        label: string,
+        sel: SwirlSourceSelector,
+    ) => {
+        const state = { value: sel.value };
+        folder
+            .addBinding(state, "value", {
+                label,
+                options: Object.fromEntries(sel.keys.map((k) => [k, k])),
+            })
+            .on("change", (ev) => sel.onChange(ev.value));
+    };
+
+    pick(pane, "source", pickers.source);
+
+    const bubbles = pane.addFolder({ title: "Bubbles" });
+    bind(bubbles, "depth", range(0.02, 1.5, 0.01));
+    bind(bubbles, "cellSize", range(0.02, 0.6, 0.005));
+    bind(bubbles, "cellSizeRandomness", range(0, 1, 0.01));
+    bind(bubbles, "jitter", range(0, 0.9, 0.01));
+    bind(bubbles, "seed", range(0, 100, 1));
+    bind(bubbles, "roundness", range(0, 1, 0.01));
+    bind(bubbles, "skin", range(-0.1, 0.1, 0.001));
+    bind(bubbles, "wobble", range(0, 0.15, 0.005));
+    bind(bubbles, "speed", range(0, 2, 0.01));
+    bind(bubbles, "maxLayers", range(1, 16, 1));
+
+    const film = pane.addFolder({ title: "Film" });
+    bind(film, "iridescence", range(0, 1, 0.01));
+    bind(film, "thickness", range(0, 1500, 5));
+    bind(film, "thicknessVariation", range(0, 1, 0.01));
+    bind(film, "drain", range(0, 1, 0.01));
+    bind(film, "swirlScale", range(0, 6, 0.05));
+    bind(film, "swirlSpeed", range(-1, 1, 0.01));
+    bind(film, "reflection", range(0, 4, 0.05));
+    bind(film, "tint", { view: "color" });
+    bind(film, "tintStrength", range(0, 1, 0.01));
+    bind(film, "opacity", range(0, 1, 0.01));
+    bind(film, "color", { view: "color" });
+
+    const backdrop = pane.addFolder({ title: "Backdrop" });
+    pick(backdrop, "backdrop", pickers.backdrop);
+    pick(backdrop, "palette", pickers.palette);
+    bind(backdrop, "backdropVisible");
+    bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
+    bind(backdrop, "backdropDistance", range(0, 3, 0.01));
+    bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
+    bind(backdrop, "backdropRatio", range(0, 1, 0.01));
+    bind(backdrop, "backdropSoftness", range(0, 1, 0.01));
+
+    const light = pane.addFolder({ title: "Lights" });
+    bind(light, "lightIntensity", range(0, 8, 0.05));
+    bind(light, "lightSoftness", range(0, 1, 0.01));
+
+    const view = pane.addFolder({ title: "View" });
+    bind(view, "yaw", range(-3.15, 3.15, 0.01));
+    bind(view, "pitch", range(-1.5, 1.5, 0.01));
+    bind(view, "orbit", range(0, 1.5, 0.01));
+    bind(view, "fov", range(5, 90, 1));
+    bind(view, "zoom", range(0.1, 2, 0.01));
+    bind(view, "drag");
+    bind(view, "resolution", range(0.25, 2, 0.05));
+    bind(view, "fxaa");
+    bind(view, "debug", {
+        options: {
+            off: "off",
+            cost: "cost",
+            layers: "layers",
+            cells: "cells",
+        },
     });
 
     trackPane(pane);
