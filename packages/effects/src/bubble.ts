@@ -79,7 +79,8 @@ export type BubbleDebugView = "off" | "cost" | "layers" | "cells";
 /**
  * Params of {@link BubbleEffect}. All are read every frame. The
  * placement params (`depth`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `jitter`, `seed`, `skin`, `minSize`) place the bubbles
+ * `roundness`, `jitter`, `seed`, `skin`, `minSize`, `containment`, and
+ * `wobble` while `containment` is above 0) place the bubbles
  * again on the CPU when they change, which takes a few to a few tens of
  * milliseconds.
  */
@@ -130,6 +131,14 @@ export type BubbleParams = {
      * more, smaller bubbles; 1 turns the fill off. Placement param.
      */
     minSize: number;
+    /**
+     * How tightly the bubbles keep to the shape, 0 to 1. 0 lets them poke
+     * out of the silhouette (see `skin`) and bulge out of its front and
+     * back; 1 keeps every bubble inside it, its drift included, so the
+     * outline is the shape's own, scalloped by the bubbles touching it
+     * from inside. Placement param.
+     */
+    containment: number;
     /**
      * Amplitude of the bubbles' slow drift, relative to each bubble's
      * radius, 0 to 0.15: the walls breathe. Changing it rebuilds the
@@ -255,6 +264,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     seed: 1,
     skin: 0,
     minSize: 0.25,
+    containment: 0,
     wobble: 0.06,
     speed: 0.15,
     maxLayers: 6,
@@ -933,12 +943,18 @@ export class BubbleEffect implements Effect {
             seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
             skin: clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin),
             minSize: clamp(p.minSize, 0.05, 1, d.minSize),
+            containment: clamp(p.containment, 0, 1, d.containment),
         };
+        const wobble = clamp(p.wobble, 0, WOBBLE_MAX, d.wobble);
+        if (fill.containment && fill.containment > 0) {
+            // Room for the drift: the wobble becomes a placement param.
+            fill.wobble = wobble;
+        }
         return {
             halfDepth,
             cellSize,
             fill,
-            wobble: clamp(p.wobble, 0, WOBBLE_MAX, d.wobble),
+            wobble,
         };
     }
 

@@ -85,6 +85,17 @@ export type FillOptions = {
      * fill.
      */
     minSize: number;
+    /**
+     * 0 to 1: how tightly the bubbles keep to the shape. 0 lets them poke
+     * out by the limits above; 1 keeps every bubble inside it, its drift
+     * included.
+     */
+    containment?: number;
+    /**
+     * The drift's amplitude per radius, which `containment` makes room
+     * for. Only read when `containment` is above 0.
+     */
+    wobble?: number;
     /** Spheres at most, up to {@link BUBBLE_MAX_COUNT}. */
     maxCount?: number;
 };
@@ -110,13 +121,24 @@ export type BubbleFill = {
 export type FillShape = {
     protrude: number;
     bulgeZ: number;
+    /** 1 - containment: the share of the poke-out limits left. */
+    loose: number;
+    /**
+     * A radius allowed by the shape is divided by this, so the drift
+     * cannot carry a contained bubble out: 1 + containment × wobble.
+     */
+    driftRoom: number;
 };
 
 /** How far a sphere may poke out of the shape, from the options. */
 export function fillShape(o: FillOptions): FillShape {
+    const c = Math.min(Math.max(o.containment ?? 0, 0), 1);
+    const loose = 1 - c;
     return {
-        protrude: Math.max(SPHERE_PROTRUDE * o.cellSize - o.skin, 0),
-        bulgeZ: SPHERE_BULGE_Z * o.cellSize,
+        protrude: Math.max(loose * SPHERE_PROTRUDE * o.cellSize - o.skin, 0),
+        bulgeZ: loose * SPHERE_BULGE_Z * o.cellSize,
+        loose,
+        driftRoom: 1 + c * Math.max(o.wobble ?? 0, 0),
     };
 }
 
@@ -320,7 +342,10 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
         Math.max(Math.floor(o.maxCount ?? BUBBLE_MAX_COUNT), 0),
         BUBBLE_MAX_COUNT,
     );
-    const { protrude, bulgeZ } = fillShape({ ...o, cellSize: cell });
+    const { protrude, bulgeZ, loose, driftRoom } = fillShape({
+        ...o,
+        cellSize: cell,
+    });
     const pullDepth = PULL_DEPTH * cell;
     const pullMax = PULL_MAX * cell;
     const sphereR =
@@ -357,13 +382,22 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
                     cx -= gx * move;
                     cy -= gy * move;
                     depthIn = pullDepth;
+                    if (loose < 1) {
+                        // The pull assumes a straight outline; a contained
+                        // bubble needs its true depth.
+                        depthIn = Math.min(
+                            depthIn,
+                            -sampleSd2(shape, cx, cy)[0],
+                        );
+                    }
                 }
                 const f = h[3] * 7.31;
                 let r = sphereR * (1 - radiusVar * (f - Math.floor(f)));
                 r = Math.min(
                     r,
-                    Math.min(depthIn, halfDepth - Math.abs(cz) + bulgeZ) +
-                        protrude,
+                    (Math.min(depthIn, halfDepth - Math.abs(cz) + bulgeZ) +
+                        protrude) /
+                        driftRoom,
                 );
                 if (r > 0) {
                     lat.push(cx, cy, cz, r);
@@ -474,10 +508,12 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
                         // A filling sphere pokes out of the shape by a
                         // share of its radius at most, so the small ones
                         // along the outline keep it crisp.
-                        dB[v] = Math.min(
-                            col[j] + Math.min(protrude, FILL_POKE_K * col[j]),
-                            dz + Math.min(protrude + bulgeZ, FILL_POKE_K * dz),
-                        );
+                        const poke = loose * FILL_POKE_K;
+                        dB[v] =
+                            Math.min(
+                                col[j] + Math.min(protrude, poke * col[j]),
+                                dz + Math.min(protrude + bulgeZ, poke * dz),
+                            ) / driftRoom;
                         bMax = Math.max(bMax, dB[v]);
                     } else {
                         dB[v] = -1;
@@ -606,7 +642,7 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
                 // neighbour may poke out a little more to reach it, so
                 // it shares a wall rather than floating loose.
                 const reachIt = FILL_REACH * dS[v];
-                if (r < reachIt && reachIt <= dB[v] + tMin) {
+                if (r < reachIt && reachIt <= dB[v] + loose * tMin) {
                     r = reachIt;
                 }
                 const n0 = out.length / 4;

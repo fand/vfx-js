@@ -206,6 +206,12 @@ export const bigCells: StoryObj<Args> = {
     },
 };
 
+// The bubbles held inside the shape (containment 1): the outline is
+// the logo's own, scalloped by the bubbles touching it from inside.
+export const contained: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", params: { containment: 1 } },
+};
+
 // The same with radii that vary more.
 export const random: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { cellSizeRandomness: 0.6 } },

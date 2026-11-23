@@ -274,6 +274,32 @@ describe("placeBubbles", () => {
         expect(f.capped).toBe(true);
     });
 
+    test("containment 0 is the default placement", () => {
+        const zero = placeBubbles(shape, { ...OPTS, containment: 0 });
+        expect(Array.from(zero.spheres)).toEqual(Array.from(fill.spheres));
+    });
+
+    test("containment 1 keeps every bubble inside, drift included", () => {
+        const wobble = 0.1;
+        const tight = placeBubbles(shape, {
+            ...OPTS,
+            containment: 1,
+            wobble,
+        });
+        expect(tight.count).toBeGreaterThan(fill.latticeCount);
+        for (let i = 0; i < tight.count; i++) {
+            const [x, y, z, r] = sphere(tight, i);
+            const d = insideDistance(shape, OPTS.halfDepth, x, y, z);
+            expect(r * (1 + wobble)).toBeLessThanOrEqual(d + 1e-4);
+        }
+        // Half way pokes out less than not at all contained.
+        const half = placeBubbles(shape, { ...OPTS, containment: 0.5 });
+        expect(tight.reach).toBeLessThan(half.reach);
+        expect(half.reach).toBeLessThan(fill.reach);
+        // The tight foam still fills the shape seen from the front.
+        expect(projectedShare(tight)).toBeGreaterThan(0.75);
+    });
+
     test("reach bounds how far the spheres reach out of the shape", () => {
         for (let i = 0; i < fill.count; i++) {
             const [x, y, z, r] = sphere(fill, i);
