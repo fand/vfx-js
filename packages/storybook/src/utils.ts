@@ -1166,6 +1166,7 @@ export function attachGlassPane(
     bind(view, "zoom", range(0.1, 2, 0.01));
     bind(view, "drag");
     bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
+    bind(view, "hitGeometry");
     bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
     bind(view, "pointerStrength", range(0, 4, 0.01));
     bind(view, "resolution", range(0.25, 2, 0.05));

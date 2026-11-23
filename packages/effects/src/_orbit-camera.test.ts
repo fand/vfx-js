@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
     DRAG_PITCH_MAX,
     DRAG_RAD_PER_PX,
+    elementGeometryMatrix,
+    hitAreaMatrix,
     OrbitCamera,
     type OrbitCameraInput,
     type OrbitCameraParams,
@@ -524,5 +526,200 @@ describe("OrbitCamera, pointer", () => {
         c.update(PARAMS, at(100, { live: false }));
         expect(c.offsets.tiltPitch).toBeCloseTo(0, 12);
         expect(w.added).toEqual([]);
+    });
+});
+
+/**
+ * Where CSS point (x, y) of a box of w × h CSS px lands under a
+ * `matrix3d` with `transform-origin` at its centre, as the browser does
+ * it: from the centre, through the matrix, divided by w.
+ */
+function applyCss(
+    m: readonly number[],
+    size: readonly [number, number],
+    p: readonly [number, number],
+): [number, number] {
+    const x = p[0] - size[0] / 2;
+    const y = p[1] - size[1] / 2;
+    const X = m[0] * x + m[4] * y + m[12];
+    const Y = m[1] * x + m[5] * y + m[13];
+    const W = m[3] * x + m[7] * y + m[15];
+    return [X / W + size[0] / 2, Y / W + size[1] / 2];
+}
+
+/** A point through a 4 × 4 matrix (column-major), z = 0, divided by w. */
+function applyMatrix(
+    m: readonly number[],
+    p: readonly [number, number],
+): [number, number] {
+    const W = m[3] * p[0] + m[7] * p[1] + m[15];
+    return [
+        (m[0] * p[0] + m[4] * p[1] + m[12]) / W,
+        (m[1] * p[0] + m[5] * p[1] + m[13]) / W,
+    ];
+}
+
+/**
+ * Where the shape point under CSS point (x, y) of the element (CSS px,
+ * top-left origin) is drawn on its plane z = faceZ, in CSS px of the
+ * element's box (top-left origin): the projection of the header comment,
+ * then output px (bottom-left, physical) to CSS.
+ */
+function drawnCss(
+    cam: OrbitCameraView,
+    at: OrbitCameraInput,
+    faceZ: number,
+    p: readonly [number, number],
+): [number, number] {
+    const pr = at.pixelRatio;
+    const [ew, eh] = at.dims.elementPixel;
+    const half = Math.max(ew, eh) / 2;
+    const shape = [
+        (p[0] * pr - ew / 2) / half,
+        (eh / 2 - p[1] * pr) / half,
+        faceZ,
+    ];
+    const out = project(cam, shape);
+    const lx = out[0] + cam.origin[0];
+    const ly = out[1] + cam.origin[1];
+    return [lx / pr, eh / pr - ly / pr];
+}
+
+// 400 × 200 physical px at pixel ratio 2: a 200 × 100 CSS box.
+const BOX: [number, number] = [200, 100];
+const BOX_POINTS: [number, number][] = [
+    [0, 0],
+    [200, 0],
+    [200, 100],
+    [0, 100],
+    [100, 50],
+    [30, 80],
+];
+const CAMERAS: [string, Partial<OrbitCameraParams>, number, number][] = [
+    ["element", { yaw: 33, pitch: -12, zoom: 0.7, fov: 60 }, 300, 300],
+    ["element, front cap far", { yaw: -50, pitch: 25, fov: 90 }, 300, 300],
+    [
+        "viewport, off-centre",
+        { yaw: 25, pitch: 18, zoom: 1.3, fov: 75, cameraOrigin: "viewport" },
+        20,
+        30,
+    ],
+    [
+        "viewport, other corner",
+        { yaw: -40, pitch: -8, zoom: 0.8, fov: 50, cameraOrigin: "viewport" },
+        580,
+        560,
+    ],
+];
+
+describe("hitAreaMatrix", () => {
+    for (const [name, over, x, y] of CAMERAS) {
+        test(`maps the box onto the drawn face: ${name}`, () => {
+            const at = input({ pixelRatio: 2 }, x, y, 50);
+            const cam = new OrbitCamera(PARAMS).update(
+                { ...PARAMS, ...over },
+                at,
+            );
+            for (const faceZ of [0, 0.1, 0.35]) {
+                const m = hitAreaMatrix(
+                    cam,
+                    at.dims.elementPixel,
+                    at.pixelRatio,
+                    faceZ,
+                );
+                expect(m).not.toBeNull();
+                for (const p of BOX_POINTS) {
+                    expectClose(
+                        applyCss(m as number[], BOX, p),
+                        drawnCss(cam, at, faceZ, p),
+                        6,
+                    );
+                }
+            }
+        });
+    }
+
+    test("front-on, the z = 0 plane is the identity in both modes", () => {
+        for (const cameraOrigin of ["element", "viewport"] as const) {
+            const at = input({ pixelRatio: 2 }, 20, 30);
+            const cam = new OrbitCamera(PARAMS).update(
+                { ...PARAMS, cameraOrigin, fov: 70 },
+                at,
+            );
+            const m = hitAreaMatrix(cam, at.dims.elementPixel, 2, 0);
+            // biome-ignore format: a 4 × 4 matrix
+            expectClose(m as number[], [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1 / cam.camDist, 0,
+                0, 0, 0, 1,
+            ]);
+        }
+    });
+
+    test("none while the face points away from the eye or is edge-on", () => {
+        const at = input();
+        const el = new OrbitCamera(PARAMS);
+        const get = (over: Partial<OrbitCameraParams>, faceZ = 0.1) =>
+            hitAreaMatrix(
+                el.update({ ...PARAMS, ...over }, at),
+                at.dims.elementPixel,
+                1,
+                faceZ,
+            );
+        expect(get({ yaw: 120 })).toBeNull();
+        expect(get({ yaw: 180 })).toBeNull();
+        expect(get({ pitch: -100 })).toBeNull();
+        expect(get({ yaw: 90 }, 0)).toBeNull();
+        expect(get({ yaw: 85 })).not.toBeNull();
+        const cam = el.update(PARAMS, at);
+        expect(hitAreaMatrix(cam, [0, 0], 1, 0)).toBeNull();
+        expect(hitAreaMatrix(cam, [400, 200], 0, 0)).toBeNull();
+        expect(hitAreaMatrix(cam, [400, 200], 1, Number.NaN)).toBeNull();
+    });
+});
+
+describe("elementGeometryMatrix", () => {
+    for (const [name, over, x, y] of CAMERAS) {
+        test(`maps the box from its top-left onto the drawn face: ${name}`, () => {
+            const at = input({ pixelRatio: 2 }, x, y, 50);
+            const cam = new OrbitCamera(PARAMS).update(
+                { ...PARAMS, ...over },
+                at,
+            );
+            for (const faceZ of [0, 0.11]) {
+                const m = elementGeometryMatrix(
+                    cam,
+                    at.dims.elementPixel,
+                    at.pixelRatio,
+                    faceZ,
+                );
+                for (const p of BOX_POINTS) {
+                    expectClose(
+                        applyMatrix(m, p),
+                        drawnCss(cam, at, faceZ, p),
+                        6,
+                    );
+                }
+            }
+        });
+    }
+
+    test("front-on at z = 0, the box stays where it is", () => {
+        const at = input({ pixelRatio: 2 });
+        const cam = new OrbitCamera(PARAMS).update(PARAMS, at);
+        const m = elementGeometryMatrix(cam, at.dims.elementPixel, 2, 0);
+        for (const p of BOX_POINTS) {
+            expectClose(applyMatrix(m, p), p);
+        }
+    });
+
+    test("facing away, the box is squashed to its centre", () => {
+        const at = input({ pixelRatio: 2 });
+        const cam = new OrbitCamera(PARAMS).update({ ...PARAMS, yaw: 180 }, at);
+        const m = elementGeometryMatrix(cam, at.dims.elementPixel, 2, 0.1);
+        for (const p of BOX_POINTS) {
+            expectClose(applyMatrix(m, p), [100, 50]);
+        }
     });
 });

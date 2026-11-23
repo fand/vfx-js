@@ -19,6 +19,7 @@ type MockHost = {
     ctx: {
         src?: unknown;
         target?: unknown;
+        setElementGeometry?: (m: ArrayLike<number> | null) => void;
         // Other fields aren't consulted by the chain.
     };
     _calls: Call[];
@@ -54,7 +55,11 @@ vi.mock("./effect-host.js", () => {
     class EffectHost {
         ctx: MockHost["ctx"] = {};
         _calls: Call[] = [];
-        constructor() {
+        constructor(...args: unknown[]) {
+            const sink = args[6] as
+                | ((m: ArrayLike<number> | null) => void)
+                | null;
+            this.ctx.setElementGeometry = (m) => sink?.(m);
             hosts.push(this as unknown as MockHost);
         }
         setPhase(p: string) {
@@ -1398,3 +1403,75 @@ afterEach(() => {
 
 // Silence unused types from spot-checks.
 void ({} as EffectRenderTarget);
+
+// ---------------------------------------------------------------------------
+// element geometry
+// ---------------------------------------------------------------------------
+
+describe("EffectChain: elementGeometry", () => {
+    const A = Array.from({ length: 16 }, (_, i) => i);
+    const B = Array.from({ length: 16 }, (_, i) => -i);
+
+    it("is what an effect reported this frame, the last call winning", () => {
+        let report: (number[] | null)[] = [A];
+        const effects: Effect[] = [
+            {
+                update: (ctx) => {
+                    for (const m of report) {
+                        ctx.setElementGeometry(m);
+                    }
+                },
+            },
+            {
+                render: (ctx) => {
+                    if (report.length > 1) {
+                        ctx.setElementGeometry(B);
+                    }
+                },
+            },
+        ];
+        const chain = makeChain(effects);
+        expect(chain.elementGeometry).toBeNull();
+        chain.run(makeInput());
+        expect(chain.elementGeometry).toBe(A);
+        report = [A, null];
+        chain.run(makeInput());
+        expect(chain.elementGeometry).toBe(B);
+    });
+
+    it("is null after a frame where no effect reported it", () => {
+        let on = true;
+        const chain = makeChain([
+            {
+                render: (ctx) => {
+                    if (on) {
+                        ctx.setElementGeometry(A);
+                    }
+                },
+            },
+        ]);
+        chain.run(makeInput());
+        expect(chain.elementGeometry).toBe(A);
+        on = false;
+        chain.run(makeInput());
+        expect(chain.elementGeometry).toBeNull();
+    });
+
+    it("keeps the last value while the element is not visible", () => {
+        const chain = makeChain([
+            { render: (ctx) => ctx.setElementGeometry(A) },
+        ]);
+        chain.run(makeInput());
+        chain.run(makeInput({ isVisible: false }));
+        expect(chain.elementGeometry).toBe(A);
+    });
+
+    it("post effects have no element: always null", () => {
+        const chain = makeChain(
+            [{ render: (ctx) => ctx.setElementGeometry(A) }],
+            true,
+        );
+        chain.run(makeInput());
+        expect(chain.elementGeometry).toBeNull();
+    });
+});

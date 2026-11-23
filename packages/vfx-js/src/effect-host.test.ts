@@ -534,7 +534,10 @@ function makeCtxStub(gl: WebGL2RenderingContext): {
     };
 }
 
-function makeHost(glslVersion: "100" | "300 es" = "300 es") {
+function makeHost(
+    glslVersion: "100" | "300 es" = "300 es",
+    onElementGeometry: ((m: ArrayLike<number> | null) => void) | null = null,
+) {
     const gl = makeGlStub();
     const { ctx: glCtx } = makeCtxStub(gl);
     const quad = {} as Quad;
@@ -550,6 +553,7 @@ function makeHost(glslVersion: "100" | "300 es" = "300 es") {
         } as unknown as EffectTexture,
         { autoCrop: true, glslVersion },
         programCache,
+        onElementGeometry,
     );
     host.setFrameDims({
         outputBufferW: 100,
@@ -2410,5 +2414,47 @@ describe("EffectHost.readPixels", () => {
             "context is lost",
         );
         expect(pixelReads).toHaveLength(2);
+    });
+});
+
+describe("EffectHost.setElementGeometry", () => {
+    const M = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 0, 1];
+
+    it("is a no-op without a sink (post effects)", () => {
+        const { host } = makeHost();
+        host.setPhase("update");
+        expect(() => host.ctx.setElementGeometry(M)).not.toThrow();
+    });
+
+    it("forwards in update and render, not in init or after dispose", () => {
+        const sink = vi.fn();
+        const { host } = makeHost("300 es", sink);
+        host.setPhase("init");
+        host.ctx.setElementGeometry(M);
+        expect(sink).not.toHaveBeenCalled();
+        host.setPhase("update");
+        host.ctx.setElementGeometry(M);
+        host.setPhase("render");
+        host.ctx.setElementGeometry(null);
+        expect(sink.mock.calls).toEqual([[M], [null]]);
+        host.dispose();
+        host.ctx.setElementGeometry(M);
+        expect(sink).toHaveBeenCalledTimes(2);
+    });
+
+    it("a value that is not 16 finite numbers counts as null, with one warning", () => {
+        const sink = vi.fn();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host } = makeHost("300 es", sink);
+        host.setPhase("update");
+        const nan = [...M];
+        nan[3] = Number.NaN;
+        host.ctx.setElementGeometry([1, 2, 3]);
+        host.ctx.setElementGeometry(nan);
+        expect(sink.mock.calls).toEqual([[null], [null]]);
+        expect(warn).toHaveBeenCalledOnce();
+        host.ctx.setElementGeometry(new Float64Array(M));
+        expect(sink.mock.calls[2][0]).toEqual(new Float64Array(M));
+        warn.mockRestore();
     });
 });

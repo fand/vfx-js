@@ -69,6 +69,11 @@ type Args = {
     backdrop: string;
     /** Overrides of the effect defaults for this story. */
     params?: Partial<Omit<GlassParams, "backdrop">>;
+    /**
+     * Add HTML sources with `vfx.addHTML` (html-in-canvas), and show a
+     * readout of clicks and `:hover` on them.
+     */
+    html?: boolean;
 };
 
 function createSource(key: SourceKey): HTMLElement {
@@ -100,6 +105,22 @@ function whenLoaded(el: HTMLElement): Promise<void> {
             once: true,
         });
     });
+}
+
+// Count clicks and show `:hover` on the element, to check where the
+// browser hit tests it.
+function watchHits(el: HTMLElement, out: HTMLElement): void {
+    let clicks = 0;
+    const show = () => {
+        out.textContent = `clicks: ${clicks}\nhover: ${el.matches(":hover") ? "yes" : "no"}`;
+    };
+    el.addEventListener("click", () => {
+        clicks++;
+        show();
+    });
+    el.addEventListener("pointerenter", show);
+    el.addEventListener("pointerleave", show);
+    show();
 }
 
 export default {
@@ -142,6 +163,13 @@ export default {
             backdropColors: palette(),
         });
 
+        const readout = document.createElement("output");
+        readout.style.cssText =
+            "position: fixed; left: 16px; top: 16px; z-index: 10000; padding: 6px 10px; border-radius: 6px; background: #fffc; color: #000; font: 13px/1.4 ui-monospace, monospace; white-space: pre";
+        if (args.html) {
+            root.appendChild(readout);
+        }
+
         let sourceKey: SourceKey = args.source;
         let el: HTMLElement | null = null;
         let effect: GlassEffect | null = null;
@@ -180,7 +208,14 @@ export default {
                 return;
             }
             effect = new GlassEffect(current(), { still });
-            adding = vfx.add(next, { effect });
+            if (args.html && !(next instanceof HTMLImageElement)) {
+                // addHTML needs a set width for a content-sized element.
+                next.style.width = `${next.getBoundingClientRect().width}px`;
+                watchHits(next, readout);
+                adding = vfx.addHTML(next, { effect });
+            } else {
+                adding = vfx.add(next, { effect });
+            }
             await adding;
         };
 
@@ -249,5 +284,24 @@ export const htmlButton: StoryObj<Args> = {
         source: "HTML button",
         backdrop: "grid",
         params: { relief: -0.05 },
+    },
+};
+
+// The button added with `addHTML` and `hitGeometry` on: clicks, `:hover`
+// and the cursor follow the turned front face (Chrome 157+).
+export const htmlButtonHitGeometry: StoryObj<Args> = {
+    args: {
+        source: "HTML button",
+        backdrop: "grid",
+        html: true,
+        params: {
+            relief: -0.05,
+            yaw: 40,
+            fov: 60,
+            orbitAnimation: 0,
+            drag: false,
+            pointer: "tilt",
+            hitGeometry: true,
+        },
     },
 };
