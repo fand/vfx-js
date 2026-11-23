@@ -186,9 +186,9 @@ export default {
     },
 } satisfies Meta<Args>;
 
-// The VFX-JS logo as a foam of cells placed on the CPU (the default).
+// The VFX-JS logo as a foam of Voronoi cells placed on the CPU.
 export const packed: StoryObj<Args> = {
-    args: { source: "VFX-JS logo" },
+    args: { source: "VFX-JS logo", params: { packing: "packed" } },
 };
 
 // The same with seeds on a jittered lattice, made in the shader.
@@ -196,13 +196,51 @@ export const grid: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { packing: "grid" } },
 };
 
+// The logo as a cluster of overlapping spheres on a lattice, cut by flat
+// shared walls where they overlap (the default).
+export const spheres: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", params: { packing: "spheres" } },
+};
+
+// The same with radii that vary more.
+export const spheresRandom: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { packing: "spheres", cellSizeRandomness: 0.6 },
+    },
+};
+
+// "spheres" from flat-walled foam (roundness 0) to nearly separate
+// spheres (1).
+export const spheresRoundness0: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { packing: "spheres", roundness: 0 },
+    },
+};
+
+export const spheresRoundness05: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { packing: "spheres", roundness: 0.5 },
+    },
+};
+
+export const spheresRoundness1: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { packing: "spheres", roundness: 1 },
+    },
+};
+
 // Plain HTML text, seen nearly from the front so the letters read.
 export const htmlText: StoryObj<Args> = {
     args: {
         source: "HTML text",
         params: {
-            cellSize: 0.06,
+            cellSize: 0.045,
             depth: 0.12,
+            roundness: 0.3,
             yaw: 0.2,
             pitch: 0.12,
             orbit: 0.15,
@@ -235,6 +273,7 @@ export const closeUp: StoryObj<Args> = {
         source: "cloud",
         background: "linear-gradient(#c3d0fb, #a9b9ec)",
         params: {
+            packing: "packed",
             cellSize: 0.34,
             depth: 0.4,
             gap: 0.006,
@@ -252,11 +291,36 @@ export const closeUp: StoryObj<Args> = {
     },
 };
 
+// Large spheres on the pale page: a bubble cluster, flat walls where
+// the bubbles meet.
+export const closeUpSpheres: StoryObj<Args> = {
+    args: {
+        source: "cloud",
+        background: "linear-gradient(#c3d0fb, #a9b9ec)",
+        params: {
+            packing: "spheres",
+            cellSize: 0.3,
+            depth: 0.4,
+            roundness: 0.5,
+            cellSizeRandomness: 0.3,
+            iridescence: 0.2,
+            tint: "#3d5fc4",
+            tintStrength: 0.6,
+            lightSoftness: 1,
+            yaw: 0.1,
+            pitch: 0.12,
+            orbit: 0.1,
+            zoom: 0.8,
+        },
+    },
+};
+
 // Opaque cells: matte pillows packed in the shape.
 export const opaque: StoryObj<Args> = {
     args: {
         source: "cloud",
         params: {
+            packing: "packed",
             cellSize: 0.22,
             depth: 0.4,
             rounding: 0.01,

@@ -4,7 +4,10 @@
 // 1. The silhouette is read back from the element (`ctx.src` alpha) and
 //    turned into a 2D signed distance field S; the 3D volume is its
 //    extrusion (see `_silhouette.ts`).
-// 2. The volume is split into 3D Voronoi cells. Their seeds are placed on
+// 2. "spheres" (default): spheres on a jittered lattice, a power diagram
+//    found exactly along each ray (see `_sphere-foam.ts` and
+//    traceSpheres). "packed" / "grid": the volume is split into 3D
+//    Voronoi cells. Their seeds are placed on
 //    the CPU, evenly, inside the shape ("packed", see `_bubble-pack.ts`),
 //    or in the shader on a jittered lattice ("grid").
 // 3. Each cell is the hard maximum of the bisector planes to its
@@ -70,9 +73,13 @@ import {
  * changes), evenly inside the shape, so the cells are alike in size and
  * thin parts get cells along their middle. `"grid"`: one per cell of a
  * jittered lattice, made in the shader; seeds near the shape are pulled
- * into it, so thin strokes may get uneven cells.
+ * into it, so thin strokes may get uneven cells. `"spheres"`: a sphere
+ * per cell of the same lattice, sized by `cellSize`, `roundness` and
+ * `cellSizeRandomness`; overlapping spheres are cut by flat shared walls
+ * (a power diagram), exposed ones keep their round outside, found
+ * exactly along each ray.
  */
-export type BubblePacking = "packed" | "grid";
+export type BubblePacking = "packed" | "grid" | "spheres";
 
 /**
  * A {@link BubbleParams.debug} view: texture lookups per pixel
@@ -88,12 +95,18 @@ export type BubbleParams = {
     /** Where the seeds of the cells come from. */
     packing: BubblePacking;
     /**
-     * Size of the cells: the distance between neighbouring seeds, in the
+     * Size of the cells: the distance between neighbouring seeds (the
+     * lattice spacing for `"grid"` and `"spheres"`), in the
      * same units as `depth`. Several cells across a stroke make it read
      * as foam. `"packed"` makes at most 1024 cells and spaces them wider
      * when the shape needs more.
      */
     cellSize: number;
+    /**
+     * `"spheres"` only: how much the spheres' radii vary, 0 (all alike)
+     * to 1 (each shrunk by a random share, up to all of it).
+     */
+    cellSizeRandomness: number;
     /**
      * `"packed"` only: how evenly sized the cells are, 0 (random) to 1
      * (rounds of Lloyd relaxation).
@@ -109,19 +122,26 @@ export type BubbleParams = {
     /**
      * Distance between the two films of a wall, world units. 0 (the
      * default): neighbours share one film, as in real foam. Above 0, each
-     * cell has its own, and walls show as double lines.
+     * cell has its own, and walls show as double lines. Not used by
+     * `"spheres"`.
      */
     gap: number;
     /**
      * Radius of the creases where the outer faces of neighbouring cells
-     * meet, world units.
+     * meet, world units. Not used by `"spheres"`.
      */
     rounding: number;
     /**
-     * How much the outer face of each cell bulges, 0 to 1: up to 0.4 cell
-     * sizes in its middle, back to the silhouette at its walls, so the
-     * foam's outside is a skin of domes meeting in creases. 0 keeps the
-     * flat faces of the extrusion.
+     * How round the cells are, 0 to 1.
+     *
+     * `"packed"` and `"grid"`: how much the outer face of each cell
+     * bulges, up to 0.4 cell sizes in its middle and back to the
+     * silhouette at its walls, so the foam's outside is a skin of domes
+     * meeting in creases. 0 keeps the flat faces of the extrusion.
+     *
+     * `"spheres"`: the radius of the spheres, from a whole `cellSize` at
+     * 0 (heavy overlap: flat-walled foam with shallow round caps) to about
+     * half of it at 1 (nearly separate spheres that just touch).
      */
     roundness: number;
     /**
@@ -246,14 +266,15 @@ export type BubbleEffectOptions = {
 
 const DEFAULT_PARAMS: BubbleParams = {
     depth: 0.1,
-    packing: "packed",
+    packing: "spheres",
     cellSize: 0.05,
+    cellSizeRandomness: 0.25,
     regularity: 0.6,
     jitter: 0.6,
     seed: 1,
     gap: 0,
     rounding: 0.004,
-    roundness: 0.6,
+    roundness: 0.45,
     skin: 0,
     wobble: 0.05,
     speed: 0.15,
@@ -291,7 +312,11 @@ const DEFAULT_PARAMS: BubbleParams = {
     debug: "off",
 };
 
-const PACKINGS: Record<BubblePacking, number> = { packed: 0, grid: 1 };
+const PACKINGS: Record<BubblePacking, number> = {
+    packed: 0,
+    grid: 1,
+    spheres: 2,
+};
 const DEBUG_VIEWS: Record<BubbleDebugView, number> = {
     off: 0,
     cost: 1,
@@ -316,6 +341,11 @@ const BULGE_WIDTH = 0.5;
 // Rounding of the caps' outline: the walls' distance is blended over
 // this, relative to the cell size.
 const BULGE_SOFT = 0.12;
+// "spheres": radius per lattice spacing at roundness 0 and 1, and how
+// far a sphere may poke out of the shape, per cell size.
+const SPHERE_R_FLAT = 1.0;
+const SPHERE_R_ROUND = 0.52;
+const SPHERE_PROTRUDE = 0.5;
 // "grid": seeds near the shape are pulled in to this depth, and at most
 // this far, relative to the cell size.
 const PULL_DEPTH = 0.1;
@@ -375,6 +405,12 @@ uniform int latLayers;
 uniform float jitter;
 uniform float pullDepth;
 uniform float pullMax;
+// "spheres": the base radius, its random share, how far a sphere may
+// poke out of the shape, and how far any can reach out of it.
+uniform float sphereR;
+uniform float radiusVar;
+uniform float protrude;
+uniform float reachMax;
 
 uniform sampler2D filmLut;
 uniform float iridescence;
@@ -391,6 +427,8 @@ uniform vec3 bodyColor;
 uniform int debugView;
 
 const int MAX_NB = 26;
+// "spheres": spheres the ray passes through in one lattice cell, at most.
+const int MAX_CAND = 12;
 const int MAX_STEPS = 96;
 // Field evaluations per pixel, at most.
 const int MAX_EVALS = 200;
@@ -797,13 +835,13 @@ vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
     return r + R * sky;
 }
 
-void film(float t, bool entering) {
-    cellField(t, true);
-    vec3 p = ro + rd * t;
-    vec3 n = normalize(cellNormal);
+// Shade a film at p with normal n, of the cell round \`center\` with id
+// \`id\`: \`outer\` is 1 on the foam's outside, 0 on a wall inside it;
+// \`cover\` is how much of the pixel it covers.
+void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover) {
     vec3 nf = dot(n, rd) > 0.0 ? -n : n;
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
-    float th = filmThickness((p - regC) / cellSize, regId);
+    float th = filmThickness((p - center) / cellSize, id);
     vec3 R = mix(
         vec3(plainFilm(cosI)),
         textureLod(filmLut, vec2(th / THICKNESS_MAX, cosI), 0.0).rgb,
@@ -811,14 +849,14 @@ void film(float t, bool entering) {
     );
     // Grazing films reflect most, but a foam is mostly grazing films:
     // their reflectance is held down, more for the walls inside it.
-    R = min(R, vec3(RIM_MAX)) * mix(WALL_DIM, 1.0, fieldS);
+    R = min(R, vec3(RIM_MAX)) * mix(WALL_DIM, 1.0, outer) * cover;
     vec3 rv = viewRot * reflect(rd, nf);
     vec3 refl = reflected(R, viewRot * p, rv) * reflection;
     col += remain * refl / (1.0 + refl);
     // The light that passes: some of it scattered in the tint, more at a
     // grazing angle, where the path through the film is longer.
     vec3 T = 1.0 - R;
-    float k = 1.0 - exp(-tintStrength * 0.03 / max(cosI * cosI, 0.1));
+    float k = (1.0 - exp(-tintStrength * 0.03 / max(cosI * cosI, 0.1))) * cover;
     col += remain * T * k * tint;
     remain *= T * (1.0 - k);
     if (entering && opacity > 0.0) {
@@ -830,13 +868,254 @@ void film(float t, bool entering) {
         float li = 0.35 + 0.5 * lightIntensity;
         vec3 body = bodyColor * li * (0.25 + 0.85 * wrap * wrap)
             + rim * 0.2 * li * vec3(0.8, 0.9, 1.0);
-        col += remain * opacity * body;
-        remain *= 1.0 - opacity;
+        float o = opacity * cover;
+        col += remain * o * body;
+        remain *= 1.0 - o;
     }
     if (films == 0) {
-        firstId = regId;
+        firstId = id;
     }
     films++;
+}
+
+void film(float t, bool entering) {
+    cellField(t, true);
+    shadeFilm(ro + rd * t, normalize(cellNormal), regC, regId, fieldS, entering, 1.0);
+}
+
+// ---- "spheres": a power diagram of spheres on a jittered lattice ----
+
+// The 27 seeds round the lattice cell the ray is in (index x + 3 y + 9 z,
+// offsets -1..1): centre and radius (radius 0: none), id, and the ray's
+// power line b t + k for each.
+vec4 win[27];
+float winId[27];
+vec2 winBK[27];
+// Where the ray is inside each sphere (empty when it misses).
+vec2 winHit[27];
+
+// The sphere of lattice cell L. Its seed is pulled into the shape (or
+// dropped) at rest, so the drift never makes one appear or vanish. Its
+// radius pokes out of the shape by \`protrude\` at most, and stays within
+// one lattice cell of its own, so the 27 round a point hold every sphere
+// that can own it.
+void sphereSeed(ivec3 L, out vec4 sph, out float id) {
+    sph = vec4(0.0);
+    id = 0.0;
+    if (L.z < 0 || L.z >= latLayers) {
+        return;
+    }
+    vec4 h = hash4(uvec3(L + 4096));
+    vec3 cell = latOrigin + (vec3(L) + 0.5) * latCell;
+    vec3 c = cell + jitter * (h.xyz - 0.5) * vec3(1.0, 1.0, 0.5) * latCell;
+    vec3 s = sd2(c.xy);
+    cost += 1.0;
+    float depthIn = -s.x;
+    if (s.x > -pullDepth) {
+        // Pulled in along the field to pullDepth (one lookup: the field
+        // is close enough to linear over the pull).
+        float move = s.x + pullDepth;
+        if (move > pullMax) {
+            return;
+        }
+        c.xy -= s.yz * move;
+        depthIn = pullDepth;
+    }
+    float r = sphereR * (1.0 - radiusVar * fract(h.w * 7.31));
+    // The outline stays readable: a sphere pokes out of the silhouette by
+    // protrude at most. Out of the front and back it may bulge more.
+    r = min(r, min(depthIn, halfDepth - abs(c.z) + 0.3 * latCell.x) + protrude);
+    vec3 room = (1.5 - abs(c - cell) / latCell) * latCell - wobbleAmp;
+    r = min(r, min(room.x, min(room.y, room.z)));
+    if (r <= 0.0) {
+        return;
+    }
+    sph = vec4(c + drift(h), r);
+    id = h.w * 251.0;
+}
+
+void loadSlot(int i, ivec3 L) {
+    vec4 sph;
+    float id;
+    sphereSeed(L, sph, id);
+    win[i] = sph;
+    winId[i] = id;
+    vec3 oc = ro - sph.xyz;
+    vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
+    winBK[i] = bk;
+    float disc = bk.x * bk.x - 4.0 * bk.y;
+    winHit[i] = sph.w > 0.0 && disc > 0.0
+        ? 0.5 * (-bk.x + vec2(-1.0, 1.0) * sqrt(disc))
+        : vec2(1e30, -1e30);
+}
+
+// A lattice cell's slot in the window: its coordinates mod 3, so a step
+// only overwrites the 9 slots of the slab it leaves.
+int slotOf(ivec3 L) {
+    ivec3 m = ((L % 3) + 3) % 3;
+    return m.x + 3 * m.y + 9 * m.z;
+}
+
+void loadWindow(ivec3 C) {
+    for (int i = 0; i < 27; i++) {
+        ivec3 L = C + ivec3(i % 3, (i / 3) % 3, i / 9) - 1;
+        loadSlot(slotOf(L), L);
+    }
+}
+
+// Step the window to cell C, one cell along an axis (0 x, 1 y, 2 z) in
+// direction dir: load the 9 seeds of the slab that comes in.
+void shiftWindow(ivec3 C, int axis, int dir) {
+    for (int i = 0; i < 9; i++) {
+        ivec3 L = C;
+        L[axis] += dir;
+        L[(axis + 1) % 3] += i % 3 - 1;
+        L[(axis + 2) % 3] += i / 3 - 1;
+        loadSlot(slotOf(L), L);
+    }
+}
+
+bool sphereInside = false;
+
+// Shade a sphere's own surface at t.
+void sphereFilm(int i, float t, bool entering, float cover) {
+    vec3 p = ro + rd * t;
+    shadeFilm(p, (p - win[i].xyz) / win[i].w, win[i].xyz, winId[i], 1.0, entering, cover);
+}
+
+// The films of the foam on [t0, t1] with this window: the lower envelope
+// of the power lines, as in \`_sphere-foam.ts\`.
+void sphereSegment(float t0, float t1, float cone, int layers) {
+    // Only spheres the ray passes through on the segment can own a point
+    // inside the foam; the others are left out of the envelope.
+    int cand[MAX_CAND];
+    int n = 0;
+    for (int i = 0; i < 27; i++) {
+        vec2 h = winHit[i];
+        if (h.x < t1 && h.y > t0 && n < MAX_CAND) {
+            cand[n] = i;
+            n++;
+        }
+    }
+    if (n == 0) {
+        sphereInside = false;
+        return;
+    }
+    int own = cand[0];
+    float lo = winBK[own].x * t0 + winBK[own].y;
+    for (int c = 1; c < MAX_CAND; c++) {
+        if (c >= n) {
+            break;
+        }
+        int i = cand[c];
+        float l = winBK[i].x * t0 + winBK[i].y;
+        if (l < lo || (l == lo && winBK[i].x < winBK[own].x)) {
+            lo = l;
+            own = i;
+        }
+    }
+    float ta = t0;
+    for (int guard = 0; guard <= MAX_CAND; guard++) {
+        if (films >= layers) {
+            return;
+        }
+        vec2 bo = winBK[own];
+        float ts = 1e30;
+        int next = -1;
+        for (int c = 0; c < MAX_CAND; c++) {
+            if (c >= n) {
+                break;
+            }
+            int j = cand[c];
+            vec2 bj = winBK[j];
+            if (bj.x < bo.x) {
+                float tj = max((bj.y - bo.y) / (bo.x - bj.x), ta);
+                if (tj < ts) {
+                    ts = tj;
+                    next = j;
+                }
+            }
+        }
+        float tb = min(ts, t1);
+        float disc = bo.x * bo.x - 4.0 * bo.y;
+        if (disc > 0.0) {
+            float hh = sqrt(disc);
+            float tIn = 0.5 * (-bo.x - hh);
+            float tOut = 0.5 * (-bo.x + hh);
+            // Edge antialiasing: a chord shorter than the pixel's
+            // footprint covers part of it.
+            float cover = clamp(0.5 * hh / max(cone * tIn, 1e-6), 0.0, 1.0);
+            if (!sphereInside && tIn > ta && tIn <= tb && tIn > 0.0) {
+                sphereFilm(own, tIn, true, cover);
+                sphereInside = true;
+            }
+            if (sphereInside && tOut > ta && tOut <= tb && films < layers) {
+                sphereFilm(own, tOut, false, cover);
+                sphereInside = false;
+            }
+        }
+        if (next < 0 || ts >= t1) {
+            return;
+        }
+        if (sphereInside && films < layers) {
+            // One flat wall on the radical plane, shared by both cells.
+            vec3 p = ro + rd * ts;
+            vec3 c = 0.5 * (win[own].xyz + win[next].xyz);
+            shadeFilm(p, normalize(win[next].xyz - win[own].xyz), c, winId[own] + winId[next], 0.0, false, 1.0);
+        }
+        own = next;
+        ta = ts;
+    }
+}
+
+void traceSpheres(vec2 tb, float cone, int layers) {
+    float t = max(tb.x, 0.0);
+    bool walking = false;
+    ivec3 C = ivec3(0);
+    vec3 tMax = vec3(0.0);
+    vec3 tDelta = vec3(0.0);
+    ivec3 stp = ivec3(0);
+    for (int i = 0; i < 160; i++) {
+        if (t > tb.y || films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+            break;
+        }
+        if (!walking) {
+            // Empty space: no sphere reaches farther than this out of the
+            // shape.
+            float s = sdf3(ro + rd * t).x;
+            cost += 1.0;
+            if (s > reachMax + 1e-4) {
+                t += s - reachMax;
+                continue;
+            }
+            vec3 q = (ro + rd * t - latOrigin) / latCell;
+            C = ivec3(floor(q));
+            vec3 d = mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
+            vec3 inv = 1.0 / d;
+            stp = ivec3(sign(d));
+            tMax = t + (floor(q) + step(0.0, d) - q) * latCell * inv;
+            tDelta = latCell * abs(inv);
+            loadWindow(C);
+            sphereInside = false;
+            walking = true;
+        }
+        float tn = min(tMax.x, min(tMax.y, tMax.z));
+        sphereSegment(t, min(tn, tb.y), cone, layers);
+        t = tn;
+        int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
+        C[axis] += stp[axis];
+        tMax[axis] += tDelta[axis];
+        shiftWindow(C, axis, stp[axis]);
+        // Out of every sphere and well away from the shape: back to
+        // tracing, which skips the empty cells faster than stepping.
+        if (!sphereInside) {
+            float s = sdf3(ro + rd * t).x;
+            cost += 1.0;
+            if (s > reachMax + 2.0 * cellSize) {
+                walking = false;
+            }
+        }
+    }
 }
 
 // Slab test against the shape's bounding box. x = near, y = far.
@@ -874,133 +1153,137 @@ void main() {
     float cone = pixelSize / focalPx;
     int layers = clamp(maxLayers, 1, MAX_LAYERS);
 
-    float t = max(tb.x, 0.0);
-    // In empty space the ray traces the shape; in a cell's Voronoi
-    // region, the cell's field.
-    bool inRegion = false;
-    float tOut = 0.0;
-    int exitK = -1;
-    // Without a gap, the wall a ray leaves one cell by is the wall it
-    // enters the next by: one film, shaded once.
-    bool shared = halfGap < 1e-5;
-    float lastExit = -1.0;
-    for (int i = 0; i < MAX_STEPS; i++) {
-        if (t > tb.y || films >= layers || evals > MAX_EVALS
-            || max(remain.r, max(remain.g, remain.b)) < 0.02) {
-            break;
-        }
-        float eps = 0.5 * t * cone + 1e-4;
-        if (!inRegion) {
-            // Cells only lie where the shape's field (+ skin) is below
-            // the bulge.
-            vec3 p = ro + rd * t;
-            float s = sdf3(p).x + skin;
-            cost += 1.0;
-            evals++;
-            if (s - bulge > eps) {
-                t += s - bulge;
-                continue;
+    if (packing == 2) {
+        traceSpheres(tb, cone, layers);
+    } else {
+        float t = max(tb.x, 0.0);
+        // In empty space the ray traces the shape; in a cell's Voronoi
+        // region, the cell's field.
+        bool inRegion = false;
+        float tOut = 0.0;
+        int exitK = -1;
+        // Without a gap, the wall a ray leaves one cell by is the wall it
+        // enters the next by: one film, shaded once.
+        bool shared = halfGap < 1e-5;
+        float lastExit = -1.0;
+        for (int i = 0; i < MAX_STEPS; i++) {
+            if (t > tb.y || films >= layers || evals > MAX_EVALS
+                || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+                break;
             }
-            if (!locateAt(p)) {
-                t += 0.25 * cellSize;
-                continue;
+            float eps = 0.5 * t * cone + 1e-4;
+            if (!inRegion) {
+                // Cells only lie where the shape's field (+ skin) is below
+                // the bulge.
+                vec3 p = ro + rd * t;
+                float s = sdf3(p).x + skin;
+                cost += 1.0;
+                evals++;
+                if (s - bulge > eps) {
+                    t += s - bulge;
+                    continue;
+                }
+                if (!locateAt(p)) {
+                    t += 0.25 * cellSize;
+                    continue;
+                }
+                tOut = setupSegment(t, tb.y, s, exitK);
+                inRegion = true;
             }
-            tOut = setupSegment(t, tb.y, s, exitK);
-            inRegion = true;
-        }
 
-        // The entry: Newton steps along the ray. Where the field is
-        // convex (bar the shape's concave parts), they never pass the
-        // film, and once it rises the cell is behind.
-        float tIn = -1.0;
-        float tp = t;
-        float dp = -1.0;
-        for (int k = 0; k < 24; k++) {
-            vec2 f = cellField(t, false);
-            if (f.x < 0.0 && dp > 0.0) {
-                tIn = refineRoot(tp, dp, t, f.x, eps);
-                break;
-            }
-            if (f.x < eps) {
-                tIn = t;
-                break;
-            }
-            float step;
-            if (f.y < -1e-3) {
-                // Newton, but not much past the safe distance: the bulge
-                // is not convex, and a grazing ray would leap over a cap.
-                step = min(f.x / -f.y, f.x / lipschitz + 0.15 * cellSize);
-            } else if (fieldS < 0.2) {
-                t = tOut;
-                break;
-            } else {
-                // Sphere tracing, safe for the bulge's steeper slope.
-                step = f.x / lipschitz;
-            }
-            tp = t;
-            dp = f.x;
-            t = min(t + max(step, eps), tOut);
-            if (t >= tOut) {
-                break;
-            }
-        }
-        if (tIn >= 0.0) {
-            if (!shared || tIn - lastExit > 4.0 * eps) {
-                film(tIn, true);
-            }
-            // The exit: Newton steps back from the region's far end, where
-            // the field is at least half the gap. From that side they never
-            // pass the last film either.
-            float th = tOut;
-            vec2 f = cellField(th, false);
-            float tEx = -1.0;
-            for (int k = 0; k < 16; k++) {
+            // The entry: Newton steps along the ray. Where the field is
+            // convex (bar the shape's concave parts), they never pass the
+            // film, and once it rises the cell is behind.
+            float tIn = -1.0;
+            float tp = t;
+            float dp = -1.0;
+            for (int k = 0; k < 24; k++) {
+                vec2 f = cellField(t, false);
+                if (f.x < 0.0 && dp > 0.0) {
+                    tIn = refineRoot(tp, dp, t, f.x, eps);
+                    break;
+                }
                 if (f.x < eps) {
-                    tEx = th;
+                    tIn = t;
                     break;
                 }
-                if (f.y < 1e-3) {
+                float step;
+                if (f.y < -1e-3) {
+                    // Newton, but not much past the safe distance: the bulge
+                    // is not convex, and a grazing ray would leap over a cap.
+                    step = min(f.x / -f.y, f.x / lipschitz + 0.15 * cellSize);
+                } else if (fieldS < 0.2) {
+                    t = tOut;
+                    break;
+                } else {
+                    // Sphere tracing, safe for the bulge's steeper slope.
+                    step = f.x / lipschitz;
+                }
+                tp = t;
+                dp = f.x;
+                t = min(t + max(step, eps), tOut);
+                if (t >= tOut) {
                     break;
                 }
-                float tn = th - f.x / f.y;
-                if (tn <= tIn) {
-                    // Past the entry (the bulge is not convex): bracket
-                    // from just inside instead.
-                    float lo = tIn + 2.0 * eps;
-                    float dLo = cellField(lo, false).x;
-                    tEx = dLo < 0.0 && lo < th ? refineRoot(lo, dLo, th, f.x, eps) : tIn;
+            }
+            if (tIn >= 0.0) {
+                if (!shared || tIn - lastExit > 4.0 * eps) {
+                    film(tIn, true);
+                }
+                // The exit: Newton steps back from the region's far end, where
+                // the field is at least half the gap. From that side they never
+                // pass the last film either.
+                float th = tOut;
+                vec2 f = cellField(th, false);
+                float tEx = -1.0;
+                for (int k = 0; k < 16; k++) {
+                    if (f.x < eps) {
+                        tEx = th;
+                        break;
+                    }
+                    if (f.y < 1e-3) {
+                        break;
+                    }
+                    float tn = th - f.x / f.y;
+                    if (tn <= tIn) {
+                        // Past the entry (the bulge is not convex): bracket
+                        // from just inside instead.
+                        float lo = tIn + 2.0 * eps;
+                        float dLo = cellField(lo, false).x;
+                        tEx = dLo < 0.0 && lo < th ? refineRoot(lo, dLo, th, f.x, eps) : tIn;
+                        break;
+                    }
+                    vec2 fn = cellField(tn, false);
+                    if (fn.x < 0.0) {
+                        tEx = refineRoot(tn, fn.x, th, f.x, eps);
+                        break;
+                    }
+                    th = tn;
+                    f = fn;
+                }
+                tEx = tEx < 0.0 ? th : tEx;
+                if (films < layers) {
+                    film(tEx, false);
+                }
+                lastExit = tEx;
+                t = tOut;
+            }
+            if (t >= tOut) {
+                // Into the next cell's region.
+                t = tOut + 1e-5;
+                if (exitK < 0) {
                     break;
                 }
-                vec2 fn = cellField(tn, false);
-                if (fn.x < 0.0) {
-                    tEx = refineRoot(tn, fn.x, th, f.x, eps);
-                    break;
+                vec3 q = ro + rd * t;
+                float s = sdf3(q).x + skin;
+                cost += 1.0;
+                evals++;
+                if (s - bulge > 2.0 * rho + 4.0 * eps || !locate(nbKey[exitK], q)) {
+                    inRegion = false;
+                    continue;
                 }
-                th = tn;
-                f = fn;
+                tOut = setupSegment(t, tb.y, s, exitK);
             }
-            tEx = tEx < 0.0 ? th : tEx;
-            if (films < layers) {
-                film(tEx, false);
-            }
-            lastExit = tEx;
-            t = tOut;
-        }
-        if (t >= tOut) {
-            // Into the next cell's region.
-            t = tOut + 1e-5;
-            if (exitK < 0) {
-                break;
-            }
-            vec3 q = ro + rd * t;
-            float s = sdf3(q).x + skin;
-            cost += 1.0;
-            evals++;
-            if (s - bulge > 2.0 * rho + 4.0 * eps || !locate(nbKey[exitK], q)) {
-                inRegion = false;
-                continue;
-            }
-            tOut = setupSegment(t, tb.y, s, exitK);
         }
     }
 
@@ -1108,15 +1391,20 @@ function colorOf(hex: string, fallback: string): [number, number, number] {
  * transparent soap bubbles in thin-film colours.
  *
  * ```ts
- * vfx.add(img, { effect: new BubbleEffect({ cellSize: 0.04 }) });
+ * vfx.add(img, { effect: new BubbleEffect({ roundness: 0.7 }) });
  * ```
  *
- * The silhouette is read once when the effect starts. Its volume is
- * split into 3D Voronoi cells, each a bubble: neighbours share flat
- * walls with no room between them, and each outer face bulges into a
- * dome that meets its neighbours in a crease. The
- * seeds are placed evenly inside the shape on the CPU (`packing:
- * "packed"`), or on a jittered lattice in the shader (`"grid"`). Films
+ * By default (`packing: "spheres"`) the volume is filled with spheres on
+ * a jittered lattice; where they overlap they are cut by a flat wall
+ * they share (a power diagram), where they are exposed they keep their
+ * round outside. The films are found exactly along each ray.
+ *
+ * The silhouette is read once when the effect starts. With `"packed"`
+ * or `"grid"`, its volume is split into 3D Voronoi cells instead:
+ * neighbours share flat walls with no room between them, and each outer
+ * face bulges into a dome that meets its neighbours in a crease. Their
+ * seeds are placed evenly inside the shape on the CPU (`"packed"`), or on
+ * a jittered lattice in the shader (`"grid"`). Films
  * do not bend light, so the page shows through the foam, dimmed by what
  * the films reflect; the output is premultiplied over it.
  *
@@ -1280,6 +1568,18 @@ export class BubbleEffect implements Effect {
         // a cell size thick.
         const layers = Math.max(1, Math.round((2 * r.halfDepth) / r.cellSize));
         const zCell = (2 * r.halfDepth) / layers;
+        // "spheres": the radius from roundness (heavy overlap at 0, nearly
+        // kissing at 1), how far one pokes out of the shape, and so how
+        // far any reaches out of it.
+        const roundness = clamp(p.roundness, 0, 1, d.roundness);
+        const protrude = Math.max(SPHERE_PROTRUDE * r.cellSize - r.skin, 0);
+        const sph = {
+            radius:
+                r.cellSize *
+                (SPHERE_R_FLAT + (SPHERE_R_ROUND - SPHERE_R_FLAT) * roundness),
+            protrude,
+            reach: protrude + r.wobbleAmp + 0.01 * r.cellSize,
+        };
 
         ctx.draw({
             frag: FRAG_BUBBLE,
@@ -1290,7 +1590,7 @@ export class BubbleEffect implements Effect {
                 // The shape's own edges, rounded like the cells'.
                 rounding: Math.min(r.rounding, r.halfDepth * 0.9),
                 shapeHalf: shape.shapeHalf,
-                boxMargin: r.margin + r.wobbleAmp,
+                boxMargin: Math.max(r.margin, sph.reach) + r.wobbleAmp,
                 ...cam,
                 pixelSize: cam.bufferPx[0] / scene.width,
                 packing,
@@ -1319,6 +1619,15 @@ export class BubbleEffect implements Effect {
                 jitter: r.jitter,
                 pullDepth: PULL_DEPTH * r.cellSize,
                 pullMax: PULL_MAX * r.cellSize,
+                sphereR: sph.radius,
+                radiusVar: clamp(
+                    p.cellSizeRandomness,
+                    0,
+                    1,
+                    d.cellSizeRandomness,
+                ),
+                protrude: sph.protrude,
+                reachMax: sph.reach,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),

@@ -1210,10 +1210,11 @@ export function attachBubblePane(
 
     const bubbles = pane.addFolder({ title: "Bubbles" });
     bind(bubbles, "packing", {
-        options: { packed: "packed", grid: "grid" },
+        options: { packed: "packed", grid: "grid", spheres: "spheres" },
     });
     bind(bubbles, "depth", range(0.02, 1.5, 0.01));
     bind(bubbles, "cellSize", range(0.05, 1.5, 0.005));
+    bind(bubbles, "cellSizeRandomness", range(0, 1, 0.01));
     bind(bubbles, "regularity", range(0, 1, 0.01));
     bind(bubbles, "jitter", range(0, 0.9, 0.01));
     bind(bubbles, "seed", range(0, 100, 1));
