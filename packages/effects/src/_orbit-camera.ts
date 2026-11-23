@@ -128,8 +128,8 @@ const NUM_KEYS = Object.keys(ORBIT_CAMERA_RANGE) as NumKey[];
 
 // The orbit animation at orbitSpeed 1: angular speeds of the yaw and
 // pitch swings (rad/s of the sine's argument), and the pitch's phase.
-export const ORBIT_YAW_SPEED = 0.13;
-export const ORBIT_PITCH_SPEED = 0.09;
+const ORBIT_YAW_SPEED = 0.13;
+const ORBIT_PITCH_SPEED = 0.09;
 const ORBIT_PITCH_PHASE = 1.3;
 // Pitch swing relative to the yaw swing.
 const ORBIT_PITCH_RATIO = 0.3;
@@ -246,7 +246,7 @@ export function viewMatrix(yaw: number, pitch: number): number[] {
  * viewport plus the same scroll padding on each side, so the canvas's
  * centre is the viewport's.
  */
-export function viewportCenter(
+function viewportCenter(
     dims: Pick<EffectDims, "canvasRect">,
 ): [number, number] {
     const [x, y, w, h] = dims.canvasRect;
