@@ -37,6 +37,7 @@ import {
     type BubbleFill,
     buildSphereGrid,
     type FillOptions,
+    hash4,
     JITTER_MAX,
     placeBubbles,
     type SphereGrid,
@@ -393,22 +394,27 @@ uniform vec2 bufferPx;
 uniform float pixelSize;
 
 uniform int maxLayers;
-uniform float time;
-// Drift amplitude per radius, and its speed.
-uniform float wobble;
-uniform float wobbleSpeed;
 uniform uint seed;
 uniform float cellSize;
 
-// The spheres (x, y, z, r per texel) and the grid over them: per cell an
-// offset into the index list and a count; the index list holds four
-// sphere indices per texel. All in rows of BUBBLE_TEX_W texels.
+// The spheres (x, y, z, r per texel, drifted for this frame) and the grid
+// over them: per cell an offset into the index list and a count; the
+// index list holds four sphere indices per texel. All in rows of
+// BUBBLE_TEX_W texels.
 uniform highp sampler2D sphereTex;
 uniform highp sampler2D cellTex;
 uniform highp sampler2D indexTex;
 uniform vec3 gridOrigin;
 uniform float gridCell;
 uniform ivec3 gridDims;
+// The grid the borders are found with: the spheres listed by their own
+// radii. In a container the grid above lists them as far as the fill
+// blows them up, which the foam's outside does not need.
+uniform highp sampler2D edgeCellTex;
+uniform highp sampler2D edgeIndexTex;
+uniform vec3 edgeOrigin;
+uniform float edgeCell;
+uniform ivec3 edgeDims;
 // How far any sphere can reach out of the shape, drift included.
 uniform float reachMax;
 // The container: the foam ends where the shape's field reaches clipOff
@@ -502,13 +508,9 @@ vec4 hash4(uvec3 v) {
     return vec4(a, w ^ (w >> 16u)) * (1.0 / 4294967295.0);
 }
 
-// A slow drift of length <= amp, from a random phase.
-vec3 drift(vec4 h, float amp) {
-    if (amp <= 0.0) {
-        return vec3(0.0);
-    }
-    vec3 f = (0.6 + 0.8 * h.yzw) * (wobbleSpeed * TAU);
-    return amp * 0.5774 * sin(time * f + h.zwx * TAU);
+// The id of sphere i, which seeds its film's swirls.
+float sphereId(int i) {
+    return hash4(uvec3(uint(i), 977u, 31u)).w * 251.0;
 }
 
 // ---- shading ----
@@ -785,8 +787,6 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
         int i = int(idx[e & 3]);
         vec4 sph = texelFetch(sphereTex, texel(i), 0);
         cost += 1.0;
-        vec4 h = hash4(uvec3(uint(i), 977u, 31u));
-        sph.xyz += drift(h, wobble * sph.w);
         // In the shell, only the bubbles poking out through this side.
         if (warpOn && warpA0 + dot(warpGrad, sph.xy) > 0.5 * sph.w) {
             continue;
@@ -795,7 +795,7 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
         vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
         if (all) {
             cand[nCand] = sph;
-            candId[nCand] = h.w * 251.0;
+            candId[nCand] = sphereId(i);
             candBK[nCand] = bk;
             nCand++;
             continue;
@@ -811,7 +811,7 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
         // point inside the foam; the others are left out of the envelope.
         if (hit.x < t1 && hit.y > t0) {
             cand[nCand] = sph;
-            candId[nCand] = h.w * 251.0;
+            candId[nCand] = sphereId(i);
             candBK[nCand] = bk;
             nCand++;
         }
@@ -840,17 +840,17 @@ void nearWall(inout float e, vec3 q, vec4 own, float powI, vec4 s) {
 }
 
 // The distance from q to the nearest wall of its owner's cell, over
-// every sphere the grid cell of q lists (as \`_sphere-foam.ts\`'s
-// borderDist). A sphere that could bound the cell at q contains q or is
+// every sphere the border grid's cell of q lists (as
+// \`_sphere-foam.ts\`'s borderDist). A sphere that could bound the cell at q contains q or is
 // close to it, so it reaches into that grid cell and is listed. The list
 // is read again here: the one loaded for the ray keeps only the spheres
 // the ray passes through.
 float borderDist(vec3 q, vec4 own) {
-    ivec3 C = ivec3(floor((q - gridOrigin) / gridCell));
-    if (any(lessThan(C, ivec3(0))) || any(greaterThanEqual(C, gridDims))) {
+    ivec3 C = ivec3(floor((q - edgeOrigin) / edgeCell));
+    if (any(lessThan(C, ivec3(0))) || any(greaterThanEqual(C, edgeDims))) {
         return NO_EDGE;
     }
-    vec4 head = texelFetch(cellTex, texel(C.x + gridDims.x * (C.y + gridDims.y * C.z)), 0);
+    vec4 head = texelFetch(edgeCellTex, texel(C.x + edgeDims.x * (C.y + edgeDims.y * C.z)), 0);
     cost += 1.0;
     int off = int(head.x);
     int count = min(int(head.y), MAX_CAND);
@@ -864,14 +864,12 @@ float borderDist(vec3 q, vec4 own) {
         }
         int k = off + j;
         if (j == 0 || (k & 3) == 0) {
-            idx = texelFetch(indexTex, texel(k >> 2), 0);
+            idx = texelFetch(edgeIndexTex, texel(k >> 2), 0);
             cost += 1.0;
         }
         int i = int(idx[k & 3]);
         vec4 sph = texelFetch(sphereTex, texel(i), 0);
         cost += 1.0;
-        vec4 h = hash4(uvec3(uint(i), 977u, 31u));
-        sph.xyz += drift(h, wobble * sph.w);
         if (warpOn && warpA0 + dot(warpGrad, sph.xy) > 0.5 * sph.w) {
             continue;
         }
@@ -1227,11 +1225,15 @@ void traceContained(vec2 tb, float cone, int layers) {
         // To the container.
         float g = clipField(t);
         for (int i = 0; i < 64 && g > eps && t <= tb.y; i++) {
-            t += g;
+            t += max(g, eps);
             g = clipField(t);
         }
-        if (g > eps || t > tb.y || films >= layers) {
+        if (t > tb.y || films >= layers) {
             return;
+        }
+        if (g > eps) {
+            // Out of steps, grazing the container: go on from here.
+            continue;
         }
         for (int k = 0; k < 4; k++) {
 #if CONTAIN == 2
@@ -1467,10 +1469,19 @@ type Foam = {
     /** What the fill adds to r² deep inside the shape. */
     fillG: number;
     grid: SphereGrid;
+    /** The grid the borders are found with (`grid` itself out of a container). */
+    edgeGrid: SphereGrid;
     raw: WebGLTexture[];
     sphereTex: EffectTexture;
     cellTex: EffectTexture;
     indexTex: EffectTexture;
+    edgeCellTex: EffectTexture;
+    edgeIndexTex: EffectTexture;
+    /** Per sphere its drift's frequencies and phases, 3 each, in cycles. */
+    drift: Float32Array;
+    /** The spheres as drifted for the frame, and when it was. */
+    moved: Float32Array;
+    movedKey: string;
 };
 
 /**
@@ -1689,6 +1700,7 @@ export class BubbleEffect implements Effect {
             }
         }
         const grid = buildSphereGrid(listed, r.wobble, r.cellSize);
+        let edgeGrid = grid;
         if (listed !== spheres) {
             // Back to the true radii, in the grid's order (it may leave
             // some out).
@@ -1705,16 +1717,37 @@ export class BubbleEffect implements Effect {
                 grid.sphereData[i * 4 + 3] = spheres[j * 4 + 3];
                 j++;
             }
+            // The same spheres by their own radii: no list gets longer, so
+            // none is left out and the indices match.
+            const g = buildSphereGrid(grid.spheres, r.wobble, r.cellSize);
+            if (g.dropped === 0) {
+                edgeGrid = g;
+            }
+        }
+        const drift = new Float32Array(grid.count * 6);
+        for (let i = 0; i < grid.count; i++) {
+            const [x, y, z, w] = hash4(r.fill.seed, i, 977, 31);
+            drift.set(
+                [0.6 + 0.8 * y, 0.6 + 0.8 * z, 0.6 + 0.8 * w, z, w, x],
+                i * 6,
+            );
         }
         this.#freeFoam();
         const gl = ctx.gl;
         const raw: WebGLTexture[] = [];
         const textures: EffectTexture[] = [];
-        for (const [data, h] of [
+        const layers: [Float32Array, number][] = [
             [grid.sphereData, grid.sphereTexH],
             [grid.cellData, grid.cellTexH],
             [grid.index, grid.indexTexH],
-        ] as const) {
+        ];
+        if (edgeGrid !== grid) {
+            layers.push(
+                [edgeGrid.cellData, edgeGrid.cellTexH],
+                [edgeGrid.index, edgeGrid.indexTexH],
+            );
+        }
+        for (const [data, h] of layers) {
             const tex = uploadDataTexture(gl, BUBBLE_TEX_W, h, data);
             if (!tex) {
                 break;
@@ -1729,7 +1762,7 @@ export class BubbleEffect implements Effect {
             );
         }
         ctx.resetState();
-        if (textures.length < 3) {
+        if (textures.length < layers.length) {
             for (const tex of raw) {
                 gl.deleteTexture(tex);
             }
@@ -1742,12 +1775,61 @@ export class BubbleEffect implements Effect {
             grow,
             fillG,
             grid,
+            edgeGrid,
             raw,
             sphereTex: textures[0],
             cellTex: textures[1],
             indexTex: textures[2],
+            edgeCellTex: textures[edgeGrid === grid ? 1 : 3],
+            edgeIndexTex: textures[edgeGrid === grid ? 2 : 4],
+            drift,
+            moved: grid.sphereData.slice(),
+            movedKey: "",
         };
         return this.#foamData;
+    }
+
+    // Drift the spheres for time t and upload them: a slow wander of
+    // length <= wobble times the radius, from a random phase per sphere.
+    #move(ctx: EffectContext, foam: Foam, t: number, wobble: number): void {
+        const speed = Math.max(
+            finite(this.params.speed, DEFAULT_PARAMS.speed),
+            0,
+        );
+        const key = `${t}|${wobble}|${speed}`;
+        if (foam.movedKey === key) {
+            return;
+        }
+        foam.movedKey = key;
+        const src = foam.grid.sphereData;
+        const out = foam.moved;
+        const f = foam.drift;
+        const w = speed * Math.PI * 2 * t;
+        for (let i = 0; i < foam.grid.count; i++) {
+            const amp = wobble * src[i * 4 + 3] * 0.5774;
+            for (let a = 0; a < 3; a++) {
+                const phase = w * f[i * 6 + a] + Math.PI * 2 * f[i * 6 + 3 + a];
+                out[i * 4 + a] = src[i * 4 + a] + amp * Math.sin(phase);
+            }
+        }
+        const gl = ctx.gl;
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        gl.bindTexture(gl.TEXTURE_2D, foam.raw[0]);
+        gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0,
+            0,
+            BUBBLE_TEX_W,
+            foam.grid.sphereTexH,
+            gl.RGBA,
+            gl.FLOAT,
+            out,
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        ctx.resetState();
     }
 
     #freeFoam(): void {
@@ -1789,6 +1871,7 @@ export class BubbleEffect implements Effect {
         // with a margin for the field's filtering.
         const reach =
             foam.fill.reach + foam.grow + r.wobble * maxR + 0.02 * r.cellSize;
+        this.#move(ctx, foam, t, r.wobble);
         const containment = r.containment;
         const mode = containment <= 0 ? 0 : containment >= 0.995 ? 1 : 2;
 
@@ -1805,9 +1888,6 @@ export class BubbleEffect implements Effect {
                 ...cam,
                 pixelSize: cam.bufferPx[0] / scene.width,
                 maxLayers: clampInt(p.maxLayers, 1, MAX_LAYERS, d.maxLayers),
-                time: t,
-                wobble: r.wobble,
-                wobbleSpeed: Math.max(finite(p.speed, d.speed), 0),
                 seed: r.fill.seed,
                 cellSize: r.cellSize,
                 sphereTex: foam.sphereTex,
@@ -1816,6 +1896,11 @@ export class BubbleEffect implements Effect {
                 gridOrigin: grid.origin,
                 gridCell: grid.cell,
                 gridDims: grid.dims,
+                edgeCellTex: foam.edgeCellTex,
+                edgeIndexTex: foam.edgeIndexTex,
+                edgeOrigin: foam.edgeGrid.origin,
+                edgeCell: foam.edgeGrid.cell,
+                edgeDims: foam.edgeGrid.dims,
                 reachMax: reach,
                 clipOff: (1 - containment) * reach,
                 warpK: containment / Math.max(1 - containment, 1e-3),
