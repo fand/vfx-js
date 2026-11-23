@@ -235,7 +235,7 @@ export type SwirlParticleParams = OrbitCameraParams & {
     /**
      * Cast a soft shadow onto the page behind the shape. The page is a
      * plane parallel to the screen, {@link shadowDistance} behind the
-     * shape's centre, lit by {@link lightDirection}. A light from behind
+     * shape's front face, lit by {@link lightDirection}. A light from behind
      * (z ≤ 0) casts no shadow. The shadow is clipped to the output rect
      * (see {@link pad}). Fireflies cast none.
      */
@@ -245,9 +245,13 @@ export type SwirlParticleParams = OrbitCameraParams & {
     /** Blur radius of the shadow (gaussian sigma), in CSS px. */
     shadowSoftness: number;
     /**
-     * Distance from the shape's centre to the page behind it, in world
-     * units (the long side of the element is 2). Further means a larger
-     * offset.
+     * Distance from the shape's front face to the page behind it, in
+     * world units (the long side of the element is 2). The front face is
+     * where the front cap is when the shape is seen front-on, `depth / 2`
+     * in front of its centre; the page does not turn with the shape.
+     * At 0 the page touches the front face, so only the particles that
+     * peel off towards the viewer cast a shadow; at `depth` it touches
+     * the back. Further means a larger offset.
      */
     shadowDistance: number;
     /** Shadow colour, CSS hex. */
@@ -334,7 +338,7 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     shadow: false,
     shadowOpacity: 0.35,
     shadowSoftness: 14,
-    shadowDistance: 0.15,
+    shadowDistance: 0.26,
     shadowColor: "#1c2233",
     yaw: 0,
     pitch: 0,
@@ -825,7 +829,8 @@ uniform float occlusion;
 uniform float glintAmount;
 #endif
 #ifdef SHADOW
-// Towards the light, z > 0; the page is at view z = -shadowDepth.
+// Towards the light, z > 0; the page is at view z = -shadowDepth
+// (shadowDistance behind the front face, so shadowDepth can be negative).
 uniform vec3 shadowLight;
 uniform float shadowDepth;
 #endif
@@ -864,7 +869,8 @@ vec3 project(vec3 p) {
     vec3 q = viewRot * p;
 #ifdef SHADOW
     // Flatten onto the page along the light. Points behind the page
-    // (the page cuts the shape when shadowDepth is small) lie on it.
+    // (the page cuts the shape when shadowDistance is under depth) lie
+    // on it.
     q -= shadowLight * (max(q.z + shadowDepth, 0.0) / shadowLight.z);
 #endif
     float depth = camDist - q.z;
@@ -2486,7 +2492,7 @@ export class SwirlParticleEffect implements Effect {
         const tex = this.#drawShadow(ctx, scene, heads, {
             ...trail,
             shadowLight: [light[0], light[1], Math.max(light[2], 0.02)],
-            shadowDepth: r.shadowDistance,
+            shadowDepth: r.shadowDistance - r.depth / 2,
         });
         return tex ? { tex, amount } : null;
     }

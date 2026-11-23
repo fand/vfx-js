@@ -244,6 +244,7 @@ export const heading: StoryObj<Args> = {
             ...new SwirlParticleEffect({
                 depth: 0.3,
                 shadow: true,
+                shadowDistance: 0.3,
                 pointer: "repel",
             }).params,
         };
