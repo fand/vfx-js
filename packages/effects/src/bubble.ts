@@ -79,8 +79,7 @@ export type BubbleDebugView = "off" | "cost" | "layers" | "cells";
 /**
  * Params of {@link BubbleEffect}. All are read every frame. The
  * placement params (`depth`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `jitter`, `seed`, `skin`, `minSize`, `containment`, and
- * `wobble` while `containment` is above 0) place the bubbles
+ * `roundness`, `jitter`, `seed`, `skin`, `minSize`) place the bubbles
  * again on the CPU when they change, which takes a few to a few tens of
  * milliseconds.
  */
@@ -132,11 +131,13 @@ export type BubbleParams = {
      */
     minSize: number;
     /**
-     * How tightly the bubbles keep to the shape, 0 to 1. 0 lets them poke
-     * out of the silhouette (see `skin`) and bulge out of its front and
-     * back; 1 keeps every bubble inside it, its drift included, so the
-     * outline is the shape's own, scalloped by the bubbles touching it
-     * from inside. Placement param.
+     * How much the shape acts as a container, 0 to 1. 0 lets the bubbles
+     * poke out of the silhouette (see `skin`) and bulge out of its front
+     * and back. Towards 1 an invisible wall closes in on the shape, and
+     * at 1 it is the shape itself: the bubbles keep their size and are
+     * pressed flat against it, like a foam blown up inside a mould. They
+     * are also blown up a little, which closes the smallest gaps and
+     * leaves creases between them.
      */
     containment: number;
     /**
@@ -308,6 +309,9 @@ const DEBUG_VIEWS: Record<BubbleDebugView, number> = {
     cells: 3,
 };
 const MAX_LAYERS = 16;
+// How much a container blows the bubbles up at containment 1, as a share
+// of what would close every gap: less leaves creases between them.
+const CONTAIN_GROW = 0.3;
 const WOBBLE_MAX = 0.15;
 // Long side of the silhouette read back from the element, in px, and
 // the smoothing of its field. The field only places the bubbles, so it
@@ -353,6 +357,10 @@ uniform float gridCell;
 uniform ivec3 gridDims;
 // How far any sphere can reach out of the shape, drift included.
 uniform float reachMax;
+// The container: with clipOn, the foam ends where the shape's field
+// reaches clipOff (0: the shape itself).
+uniform int clipOn;
+uniform float clipOff;
 
 uniform sampler2D filmLut;
 uniform float iridescence;
@@ -556,6 +564,16 @@ void loadCell(ivec3 C, float t0, float t1) {
 }
 
 bool sphereInside = false;
+// The cell that owns the end of the last segment (an index into cand).
+int segOwn = 0;
+
+// Shade the container's wall at t, where it cuts the cell of sphere i.
+void wallFilm(int i, float t, bool entering) {
+    vec3 p = ro + rd * t;
+    vec4 s = sdf3(p);
+    cost += 1.0;
+    shadeFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0);
+}
 
 // Shade a sphere's own surface at t.
 void sphereFilm(int i, float t, bool entering, float cover) {
@@ -565,7 +583,9 @@ void sphereFilm(int i, float t, bool entering, float cover) {
 
 // The films of the foam on [t0, t1] with the spheres loaded: the lower
 // envelope of the power lines, as in \`_sphere-foam.ts\`.
-void sphereSegment(float t0, float t1, float cone, int layers) {
+// \`first\`: t0 is where the ray enters the container, so a cell that
+// holds that point starts with a film on the container's wall.
+void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
     int n = nCand;
     if (n == 0) {
         sphereInside = false;
@@ -581,6 +601,13 @@ void sphereSegment(float t0, float t1, float cone, int layers) {
         if (l < lo || (l == lo && candBK[i].x < candBK[own].x)) {
             lo = l;
             own = i;
+        }
+    }
+    segOwn = own;
+    if (first) {
+        sphereInside = t0 * t0 + lo < 0.0;
+        if (sphereInside) {
+            wallFilm(own, t0, true);
         }
     }
     float ta = t0;
@@ -632,7 +659,88 @@ void sphereSegment(float t0, float t1, float cone, int layers) {
             shadeFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0);
         }
         own = next;
+        segOwn = own;
         ta = ts;
+    }
+}
+
+// The container's field along the ray (negative inside).
+float clipField(float t) {
+    cost += 1.0;
+    return sdf3(ro + rd * t).x - clipOff;
+}
+
+// The foam inside the container: the ray's stretches inside it are
+// found by tracing the shape's field, and each is walked through the
+// grid, with a film on the container's wall where a cell is cut by it.
+void traceContained(vec2 tb, float cone, int layers) {
+    float t = max(tb.x, 0.0);
+    float eps = 1e-3;
+    vec3 d = mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
+    vec3 inv = 1.0 / d;
+    ivec3 stp = ivec3(sign(d));
+    vec3 tDelta = gridCell * abs(inv);
+    int steps = 0;
+    for (int iv = 0; iv < 6; iv++) {
+        // To the container.
+        float g = clipField(t);
+        for (int i = 0; i < 64 && g > eps && t <= tb.y; i++) {
+            t += g;
+            g = clipField(t);
+        }
+        if (g > eps || t > tb.y || films >= layers) {
+            return;
+        }
+        float a = t;
+        // Through it, to where the ray leaves.
+        float tp = t;
+        float gp = g;
+        float b = tb.y;
+        for (int i = 0; i < 96; i++) {
+            tp = t;
+            gp = g;
+            t += max(-g, 2.0 * eps);
+            if (t >= tb.y) {
+                break;
+            }
+            g = clipField(t);
+            if (g > 0.0) {
+                b = gp < 0.0 ? tp + (t - tp) * gp / (gp - g) : tp;
+                break;
+            }
+        }
+        // Walk the grid on [a, b].
+        vec3 q = (ro + rd * a - gridOrigin) / gridCell;
+        ivec3 C = clamp(ivec3(floor(q)), ivec3(0), gridDims - 1);
+        vec3 tMax = a + (vec3(C) + step(0.0, d) - q) * gridCell * inv;
+        float tw = a;
+        bool first = true;
+        sphereInside = false;
+        for (int i = 0; i < 128; i++) {
+            if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02 || steps++ > 256) {
+                return;
+            }
+            float tn = min(tMax.x, min(tMax.y, tMax.z));
+            float te = min(tn, b);
+            loadCell(C, tw, te);
+            sphereSegment(tw, te, cone, layers, first);
+            first = false;
+            if (tn >= b) {
+                if (sphereInside && films < layers && nCand > 0) {
+                    wallFilm(segOwn, b, false);
+                }
+                break;
+            }
+            tw = tn;
+            int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
+            C[axis] += stp[axis];
+            tMax[axis] += tDelta[axis];
+            if (C[axis] < 0 || C[axis] >= gridDims[axis]) {
+                break;
+            }
+        }
+        sphereInside = false;
+        t = b + 4.0 * eps;
     }
 }
 
@@ -669,7 +777,7 @@ void traceSpheres(vec2 tb, float cone, int layers) {
         float tn = min(tMax.x, min(tMax.y, tMax.z));
         float te = min(tn, tb.y);
         loadCell(C, t, te);
-        sphereSegment(t, te, cone, layers);
+        sphereSegment(t, te, cone, layers, false);
         t = tn;
         int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
         C[axis] += stp[axis];
@@ -731,7 +839,11 @@ void main() {
     }
     // Radius of the pixel's cone per unit of distance.
     float cone = pixelSize / focalPx;
-    traceSpheres(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
+    if (clipOn != 0) {
+        traceContained(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
+    } else {
+        traceSpheres(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
+    }
 
     if (debugView == 1) {
         outColor = heat(cost);
@@ -809,6 +921,8 @@ type Foam = {
     placeKey: string;
     gridKey: string;
     fill: BubbleFill;
+    /** How much the container blew the largest-growing bubble up. */
+    grow: number;
     grid: SphereGrid;
     raw: WebGLTexture[];
     sphereTex: EffectTexture;
@@ -943,18 +1057,14 @@ export class BubbleEffect implements Effect {
             seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
             skin: clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin),
             minSize: clamp(p.minSize, 0.05, 1, d.minSize),
-            containment: clamp(p.containment, 0, 1, d.containment),
         };
         const wobble = clamp(p.wobble, 0, WOBBLE_MAX, d.wobble);
-        if (fill.containment && fill.containment > 0) {
-            // Room for the drift: the wobble becomes a placement param.
-            fill.wobble = wobble;
-        }
         return {
             halfDepth,
             cellSize,
             fill,
             wobble,
+            containment: clamp(p.containment, 0, 1, d.containment),
         };
     }
 
@@ -963,7 +1073,7 @@ export class BubbleEffect implements Effect {
     #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
         const r = this.#resolved();
         const placeKey = JSON.stringify(r.fill);
-        const gridKey = `${placeKey}|${r.wobble}`;
+        const gridKey = `${placeKey}|${r.wobble}|${r.containment}`;
         const old = this.#foamData;
         if (old && old.gridKey === gridKey) {
             return old;
@@ -972,7 +1082,29 @@ export class BubbleEffect implements Effect {
             old && old.placeKey === placeKey
                 ? old.fill
                 : placeBubbles(shape, r.fill);
-        const grid = buildSphereGrid(fill.spheres, r.wobble, r.cellSize);
+        // In a container the bubbles are blown up to fill it: r² grows by
+        // the same amount for all, which leaves every wall between two
+        // bubbles where it is and only pushes the foam's outside out,
+        // into the gaps and against the container. At 1 it covers a gap
+        // of the fill's smallest size next to the biggest bubble.
+        let spheres = fill.spheres;
+        let grow = 0;
+        if (r.containment > 0) {
+            let maxR = 0;
+            for (let i = 0; i < fill.count; i++) {
+                maxR = Math.max(maxR, fill.spheres[i * 4 + 3]);
+            }
+            const g = 0.5 * r.fill.minSize * r.cellSize;
+            const add = r.containment * CONTAIN_GROW * (2 * maxR * g + g * g);
+            spheres = fill.spheres.slice();
+            for (let i = 0; i < fill.count; i++) {
+                const r0 = spheres[i * 4 + 3];
+                const r1 = Math.sqrt(r0 * r0 + add);
+                spheres[i * 4 + 3] = r1;
+                grow = Math.max(grow, r1 - r0);
+            }
+        }
+        const grid = buildSphereGrid(spheres, r.wobble, r.cellSize);
         this.#freeFoam();
         const gl = ctx.gl;
         const raw: WebGLTexture[] = [];
@@ -1006,6 +1138,7 @@ export class BubbleEffect implements Effect {
             placeKey,
             gridKey,
             fill,
+            grow,
             grid,
             raw,
             sphereTex: textures[0],
@@ -1052,7 +1185,9 @@ export class BubbleEffect implements Effect {
         }
         // How far any sphere reaches out of the shape, drift included,
         // with a margin for the field's filtering.
-        const reach = foam.fill.reach + r.wobble * maxR + 0.02 * r.cellSize;
+        const reach =
+            foam.fill.reach + foam.grow + r.wobble * maxR + 0.02 * r.cellSize;
+        const containment = r.containment;
 
         ctx.draw({
             frag: FRAG_BUBBLE,
@@ -1079,6 +1214,8 @@ export class BubbleEffect implements Effect {
                 gridCell: grid.cell,
                 gridDims: grid.dims,
                 reachMax: reach,
+                clipOn: containment > 0 ? 1 : 0,
+                clipOff: (1 - containment) * reach,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),

@@ -206,8 +206,8 @@ export const bigCells: StoryObj<Args> = {
     },
 };
 
-// The bubbles held inside the shape (containment 1): the outline is
-// the logo's own, scalloped by the bubbles touching it from inside.
+// The logo as a container (containment 1): the bubbles are blown up
+// inside it and pressed flat against its walls.
 export const contained: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { containment: 1 } },
 };
