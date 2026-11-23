@@ -358,6 +358,10 @@ const MAX_LAYERS = 16;
 // How much a container blows the bubbles up at containment 1, as a share
 // of what would close every gap: less leaves creases between them.
 const CONTAIN_GROW = 0.3;
+// The fill inside the shape: the gap it closes, and the depth it takes
+// to, per cell size.
+const FILL_GAP = 0.35;
+const FILL_DEPTH = 0.5;
 const WOBBLE_MAX = 0.15;
 // Long side of the silhouette read back from the element, in px, and
 // the smoothing of its field. The field only places the bubbles, so it
@@ -415,6 +419,11 @@ uniform float clipOff;
 // the foam at S / (1 - containment). warpK = containment / (1 -
 // containment). At 1 (WALL_ON) it is cut flat instead.
 uniform float warpK;
+// In a container the bubbles inside the shape are blown up with depth,
+// by up to fillG on r², reached fillDepth in: the gaps left between them
+// deep inside close, and the shape reads as full of foam.
+uniform float fillG;
+uniform float fillDepth;
 #define WALL_ON (CONTAIN == 1)
 
 uniform sampler2D filmLut;
@@ -739,6 +748,13 @@ float candId[MAX_CAND];
 vec2 candBK[MAX_CAND];
 int nCand = 0;
 
+// The fill along the current stretch inside the shape: the outline's
+// field there is fillA + fillB t (taken as straight).
+bool fillOn = false;
+float fillA;
+float fillB;
+vec2 fillGrad;
+
 ivec2 texel(int i) {
     return ivec2(i % TEX_W, i / TEX_W);
 }
@@ -784,7 +800,9 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
             nCand++;
             continue;
         }
-        float disc = bk.x * bk.x - 4.0 * bk.y;
+        // With the fill a sphere owns points beyond its radius: keep it
+        // as far as it reaches with the fill.
+        float disc = bk.x * bk.x - 4.0 * (bk.y - (fillOn ? fillG : 0.0));
         if (disc <= 0.0) {
             continue;
         }
@@ -863,6 +881,21 @@ float borderDist(vec3 q, vec4 own) {
 }
 
 bool sphereInside = false;
+
+// The shape's field at t on the stretch, and its gradient.
+float fillField(float t, out vec3 grad) {
+    float zt = ro.z + rd.z * t;
+    float dz = abs(zt) - halfDepth;
+    float d2 = fillA + fillB * t;
+    grad = d2 > dz ? vec3(fillGrad, 0.0) : vec3(0.0, 0.0, zt >= 0.0 ? 1.0 : -1.0);
+    return max(d2, dz);
+}
+
+// What the fill adds to r² at t.
+float fillAt(float t) {
+    vec3 grad;
+    return fillG * clamp(-fillField(t, grad) / fillDepth, 0.0, 1.0);
+}
 // The cell that owns the end of the last segment (an index into cand).
 int segOwn = 0;
 // Whether the last grid walk ended inside a bubble, and that bubble.
@@ -888,6 +921,15 @@ void wallFilm(int i, float t, bool entering) {
 void sphereFilm(int i, float t, bool entering, float cover) {
     vec3 p = ro + rd * t;
     vec3 n = (p - cand[i].xyz) / cand[i].w;
+    if (fillOn) {
+        // The surface is |p - c|² - r² = fill: its gradient bends with
+        // the fill's.
+        vec3 grad;
+        float sf = fillField(t, grad);
+        if (sf < 0.0 && sf > -fillDepth) {
+            n = normalize(p - cand[i].xyz + 0.5 * fillG / fillDepth * grad);
+        }
+    }
     float edge = NO_EDGE;
     if (edgeReach > 0.0) {
         edge = borderDist(p, cand[i]);
@@ -920,8 +962,15 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
         }
     }
     segOwn = own;
+    // The fill over the segment, as a line g0 + gB (t - t0).
+    float g0 = 0.0;
+    float gB = 0.0;
+    if (fillOn) {
+        g0 = fillAt(t0);
+        gB = (fillAt(t1) - g0) / max(t1 - t0, 1e-6);
+    }
     if (first) {
-        sphereInside = t0 * t0 + lo < 0.0;
+        sphereInside = t0 * t0 + lo - g0 < 0.0;
         if (sphereInside && WALL_ON) {
             wallFilm(own, t0, true);
         } else if (sphereInside && capOn) {
@@ -950,11 +999,13 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
             }
         }
         float tb = min(ts, t1);
-        float disc = bo.x * bo.x - 4.0 * bo.y;
+        // The owner's power less the fill: t² + bf.x t + bf.y.
+        vec2 bf = bo - vec2(gB, g0 - gB * t0);
+        float disc = bf.x * bf.x - 4.0 * bf.y;
         if (disc > 0.0) {
             float hh = sqrt(disc);
-            float tIn = 0.5 * (-bo.x - hh);
-            float tOut = 0.5 * (-bo.x + hh);
+            float tIn = 0.5 * (-bf.x - hh);
+            float tOut = 0.5 * (-bf.x + hh);
             // Edge antialiasing: a chord shorter than the pixel's
             // footprint covers part of it.
             float cover = clamp(0.5 * hh / max(cone * tIn, 1e-6), 0.0, 1.0);
@@ -1210,7 +1261,16 @@ void traceContained(vec2 tb, float cone, int layers) {
                     break;
                 }
             }
+            // Inside the shape: the fill.
+            vec3 pm = ro + rd * (0.5 * (a + b));
+            vec3 s2 = sd2(pm.xy);
+            cost += 1.0;
+            fillGrad = s2.yz;
+            fillA = s2.x + dot(s2.yz, ro.xy - pm.xy);
+            fillB = dot(s2.yz, rd.xy);
+            fillOn = fillG > 0.0;
             walkGrid(a, b, cone, layers);
+            fillOn = false;
             t = b + (WALL_ON ? 4.0 * eps : 1e-4);
             if (WALL_ON || films >= layers || t >= tb.y) {
                 break;
@@ -1404,6 +1464,8 @@ type Foam = {
     fill: BubbleFill;
     /** How much the container blew the largest-growing bubble up. */
     grow: number;
+    /** What the fill adds to r² deep inside the shape. */
+    fillG: number;
     grid: SphereGrid;
     raw: WebGLTexture[];
     sphereTex: EffectTexture;
@@ -1609,7 +1671,41 @@ export class BubbleEffect implements Effect {
                 grow = Math.max(grow, r1 - r0);
             }
         }
-        const grid = buildSphereGrid(spheres, r.wobble, r.cellSize);
+        // The fill inside the shape: enough to close a gap of FILL_GAP cell
+        // sizes next to the biggest bubble. The grid lists each sphere as
+        // far as it reaches with it, so no cell misses an owner.
+        let fillG = 0;
+        let listed = spheres;
+        if (r.containment > 0) {
+            let maxR = 0;
+            for (let i = 0; i < spheres.length / 4; i++) {
+                maxR = Math.max(maxR, spheres[i * 4 + 3]);
+            }
+            const h = FILL_GAP * r.cellSize;
+            fillG = r.containment * (2 * maxR * h + h * h);
+            listed = spheres.slice();
+            for (let i = 0; i < listed.length / 4; i++) {
+                listed[i * 4 + 3] = Math.sqrt(listed[i * 4 + 3] ** 2 + fillG);
+            }
+        }
+        const grid = buildSphereGrid(listed, r.wobble, r.cellSize);
+        if (listed !== spheres) {
+            // Back to the true radii, in the grid's order (it may leave
+            // some out).
+            let j = 0;
+            for (let i = 0; i < grid.count; i++) {
+                while (
+                    spheres[j * 4] !== grid.spheres[i * 4] ||
+                    spheres[j * 4 + 1] !== grid.spheres[i * 4 + 1] ||
+                    spheres[j * 4 + 2] !== grid.spheres[i * 4 + 2]
+                ) {
+                    j++;
+                }
+                grid.spheres[i * 4 + 3] = spheres[j * 4 + 3];
+                grid.sphereData[i * 4 + 3] = spheres[j * 4 + 3];
+                j++;
+            }
+        }
         this.#freeFoam();
         const gl = ctx.gl;
         const raw: WebGLTexture[] = [];
@@ -1644,6 +1740,7 @@ export class BubbleEffect implements Effect {
             gridKey,
             fill,
             grow,
+            fillG,
             grid,
             raw,
             sphereTex: textures[0],
@@ -1722,6 +1819,8 @@ export class BubbleEffect implements Effect {
                 reachMax: reach,
                 clipOff: (1 - containment) * reach,
                 warpK: containment / Math.max(1 - containment, 1e-3),
+                fillG: foam.fillG,
+                fillDepth: FILL_DEPTH * r.cellSize,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),
