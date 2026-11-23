@@ -785,7 +785,7 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">86</span>
+                                                <span class="DocSidebarCount">90</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -924,6 +924,12 @@
                                                         <a href="/vfx-js/docs/effects/GlassPatternName/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1137,6 +1143,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/OrbitCameraParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                OrbitCameraParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
                                                             <span class="DocSidebarLabel">
                                                                 ParticleExplodeParams
@@ -1239,6 +1251,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/SourceChannel/">
+                                                            <span class="DocSidebarLabel">
+                                                                SourceChannel
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/SwirlParticleColorStop/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleColorStop
@@ -1260,6 +1278,12 @@
                                                         <a href="/vfx-js/docs/effects/SwirlParticleParams/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SwirlParticlePointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                SwirlParticlePointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1368,24 +1392,30 @@
         <h1>
             SwirlParticleEffect
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/88509bce05a0d8a0ba64186b4f9f79f6dc945fe8/packages/effects/src/swirl-particle.ts#L1532" target="_blank" rel="noreferrer">
-                    effects/src/swirl-particle.ts:1532 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/f53ef07bb295f7f56678a82a1fe2861f068dd63f/packages/effects/src/swirl-particle.ts#L1511" target="_blank" rel="noreferrer">
+                    effects/src/swirl-particle.ts:1511 &#8599;
                 </a>
     </header>
 
     <div class="ApiImport"><pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { SwirlParticleEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span></code></pre></div>
 <div class="ApiText"><p>Particles that flow over the surface of the element's silhouette,
 extruded into 3D, and peel off it in curling wisps. Fibres are shaded
-from the shape's SDF, coloured by a gradient <a href="/vfx-js/docs/effects/SwirlParticleParams/#palette"><code>SwirlParticleParams.palette</code></a>
+from the shape's SDF, coloured by a gradient <code>SwirlParticleParams.palette</code>
 (or the source colours, with <code>sourceColor</code>), with HDR sparkles and bloom.</p>
 <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> SwirlParticleEffect</span><span style="color:#E1E4E8">({ palette: </span><span style="color:#9ECBFF">"ember"</span><span style="color:#E1E4E8"> }) });</span></span></code></pre>
-<p>The silhouette is the element's alpha, read back when the effect starts
-and again when the element's aspect ratio changes. Call
+<p>The silhouette is the element's alpha (or the channel
+<code>sourceChannel</code> picks), read
+back when the effect starts and again when the element's aspect ratio
+changes. Call
 <a href="/vfx-js/docs/effects/SwirlParticleEffect/#refresh"><code>refresh()</code></a> after its content
 changes. An opaque photo becomes an extruded slab. The particles are
-born over the first <a href="/vfx-js/docs/effects/SwirlParticleParams/#intro"><code>intro</code></a> seconds
+born over the first <code>intro</code> seconds
 (1.5 by default). The output is premultiplied over transparency, so set
-the page background yourself. Camera angles are in degrees.</p>
+the page background yourself. The camera
+(<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>) is the one <a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a> has, with
+angles in degrees; <code>pointer: &quot;tilt&quot;</code> turns it towards the pointer. With
+<code>cameraOrigin: &quot;viewport&quot;</code>, the default <code>pad</code> of 200 can clip an
+element near the edge of the viewport.</p>
 <p>All params, <code>count</code> and <code>fireflyRatio</code> included, are read every frame,
 so you can mutate <code>params</code> live. Numbers that are not finite fall back
 to their defaults. Set <code>drag: true</code> to orbit the camera by dragging

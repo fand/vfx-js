@@ -785,7 +785,7 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">86</span>
+                                                <span class="DocSidebarCount">90</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -924,6 +924,12 @@
                                                         <a href="/vfx-js/docs/effects/GlassPatternName/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1137,6 +1143,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/OrbitCameraParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                OrbitCameraParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
                                                             <span class="DocSidebarLabel">
                                                                 ParticleExplodeParams
@@ -1239,6 +1251,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/SourceChannel/">
+                                                            <span class="DocSidebarLabel">
+                                                                SourceChannel
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/SwirlParticleColorStop/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleColorStop
@@ -1260,6 +1278,12 @@
                                                         <a href="/vfx-js/docs/effects/SwirlParticleParams/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SwirlParticlePointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                SwirlParticlePointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1368,8 +1392,8 @@
         <h1>
             GlassEffect
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/88509bce05a0d8a0ba64186b4f9f79f6dc945fe8/packages/effects/src/glass.ts#L1311" target="_blank" rel="noreferrer">
-                    effects/src/glass.ts:1311 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/f53ef07bb295f7f56678a82a1fe2861f068dd63f/packages/effects/src/glass.ts#L1357" target="_blank" rel="noreferrer">
+                    effects/src/glass.ts:1357 &#8599;
                 </a>
     </header>
 
@@ -1378,10 +1402,23 @@
 alpha is extruded into 3D and ray-traced with refraction, internal
 reflections and a rainbow split of the light.</p>
 <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> GlassEffect</span><span style="color:#E1E4E8">({ backdrop: </span><span style="color:#9ECBFF">"grid"</span><span style="color:#E1E4E8"> }) });</span></span></code></pre>
-<p>The silhouette is read once when the effect starts. An opaque photo
-becomes a slab. The glass shows a <code>backdrop</code> behind it, a procedural
-pattern or an image, not the page: the output is opaque where the
-backdrop is seen and premultiplied over transparency elsewhere.</p>
+<p>The silhouette is the element's alpha (or the channel
+<code>sourceChannel</code> picks), read back
+when the effect starts and again when the element's aspect ratio
+changes. Call <a href="/vfx-js/docs/effects/GlassEffect/#refresh"><code>refresh()</code></a> after its
+content changes. An opaque photo becomes a slab. The glass shows a
+<code>backdrop</code> behind it, a procedural pattern or an image, not the page:
+the output is opaque where the backdrop is seen and premultiplied over
+transparency elsewhere.</p>
+<p>The camera (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>: <code>yaw</code>, <code>pitch</code>,
+<code>orbitAnimation</code>, <code>fov</code>, …) works as in <a href="/vfx-js/docs/effects/SwirlParticleEffect/"><code>SwirlParticleEffect</code></a>,
+with angles in degrees. Its defaults here: the glass turned by <code>yaw</code> 29
+and <code>pitch</code> 14, a faster orbit animation (<code>orbitSpeed</code> 3.3), and
+<code>zoom</code> 0.7, so the glass is a little smaller than the element. Set <code>drag: true</code> to orbit it with
+pointer drags that start on the element, and <code>pointer: &quot;tilt&quot;</code> to turn
+it towards the pointer. The default
+<code>pad: &quot;fullscreen&quot;</code> leaves room for an off-centre element to lean out
+of its rect with <code>cameraOrigin: &quot;viewport&quot;</code>.</p>
 <p>All params are read every frame, so you can mutate <code>params</code> live.</p>
 </div>
 
@@ -1446,7 +1483,36 @@ backdrop is seen and premultiplied over transparency elsewhere.</p>
 </section>
             </section><section class="ApiGroup">
                 <h2>Methods</h2>
-                <section class="ApiMember" id="setParams">
+                <section class="ApiMember" id="refresh">
+    <h3>
+        <a class="ApiAnchor" href="#refresh">refresh</a>
+        
+        
+    </h3>
+    <div class="ApiSignature">
+    <pre class="ApiCode"><code><span class="tf">refresh</span><span class="tp">(</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code></pre>
+    
+<div class="ApiText"><p>Capture the element's silhouette again, for when its content
+changed: an image's <code>src</code> swapped, a text edit. For an <code>&lt;img&gt;</code>,
+call it after <code>vfx.update(img)</code> has reloaded the image.</p>
+<p>The glass keeps the current shape until the new one has been read
+back (a few frames later), then switches to it. A change of the
+element's aspect ratio is recaptured automatically once its size
+settles; a change of size alone needs none.</p>
+<p>Safe to call at any time and any number of times; a call while a
+capture is pending restarts it, so the latest content wins.</p>
+</div>
+
+    
+    
+</div>
+    
+    
+    
+    
+
+
+</section><section class="ApiMember" id="setParams">
     <h3>
         <a class="ApiAnchor" href="#setParams">setParams</a>
         

@@ -10,14 +10,14 @@
         <title>GlassParams - API Reference - VFX-JS</title>
 
         <meta name="theme-color" content="#000000">
-        <meta name="description" content="GlassParams in @vfx-js/effects.">
+        <meta name="description" content="The params of GlassEffect: the glass's own, and the camera's (OrbitCameraParams).">
         <link rel="canonical" href="https://amagi.dev/vfx-js/docs/effects/GlassParams/">
 
         <meta property="og:url" content="https://amagi.dev/vfx-js/docs/effects/GlassParams/">
         <meta property="og:type" content="website">
         <meta property="og:title" content="GlassParams - API Reference - VFX-JS">
         <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
-        <meta property="og:description" content="GlassParams in @vfx-js/effects.">
+        <meta property="og:description" content="The params of GlassEffect: the glass's own, and the camera's (OrbitCameraParams).">
         <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
         <meta property="og:locale" content="en_US">
 
@@ -26,7 +26,7 @@
         <meta name="twitter:creator" content="@amagitakayosi">
         <meta name="twitter:url" content="https://amagi.dev/vfx-js/docs/effects/GlassParams/">
         <meta name="twitter:title" content="GlassParams - API Reference - VFX-JS">
-        <meta name="twitter:description" content="GlassParams in @vfx-js/effects.">
+        <meta name="twitter:description" content="The params of GlassEffect: the glass's own, and the camera's (OrbitCameraParams).">
         <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
 
         <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
@@ -785,7 +785,7 @@
                                         </details><details open>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">86</span>
+                                                <span class="DocSidebarCount">90</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -924,6 +924,12 @@
                                                         <a href="/vfx-js/docs/effects/GlassPatternName/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1137,6 +1143,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/OrbitCameraParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                OrbitCameraParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
                                                             <span class="DocSidebarLabel">
                                                                 ParticleExplodeParams
@@ -1239,6 +1251,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/SourceChannel/">
+                                                            <span class="DocSidebarLabel">
+                                                                SourceChannel
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/SwirlParticleColorStop/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleColorStop
@@ -1260,6 +1278,12 @@
                                                         <a href="/vfx-js/docs/effects/SwirlParticleParams/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SwirlParticlePointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                SwirlParticlePointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1368,718 +1392,54 @@
         <h1>
             GlassParams
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/88509bce05a0d8a0ba64186b4f9f79f6dc945fe8/packages/effects/src/glass.ts#L81" target="_blank" rel="noreferrer">
-                    effects/src/glass.ts:81 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/f53ef07bb295f7f56678a82a1fe2861f068dd63f/packages/effects/src/glass.ts#L97" target="_blank" rel="noreferrer">
+                    effects/src/glass.ts:97 &#8599;
                 </a>
     </header>
 
     <div class="ApiImport"><pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#E1E4E8"> { GlassParams } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span></code></pre></div>
-
-
-
-    <section class="ApiGroup">
-                <h2>Properties</h2>
-                <section class="ApiMember" id="absorption">
-    <h3>
-        <a class="ApiAnchor" href="#absorption">absorption</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">absorption</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>How fast the glass takes its <code>tint</code> with thickness. 0 is clear.</p>
+<div class="ApiText"><p>The params of <a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a>: the glass's own, and the camera's
+(<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>).</p>
 </div>
 
-</section><section class="ApiMember" id="backdrop">
-    <h3>
-        <a class="ApiAnchor" href="#backdrop">backdrop</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdrop</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPatternName/">GlassPatternName</a><span class="tp"> | </span><a class="tr" href="/vfx-js/docs/effects/GlassImageSource/">GlassImageSource</a></code></pre>
-                
-            
-    
-<div class="ApiText"><p>What is seen through the glass: a pattern name, or an image (an
-element, an <code>ImageBitmap</code> or a URL).</p>
-</div>
 
-</section><section class="ApiMember" id="backdropColors">
-    <h3>
-        <a class="ApiAnchor" href="#backdropColors">backdropColors</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropColors</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPaletteName/">GlassPaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <span class="tk">string</span><span class="tp">[]</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>The palette of a procedural pattern: a <a href="/vfx-js/docs/effects/GlassPaletteName/"><code>GlassPaletteName</code></a> or
-two or more <code>#rrggbb</code> colours in order, each with an equal share of
-the area. One colour is a flat fill. Stripes, marble bands and
-the flow go round the colours, the last running into the first;
-the grid nests them as concentric squares.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropDistance">
-    <h3>
-        <a class="ApiAnchor" href="#backdropDistance">backdropDistance</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropDistance</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Distance of the backdrop plane behind the shape's centre.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropRatio">
-    <h3>
-        <a class="ApiAnchor" href="#backdropRatio">backdropRatio</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropRatio</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Share of the area that the second colour covers when the palette
-has two colours, 0 to 1: the width of the stripes and marble bands,
-of the grid's lines. Ignored for three or more colours.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropScale">
-    <h3>
-        <a class="ApiAnchor" href="#backdropScale">backdropScale</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropScale</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Size of the pattern's features, or of the image, in the same units
-as <code>depth</code>.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropSoftness">
-    <h3>
-        <a class="ApiAnchor" href="#backdropSoftness">backdropSoftness</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropSoftness</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Softness of the edges between the palette's colours, 0 to 1. 0 is
-hard bands; near 1 the pattern is a continuous gradient through
-the colours.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropSpeed">
-    <h3>
-        <a class="ApiAnchor" href="#backdropSpeed">backdropSpeed</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropSpeed</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Speed of the pattern, in pattern periods per second. The patterns
-scroll, except <code>&quot;marble&quot;</code> and <code>&quot;flow&quot;</code>, which morph in place.</p>
-</div>
-
-</section><section class="ApiMember" id="backdropVisible">
-    <h3>
-        <a class="ApiAnchor" href="#backdropVisible">backdropVisible</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">backdropVisible</span><span class="tp">: </span><span class="tk">boolean</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Draw the backdrop around the glass too, not only through it.</p>
-</div>
-
-</section><section class="ApiMember" id="bevel">
-    <h3>
-        <a class="ApiAnchor" href="#bevel">bevel</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bevel</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Size of the bevel on the edges, in the same units as <code>depth</code>. Most
-of the dispersion shows on it, where the surface turns.</p>
-</div>
-
-</section><section class="ApiMember" id="bevelShape">
-    <h3>
-        <a class="ApiAnchor" href="#bevelShape">bevelShape</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bevelShape</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassBevelShape/">GlassBevelShape</a></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Profile of the bevel.</p>
-</div>
-
-</section><section class="ApiMember" id="bounces">
-    <h3>
-        <a class="ApiAnchor" href="#bounces">bounces</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bounces</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Reflections inside the glass before the ray is forced out, 1 to 6.</p>
-</div>
-
-</section><section class="ApiMember" id="bulge">
-    <h3>
-        <a class="ApiAnchor" href="#bulge">bulge</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bulge</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>How far the caps rise in the middle, in the same units as <code>depth</code>.
-0 keeps them flat; more makes a lens or a gem.</p>
-</div>
-
-</section><section class="ApiMember" id="bulgeWidth">
-    <h3>
-        <a class="ApiAnchor" href="#bulgeWidth">bulgeWidth</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bulgeWidth</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Distance from the silhouette's edge over which the caps rise to
-the full <code>bulge</code>. Where the shape is narrower than twice this, the
-bulge has a crease along its middle.</p>
-</div>
-
-</section><section class="ApiMember" id="bump">
-    <h3>
-        <a class="ApiAnchor" href="#bump">bump</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bump</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Ripples on the surface, 0 to 1, like hammered or old glass. Only
-the normals are bent; the outline stays the same.</p>
-</div>
-
-</section><section class="ApiMember" id="bumpScale">
-    <h3>
-        <a class="ApiAnchor" href="#bumpScale">bumpScale</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">bumpScale</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Size of the ripples, in the same units as <code>depth</code>.</p>
-</div>
-
-</section><section class="ApiMember" id="debug">
-    <h3>
-        <a class="ApiAnchor" href="#debug">debug</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">debug</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassDebugView/">GlassDebugView</a></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Show the cost of each pixel instead of the glass, as a heat map of
-SDF lookups: black 0, blue 64, green 128, yellow 192, red 256,
-white 320 or more.</p>
-</div>
-
-</section><section class="ApiMember" id="depth">
-    <h3>
-        <a class="ApiAnchor" href="#depth">depth</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">depth</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Extrusion depth, relative to the long side of the element (= 2).</p>
-</div>
-
-</section><section class="ApiMember" id="dispersion">
-    <h3>
-        <a class="ApiAnchor" href="#dispersion">dispersion</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">dispersion</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Spread of the index of refraction over the spectrum: red is
-<code>ior - dispersion / 2</code>, violet <code>ior + dispersion / 2</code>. Real glass
-is around 0.02; 0.1 to 0.2 gives the exaggerated rainbow look.</p>
-</div>
-
-</section><section class="ApiMember" id="drag">
-    <h3>
-        <a class="ApiAnchor" href="#drag">drag</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">drag</span><span class="tp">: </span><span class="tk">boolean</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Orbit the camera with pointer drags.</p>
-</div>
-
-</section><section class="ApiMember" id="fov">
-    <h3>
-        <a class="ApiAnchor" href="#fov">fov</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">fov</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Vertical field of view in degrees.</p>
-</div>
-
-</section><section class="ApiMember" id="frost">
-    <h3>
-        <a class="ApiAnchor" href="#frost">frost</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">frost</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Roughness of the surface, 0 to 1: what is seen through the glass,
-and reflected on it, blurs with its distance from the surface.</p>
-</div>
-
-</section><section class="ApiMember" id="fxaa">
-    <h3>
-        <a class="ApiAnchor" href="#fxaa">fxaa</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">fxaa</span><span class="tp">: </span><span class="tk">boolean</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Smooth the remaining stair steps with FXAA. Refraction on a narrow
-bevel changes faster than the pixels can follow; this is the cheap
-fix, <code>resolution: 2</code> the thorough one.</p>
-</div>
-
-</section><section class="ApiMember" id="ior">
-    <h3>
-        <a class="ApiAnchor" href="#ior">ior</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">ior</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Index of refraction at the middle of the spectrum.</p>
-</div>
-
-</section><section class="ApiMember" id="jitter">
-    <h3>
-        <a class="ApiAnchor" href="#jitter">jitter</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">jitter</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Per-pixel offset of the wavelengths, 0 to 1. Trades the banding of
-a low <code>samples</code> for fine noise.</p>
-</div>
-
-</section><section class="ApiMember" id="lightIntensity">
-    <h3>
-        <a class="ApiAnchor" href="#lightIntensity">lightIntensity</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">lightIntensity</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Brightness of the soft box lights around the shape. 0 turns them off.</p>
-</div>
-
-</section><section class="ApiMember" id="lightSoftness">
-    <h3>
-        <a class="ApiAnchor" href="#lightSoftness">lightSoftness</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">lightSoftness</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Softness of the lights' edges, 0 to 1.</p>
-</div>
-
-</section><section class="ApiMember" id="orbit">
-    <h3>
-        <a class="ApiAnchor" href="#orbit">orbit</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">orbit</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Amplitude of a slow camera wobble, in radians.</p>
-</div>
-
-</section><section class="ApiMember" id="pad">
-    <h3>
-        <a class="ApiAnchor" href="#pad">pad</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">pad</span><span class="tp">: </span><span class="tk">number</span><span class="tp"> | </span><span class="ts">&quot;fullscreen&quot;</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Padding around the element, in CSS px, or <code>&quot;fullscreen&quot;</code> to draw on
-the whole canvas.</p>
-</div>
-
-</section><section class="ApiMember" id="paths">
-    <h3>
-        <a class="ApiAnchor" href="#paths">paths</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">paths</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Rays traced through the glass per pixel, 1 to 4, spread over the
-spectrum. The cost grows linearly. 2 is enough for a small
-<code>dispersion</code>; use more when the rainbow breaks up.</p>
-</div>
-
-</section><section class="ApiMember" id="pitch">
-    <h3>
-        <a class="ApiAnchor" href="#pitch">pitch</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">pitch</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Camera pitch in radians. 0 looks straight at the front cap.</p>
-</div>
-
-</section><section class="ApiMember" id="reflection">
-    <h3>
-        <a class="ApiAnchor" href="#reflection">reflection</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">reflection</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Strength of the reflection on the outer surface.</p>
-</div>
-
-</section><section class="ApiMember" id="relief">
-    <h3>
-        <a class="ApiAnchor" href="#relief">relief</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">relief</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Height of a relief on the front cap, in the same units as <code>depth</code>,
-from the element's luminance: positive raises the bright parts,
-negative the dark ones (by sinking the bright ones). It makes a
-button's label or a photo's content show as shape. 0 is off. Read
-once with the silhouette, so a video gives a still relief.</p>
-</div>
-
-</section><section class="ApiMember" id="reliefBlur">
-    <h3>
-        <a class="ApiAnchor" href="#reliefBlur">reliefBlur</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">reliefBlur</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>How much the relief's height map is blurred, in the same units as
-<code>depth</code>. More calms a busy photo and rounds a label's edges.
-Changing it rebuilds the height map on the CPU.</p>
-</div>
-
-</section><section class="ApiMember" id="resolution">
-    <h3>
-        <a class="ApiAnchor" href="#resolution">resolution</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">resolution</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Render scale, 0.25 to 2. Below 1 is cheaper and softer; 2
-supersamples the silhouette's edge.</p>
-</div>
-
-</section><section class="ApiMember" id="samples">
-    <h3>
-        <a class="ApiAnchor" href="#samples">samples</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">samples</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Wavelengths in the spectrum, 1 to 16. They are interpolated between
-the traced <code>paths</code>, so they are cheap. Equal to <code>paths</code>, the
-channels split into separate bands instead of a smooth rainbow.</p>
-</div>
-
-</section><section class="ApiMember" id="tint">
-    <h3>
-        <a class="ApiAnchor" href="#tint">tint</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">tint</span><span class="tp">: </span><span class="tk">string</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Colour of the glass, <code>#rrggbb</code>. Thicker glass is more saturated.</p>
-</div>
-
-</section><section class="ApiMember" id="yaw">
-    <h3>
-        <a class="ApiAnchor" href="#yaw">yaw</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">yaw</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Camera yaw in radians. 0 looks straight at the front cap.</p>
-</div>
-
-</section><section class="ApiMember" id="zoom">
-    <h3>
-        <a class="ApiAnchor" href="#zoom">zoom</a>
-        
-        
-    </h3>
-    
-    
-    
-    
-                <pre class="ApiCode"><code><span class="tm">zoom</span><span class="tp">: </span><span class="tk">number</span></code></pre>
-                
-            
-    
-<div class="ApiText"><p>Size of the shape relative to the element.</p>
-</div>
-
-</section>
-            </section>
+    <pre class="ApiCode"><code><span class="tk">type </span><span class="tr">GlassParams</span><span class="tp"> =</span> <a class="tr" href="/vfx-js/docs/effects/OrbitCameraParams/">OrbitCameraParams</a><span class="tp"> &amp; </span><span class="tp">{</span>
+    <span class="tm">absorption</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">antialias</span><span class="tp">: </span><span class="tk">boolean</span><span class="tp">;</span>
+    <span class="tm">backdrop</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPatternName/">GlassPatternName</a><span class="tp"> | </span><a class="tr" href="/vfx-js/docs/effects/GlassImageSource/">GlassImageSource</a><span class="tp">;</span>
+    <span class="tm">backdropColors</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPaletteName/">GlassPaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <span class="tk">string</span><span class="tp">[]</span><span class="tp">;</span>
+    <span class="tm">backdropDistance</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">backdropRatio</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">backdropScale</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">backdropSoftness</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">backdropSpeed</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">backdropVisible</span><span class="tp">: </span><span class="tk">boolean</span><span class="tp">;</span>
+    <span class="tm">bevel</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">bevelShape</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassBevelShape/">GlassBevelShape</a><span class="tp">;</span>
+    <span class="tm">bounces</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">bulge</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">bulgeWidth</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">bump</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">bumpScale</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">debug</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassDebugView/">GlassDebugView</a><span class="tp">;</span>
+    <span class="tm">depth</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">dispersion</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">frost</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">ior</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">jitter</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">lightIntensity</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">lightSoftness</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">pad</span><span class="tp">: </span><span class="tk">number</span><span class="tp"> | </span><span class="ts">&quot;fullscreen&quot;</span><span class="tp">;</span>
+    <span class="tm">paths</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">pointer</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPointer/">GlassPointer</a><span class="tp">;</span>
+    <span class="tm">reflection</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">relief</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">reliefBlur</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">resolution</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">samples</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
+    <span class="tm">sourceChannel</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/SourceChannel/">SourceChannel</a><span class="tp">;</span>
+    <span class="tm">tint</span><span class="tp">: </span><span class="tk">string</span><span class="tp">;</span>
+<span class="tp">}</span></code></pre>
                             </main>
                         </div>
                 <footer class="SiteFooter">

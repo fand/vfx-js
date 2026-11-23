@@ -785,7 +785,7 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">86</span>
+                                                <span class="DocSidebarCount">90</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -924,6 +924,12 @@
                                                         <a href="/vfx-js/docs/effects/GlassPatternName/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlassPointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlassPointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1137,6 +1143,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/OrbitCameraParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                OrbitCameraParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
                                                             <span class="DocSidebarLabel">
                                                                 ParticleExplodeParams
@@ -1239,6 +1251,12 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/SourceChannel/">
+                                                            <span class="DocSidebarLabel">
+                                                                SourceChannel
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/SwirlParticleColorStop/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleColorStop
@@ -1260,6 +1278,12 @@
                                                         <a href="/vfx-js/docs/effects/SwirlParticleParams/">
                                                             <span class="DocSidebarLabel">
                                                                 SwirlParticleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SwirlParticlePointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                SwirlParticlePointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1861,7 +1885,7 @@
                                     <a href="/vfx-js/docs/effects/SwirlParticleEffect/">
                                         <code>SwirlParticleEffect</code>
                                     </a>
-                                    <span>Particles that flow over the surface of the element's silhouette, extruded into 3D, and peel off it in curling wisps. Fibres are shaded from the shape's SDF, coloured by a gradient <a href="/vfx-js/docs/effects/SwirlParticleParams/#palette"><code>SwirlParticleParams.palette</code></a> (or the source colours, with <code>sourceColor</code>), with HDR sparkles and bloom.</span>
+                                    <span>Particles that flow over the surface of the element's silhouette, extruded into 3D, and peel off it in curling wisps. Fibres are shaded from the shape's SDF, coloured by a gradient <code>SwirlParticleParams.palette</code> (or the source colours, with <code>sourceColor</code>), with HDR sparkles and bloom.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/TilePixelateEffect/">
                                         <code>TilePixelateEffect</code>
@@ -1976,12 +2000,12 @@
                                     <a href="/vfx-js/docs/effects/GlassBevelShape/">
                                         <code>GlassBevelShape</code>
                                     </a>
-                                    <span>Profile of the <a href="/vfx-js/docs/effects/GlassParams/#bevel"><code>GlassParams.bevel</code></a>: a quarter circle, or a flat 45° cut with hard edges.</span>
+                                    <span>Profile of the <code>GlassParams.bevel</code>: a quarter circle, or a flat 45° cut with hard edges.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassDebugView/">
                                         <code>GlassDebugView</code>
                                     </a>
-                                    <span>A <a href="/vfx-js/docs/effects/GlassParams/#debug"><code>GlassParams.debug</code></a> view: the SDF lookups spent per pixel on finding the surface (<code>&quot;outer&quot;</code>), on tracing inside the glass (<code>&quot;inner&quot;</code>), or both (<code>&quot;total&quot;</code>).</span>
+                                    <span>A <code>GlassParams.debug</code> view: the SDF lookups spent per pixel on finding the surface (<code>&quot;outer&quot;</code>), on tracing inside the glass (<code>&quot;inner&quot;</code>), or both (<code>&quot;total&quot;</code>).</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassEffectOptions/">
                                         <code>GlassEffectOptions</code>
@@ -1991,22 +2015,27 @@
                                     <a href="/vfx-js/docs/effects/GlassImageSource/">
                                         <code>GlassImageSource</code>
                                     </a>
-                                    <span>An image for <a href="/vfx-js/docs/effects/GlassParams/#backdrop"><code>GlassParams.backdrop</code></a>. Strings other than a <a href="/vfx-js/docs/effects/GlassPatternName/"><code>GlassPatternName</code></a> are treated as URLs.</span>
+                                    <span>An image for <code>GlassParams.backdrop</code>. Strings other than a <a href="/vfx-js/docs/effects/GlassPatternName/"><code>GlassPatternName</code></a> are treated as URLs.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassPaletteName/">
                                         <code>GlassPaletteName</code>
                                     </a>
-                                    <span>A preset for <a href="/vfx-js/docs/effects/GlassParams/#backdropColors"><code>GlassParams.backdropColors</code></a>, see <a href="/vfx-js/docs/effects/GLASS_PALETTES/"><code>GLASS_PALETTES</code></a>.</span>
+                                    <span>A preset for <code>GlassParams.backdropColors</code>, see <a href="/vfx-js/docs/effects/GLASS_PALETTES/"><code>GLASS_PALETTES</code></a>.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassParams/">
                                         <code>GlassParams</code>
                                     </a>
-                                    <span></span>
+                                    <span>The params of <a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a>: the glass's own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>).</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassPatternName/">
                                         <code>GlassPatternName</code>
                                     </a>
-                                    <span>A procedural <a href="/vfx-js/docs/effects/GlassParams/#backdrop"><code>GlassParams.backdrop</code></a>, coloured through the <a href="/vfx-js/docs/effects/GlassParams/#backdropColors"><code>GlassParams.backdropColors</code></a> palette. <code>&quot;none&quot;</code> is black. <code>&quot;marble&quot;</code> is the contour bands of a slow noise field, like zebra marble. <code>&quot;flow&quot;</code> runs through the palette diagonally, bent by a slow noise field into wavering ribbons.</span>
+                                    <span>A procedural <code>GlassParams.backdrop</code>, coloured through the <code>GlassParams.backdropColors</code> palette. <code>&quot;none&quot;</code> is black. <code>&quot;marble&quot;</code> is the contour bands of a slow noise field, like zebra marble. <code>&quot;flow&quot;</code> runs through the palette diagonally, bent by a slow noise field into wavering ribbons.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/GlassPointer/">
+                                        <code>GlassPointer</code>
+                                    </a>
+                                    <span>What the pointer does to a <a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a>.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlitchParams/">
                                         <code>GlitchParams</code>
@@ -2183,6 +2212,11 @@
                                     </a>
                                     <span>Trail colour: a single <a href="/vfx-js/docs/effects/MatrixColor/"><code>MatrixColor</code></a>, or an array of two or more colour stops forming a gradient along each drop's trail (first stop at the head, last at the tail end). Stops are interpolated in OKLCH.</span>
                                 </li><li>
+                                    <a href="/vfx-js/docs/effects/OrbitCameraParams/">
+                                        <code>OrbitCameraParams</code>
+                                    </a>
+                                    <span>The camera params of the 3D shape effects (<a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a>, <a href="/vfx-js/docs/effects/SwirlParticleEffect/"><code>SwirlParticleEffect</code></a>). Angles are in degrees.</span>
+                                </li><li>
                                     <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
                                         <code>ParticleExplodeParams</code>
                                     </a>
@@ -2268,10 +2302,15 @@
                                     </a>
                                     <span></span>
                                 </li><li>
+                                    <a href="/vfx-js/docs/effects/SourceChannel/">
+                                        <code>SourceChannel</code>
+                                    </a>
+                                    <span>Which channel of the element is read as a shape: <code>&quot;alpha&quot;</code> (where it is opaque), <code>&quot;luminance&quot;</code> (where it is bright) or <code>&quot;none&quot;</code> (the whole element rect).</span>
+                                </li><li>
                                     <a href="/vfx-js/docs/effects/SwirlParticleColorStop/">
                                         <code>SwirlParticleColorStop</code>
                                     </a>
-                                    <span>One stop of a <a href="/vfx-js/docs/effects/SwirlParticleParams/#palette"><code>SwirlParticleParams.palette</code></a> gradient, like a stop in a CSS <code>linear-gradient</code>.</span>
+                                    <span>One stop of a <code>SwirlParticleParams.palette</code> gradient, like a stop in a CSS <code>linear-gradient</code>.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/SwirlParticleEffectOptions/">
                                         <code>SwirlParticleEffectOptions</code>
@@ -2286,7 +2325,12 @@
                                     <a href="/vfx-js/docs/effects/SwirlParticleParams/">
                                         <code>SwirlParticleParams</code>
                                     </a>
-                                    <span></span>
+                                    <span>The params of <a href="/vfx-js/docs/effects/SwirlParticleEffect/"><code>SwirlParticleEffect</code></a>: the particles' own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>).</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/SwirlParticlePointer/">
+                                        <code>SwirlParticlePointer</code>
+                                    </a>
+                                    <span>What the pointer does to a <a href="/vfx-js/docs/effects/SwirlParticleEffect/"><code>SwirlParticleEffect</code></a>.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/TilePixelateParams/">
                                         <code>TilePixelateParams</code>
