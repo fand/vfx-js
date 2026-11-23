@@ -217,7 +217,16 @@ export const contained: StoryObj<Args> = {
 export const borders: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",
-        params: { containment: 1, borderStrength: 1 },
+        params: { containment: 1, borderStrength: 1, froth: 0 },
+    },
+};
+
+// Very fine bubbles lining the borders, densest at the line. Close
+// enough to see them: smaller than about 1.5 px they only brighten it.
+export const froth: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { containment: 1, borderStrength: 0.6, froth: 1, zoom: 2 },
     },
 };
 
@@ -288,6 +297,20 @@ export const closeUp: StoryObj<Args> = {
             pitch: 0.12,
             orbit: 0.1,
             zoom: 0.8,
+        },
+    },
+};
+
+// The close-up pressed into a mould, with pale borders and froth
+// along them.
+export const closeUpFroth: StoryObj<Args> = {
+    args: {
+        ...closeUp.args,
+        params: {
+            ...closeUp.args?.params,
+            containment: 1,
+            borderStrength: 0.6,
+            froth: 1,
         },
     },
 };

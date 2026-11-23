@@ -1239,6 +1239,9 @@ export function attachBubblePane(
     bind(borders, "borderWidth", range(0, 0.5, 0.005));
     bind(borders, "borderStrength", range(0, 2, 0.01));
     bind(borders, "borderThickness", range(0, 1500, 5));
+    bind(borders, "froth", range(0, 1, 0.01));
+    bind(borders, "frothSize", range(0.01, 0.3, 0.005));
+    bind(borders, "frothWidth", range(0, 0.5, 0.005));
 
     const backdrop = pane.addFolder({ title: "Backdrop" });
     pick(backdrop, "backdrop", pickers.backdrop);
