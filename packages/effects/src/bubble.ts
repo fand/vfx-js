@@ -133,11 +133,13 @@ export type BubbleParams = {
     /**
      * How much the shape acts as a container, 0 to 1. 0 lets the bubbles
      * poke out of the silhouette (see `skin`) and bulge out of its front
-     * and back. Towards 1 an invisible wall closes in on the shape, and
-     * at 1 it is the shape itself: the bubbles keep their size and are
-     * pressed flat against it, like a foam blown up inside a mould. They
-     * are also blown up a little, which closes the smallest gaps and
-     * leaves creases between them.
+     * and back. Above 0, what pokes out is squashed towards the shape,
+     * keeping its roundness: a cap that stood h above the shape stands
+     * (1 - containment) h. At 1 the bubbles are pressed flat against the
+     * shape, like a foam blown up inside a mould. They are also blown up
+     * a little, which closes the smallest gaps and leaves creases
+     * between them. The squashed part is ray marched, so values between
+     * 0 and 1 cost more than either end.
      */
     containment: number;
     /**
@@ -361,6 +363,12 @@ uniform float reachMax;
 // reaches clipOff (0: the shape itself).
 uniform int clipOn;
 uniform float clipOff;
+// Below containment 1 the part of the foam outside the shape is not cut
+// but squashed towards it: a point at distance S from the shape shows
+// the foam at S / (1 - containment). warpK = containment / (1 -
+// containment); wallOn (containment 1) cuts flat instead.
+uniform float warpK;
+uniform int wallOn;
 
 uniform sampler2D filmLut;
 uniform float iridescence;
@@ -521,7 +529,8 @@ ivec2 texel(int i) {
 // Load the spheres of grid cell C that the ray passes through on
 // [t0, t1]. The cell's list holds every sphere that can reach into it,
 // drift included, so none that owns a point of the segment is missed.
-void loadCell(ivec3 C, float t0, float t1) {
+// With \`all\`, every sphere of the list is loaded instead.
+void loadCell(ivec3 C, float t0, float t1, bool all) {
     nCand = 0;
     if (any(lessThan(C, ivec3(0))) || any(greaterThanEqual(C, gridDims))) {
         return;
@@ -547,6 +556,13 @@ void loadCell(ivec3 C, float t0, float t1) {
         sph.xyz += drift(h, wobble * sph.w);
         vec3 oc = ro - sph.xyz;
         vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
+        if (all) {
+            cand[nCand] = sph;
+            candId[nCand] = h.w * 251.0;
+            candBK[nCand] = bk;
+            nCand++;
+            continue;
+        }
         float disc = bk.x * bk.x - 4.0 * bk.y;
         if (disc <= 0.0) {
             continue;
@@ -606,7 +622,7 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
     segOwn = own;
     if (first) {
         sphereInside = t0 * t0 + lo < 0.0;
-        if (sphereInside) {
+        if (sphereInside && wallOn != 0) {
             wallFilm(own, t0, true);
         }
     }
@@ -670,17 +686,198 @@ float clipField(float t) {
     return sdf3(ro + rd * t).x - clipOff;
 }
 
-// The foam inside the container: the ray's stretches inside it are
-// found by tracing the shape's field, and each is walked through the
-// grid, with a film on the container's wall where a cell is cut by it.
-void traceContained(vec2 tb, float cone, int layers) {
-    float t = max(tb.x, 0.0);
-    float eps = 1e-3;
+// Walk the grid on [a, b], a stretch of the ray inside the shape (or,
+// with wallOn, inside the container): the foam's films there. With
+// wallOn, a cell cut by the container gets a film on its wall.
+void walkGrid(float a, float b, float cone, int layers) {
     vec3 d = mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
     vec3 inv = 1.0 / d;
     ivec3 stp = ivec3(sign(d));
     vec3 tDelta = gridCell * abs(inv);
-    int steps = 0;
+    vec3 q = (ro + rd * a - gridOrigin) / gridCell;
+    ivec3 C = clamp(ivec3(floor(q)), ivec3(0), gridDims - 1);
+    vec3 tMax = a + (vec3(C) + step(0.0, d) - q) * gridCell * inv;
+    float tw = a;
+    bool first = true;
+    sphereInside = false;
+    for (int i = 0; i < 128; i++) {
+        if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+            return;
+        }
+        float tn = min(tMax.x, min(tMax.y, tMax.z));
+        float te = min(tn, b);
+        loadCell(C, tw, te, false);
+        sphereSegment(tw, te, cone, layers, first);
+        first = false;
+        if (tn >= b) {
+            if (sphereInside && films < layers && nCand > 0 && wallOn != 0) {
+                wallFilm(segOwn, b, false);
+            }
+            break;
+        }
+        tw = tn;
+        int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
+        C[axis] += stp[axis];
+        tMax[axis] += tDelta[axis];
+        if (C[axis] < 0 || C[axis] >= gridDims[axis]) {
+            break;
+        }
+    }
+    sphereInside = false;
+}
+
+// ---- the squashed shell outside the shape ----
+
+// The foam at a point of the ray outside the shape: the shape's field
+// there, the point it shows (pushed out along the field), and the cell
+// that owns that: its sphere and id, its power, whether the point is in
+// the foam, and the distance to the nearest sphere.
+ivec3 shC = ivec3(-9999);
+vec4 shS;
+vec3 shQ;
+vec4 shSph;
+float shId;
+float shV;
+float shDist;
+bool shIn;
+
+void shellEval(float t) {
+    vec3 p = ro + rd * t;
+    shS = sdf3(p);
+    cost += 1.0;
+    shQ = p + shS.yzw * (max(shS.x, 0.0) * warpK);
+    ivec3 C = ivec3(floor((shQ - gridOrigin) / gridCell));
+    if (C != shC) {
+        loadCell(C, 0.0, 0.0, true);
+        shC = C;
+    }
+    shV = 1e30;
+    shDist = 1e30;
+    shSph = vec4(0.0);
+    shId = -1.0;
+    for (int i = 0; i < MAX_CAND; i++) {
+        if (i >= nCand) {
+            break;
+        }
+        vec3 m = shQ - cand[i].xyz;
+        float d2 = dot(m, m);
+        float pw = d2 - cand[i].w * cand[i].w;
+        if (pw < shV) {
+            shV = pw;
+            shSph = cand[i];
+            shId = candId[i];
+        }
+        shDist = min(shDist, sqrt(d2) - cand[i].w);
+    }
+    shIn = shV < 0.0;
+}
+
+// The normal, at the last point evaluated, of a surface whose normal is
+// m where it is shown: the push is p + k S n, so its transpose Jacobian
+// (without the field's curvature) turns m into m + k n (n . m).
+vec3 shellNormal(vec3 m) {
+    vec3 n = shS.x > 0.0 ? shS.yzw : vec3(0.0);
+    return normalize(m + warpK * n * dot(n, m));
+}
+
+// March the shell from t: the films of the squashed foam, until the ray
+// enters the shape (true, t there) or leaves the container or tEnd
+// (false).
+bool shellMarch(inout float t, float tEnd, int layers) {
+    float scale = 1.0 / (1.0 + warpK);
+    float stepMin = max(clipOff / 24.0, 2e-4);
+    float stepMax = max(0.35 * gridCell * scale, stepMin);
+    shellEval(t);
+    if (shS.x < 0.0) {
+        return true;
+    }
+    for (int i = 0; i < 96; i++) {
+        if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+            return false;
+        }
+        bool in0 = shIn;
+        float v0 = shV;
+        float id0 = shId;
+        vec4 sph0 = shSph;
+        float t0 = t;
+        float s0 = shS.x;
+        // A safe step where it is shown, scaled back to the ray.
+        float stp = in0 ? shSph.w - length(shQ - shSph.xyz) : shDist;
+        t += clamp(stp * scale * 0.9, stepMin, stepMax);
+        if (t > tEnd) {
+            return false;
+        }
+        shellEval(t);
+        if (shS.x - clipOff > 1e-3) {
+            return false;
+        }
+        bool entered = shS.x < 0.0;
+        if (entered) {
+            t = t0 + (t - t0) * s0 / (s0 - shS.x);
+            shellEval(t);
+        }
+        if (in0 != shIn) {
+            // The foam's outside: a root of the owner's power.
+            float ta = t0;
+            float va = v0;
+            float tc = t;
+            float vc = shV;
+            for (int k = 0; k < 3; k++) {
+                float tm = ta + (tc - ta) * va / (va - vc);
+                shellEval(tm);
+                if ((shV < 0.0) == in0) {
+                    ta = tm;
+                    va = shV;
+                } else {
+                    tc = tm;
+                    vc = shV;
+                }
+            }
+            // Shade from the side inside the foam, which has the owner.
+            float tf = in0 ? ta : tc;
+            shellEval(tf);
+            if (shIn) {
+                vec3 m = shQ - shSph.xyz;
+                vec3 p = ro + rd * tf;
+                shadeFilm(p, shellNormal(m), p - m, shId, 1.0, !in0, 1.0);
+            }
+            shellEval(t);
+        } else if (shIn && shId != id0) {
+            // A wall between two cells: bisect for where the owner changes.
+            float ta = t0;
+            float tc = t;
+            for (int k = 0; k < 4; k++) {
+                float tm = 0.5 * (ta + tc);
+                shellEval(tm);
+                if (shId == id0) {
+                    ta = tm;
+                } else {
+                    tc = tm;
+                }
+            }
+            shellEval(tc);
+            if (shIn && shId != id0 && films < layers) {
+                vec3 mid = 0.5 * (sph0.xyz + shSph.xyz);
+                vec3 p = ro + rd * tc;
+                shadeFilm(p, shellNormal(shSph.xyz - sph0.xyz), p - (shQ - mid), id0 + shId, 0.0, false, 1.0);
+            }
+            shellEval(t);
+        }
+        if (entered) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The foam inside the container. The ray's stretches inside it are
+// found by tracing the shape's field. With wallOn each is walked through
+// the grid and cut flat by the container. Otherwise the stretches inside
+// the shape are walked the same way, and those between the shape and the
+// container, where the foam is squashed, are marched.
+void traceContained(vec2 tb, float cone, int layers) {
+    float t = max(tb.x, 0.0);
+    float eps = 1e-3;
     for (int iv = 0; iv < 6; iv++) {
         // To the container.
         float g = clipField(t);
@@ -691,56 +888,45 @@ void traceContained(vec2 tb, float cone, int layers) {
         if (g > eps || t > tb.y || films >= layers) {
             return;
         }
-        float a = t;
-        // Through it, to where the ray leaves.
-        float tp = t;
-        float gp = g;
-        float b = tb.y;
-        for (int i = 0; i < 96; i++) {
-            tp = t;
-            gp = g;
-            t += max(-g, 2.0 * eps);
-            if (t >= tb.y) {
-                break;
-            }
-            g = clipField(t);
-            if (g > 0.0) {
-                b = gp < 0.0 ? tp + (t - tp) * gp / (gp - g) : tp;
-                break;
-            }
-        }
-        // Walk the grid on [a, b].
-        vec3 q = (ro + rd * a - gridOrigin) / gridCell;
-        ivec3 C = clamp(ivec3(floor(q)), ivec3(0), gridDims - 1);
-        vec3 tMax = a + (vec3(C) + step(0.0, d) - q) * gridCell * inv;
-        float tw = a;
-        bool first = true;
-        sphereInside = false;
-        for (int i = 0; i < 128; i++) {
-            if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02 || steps++ > 256) {
-                return;
-            }
-            float tn = min(tMax.x, min(tMax.y, tMax.z));
-            float te = min(tn, b);
-            loadCell(C, tw, te);
-            sphereSegment(tw, te, cone, layers, first);
-            first = false;
-            if (tn >= b) {
-                if (sphereInside && films < layers && nCand > 0) {
-                    wallFilm(segOwn, b, false);
+        for (int k = 0; k < 4; k++) {
+            if (wallOn == 0) {
+                if (!shellMarch(t, tb.y, layers)) {
+                    break;
                 }
-                break;
             }
-            tw = tn;
-            int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
-            C[axis] += stp[axis];
-            tMax[axis] += tDelta[axis];
-            if (C[axis] < 0 || C[axis] >= gridDims[axis]) {
+            // Through the container (wallOn) or the shape, to where the
+            // ray leaves it.
+            float off = wallOn != 0 ? clipOff : 0.0;
+            float a = t;
+            float tp = t;
+            float gp = 0.0;
+            g = sdf3(ro + rd * t).x - off;
+            float b = tb.y;
+            for (int i = 0; i < 96; i++) {
+                tp = t;
+                gp = g;
+                t += max(-g, 2.0 * eps);
+                if (t >= tb.y) {
+                    break;
+                }
+                g = sdf3(ro + rd * t).x - off;
+                cost += 1.0;
+                if (g > 0.0) {
+                    b = gp < 0.0 ? tp + (t - tp) * gp / (gp - g) : tp;
+                    break;
+                }
+            }
+            walkGrid(a, b, cone, layers);
+            shC = ivec3(-9999);
+            t = b + (wallOn != 0 ? 4.0 * eps : 1e-4);
+            if (wallOn != 0 || films >= layers || t >= tb.y) {
                 break;
             }
         }
-        sphereInside = false;
-        t = b + 4.0 * eps;
+        if (films >= layers || t >= tb.y) {
+            return;
+        }
+        t += 4.0 * eps;
     }
 }
 
@@ -776,7 +962,7 @@ void traceSpheres(vec2 tb, float cone, int layers) {
         }
         float tn = min(tMax.x, min(tMax.y, tMax.z));
         float te = min(tn, tb.y);
-        loadCell(C, t, te);
+        loadCell(C, t, te, false);
         sphereSegment(t, te, cone, layers, false);
         t = tn;
         int axis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
@@ -1216,6 +1402,8 @@ export class BubbleEffect implements Effect {
                 reachMax: reach,
                 clipOn: containment > 0 ? 1 : 0,
                 clipOff: (1 - containment) * reach,
+                warpK: containment / Math.max(1 - containment, 1e-3),
+                wallOn: containment >= 0.995 ? 1 : 0,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),
