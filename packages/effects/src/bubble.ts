@@ -193,6 +193,25 @@ export type BubbleParams = {
     color: string;
 
     /**
+     * Width of the borders on the foam's outside, where two bubbles meet,
+     * as a share of `cellSize`, 0 to 0.5: the film thickens over this
+     * width (see `borderThickness`), and the white line (see
+     * `borderStrength`) is about a third of it. Walls inside the foam get
+     * no border.
+     */
+    borderWidth: number;
+    /**
+     * Brightness of the white line along the borders: the light the water
+     * gathered there scatters, 0 (off) to 2.
+     */
+    borderStrength: number;
+    /**
+     * How much thicker the film gets towards a border, in nm, 0 (off) to
+     * 1500: the interference colours run in bands along it.
+     */
+    borderThickness: number;
+
+    /**
      * The backdrop: a pattern name, or an image (an element, an
      * `ImageBitmap` or a URL). Films reflect it and, with
      * `backdropVisible`, it is drawn behind the foam; otherwise the page
@@ -282,6 +301,9 @@ const DEFAULT_PARAMS: BubbleParams = {
     tintStrength: 0.3,
     opacity: 0,
     color: "#2f7fe0",
+    borderWidth: 0.06,
+    borderStrength: 0.35,
+    borderThickness: 600,
     backdrop: "none",
     backdropVisible: false,
     backdropScale: 0.25,
@@ -382,6 +404,11 @@ uniform vec3 tint;
 uniform float tintStrength;
 uniform float opacity;
 uniform vec3 bodyColor;
+// The borders on the foam's outside: their width in world units (0: off,
+// none of their work is done), the white line, the film's thickening.
+uniform float borderWidth;
+uniform float borderStrength;
+uniform float borderThickness;
 uniform int debugView;
 
 // Spheres a grid cell lists, at most: the ray passes through some of them.
@@ -395,6 +422,9 @@ const float TAU = 6.2831853;
 const float LIGHT_GAIN = 8.0;
 const float RIM_MAX = 0.2;
 const float WALL_DIM = 0.35;
+// The white line's width, as a share of the border's.
+const float BORDER_LINE = 0.33;
+const float NO_EDGE = 1e30;
 
 ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
@@ -403,6 +433,8 @@ ${GLSL_HEAT}
 
 vec3 ro;
 vec3 rd;
+// Radius of the pixel's cone per unit of distance.
+float pixCone;
 float cost = 0.0;
 
 uvec3 pcg3d(uvec3 v) {
@@ -471,11 +503,26 @@ vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
 
 // Shade a film at p with normal n, of the cell round \`center\` with id
 // \`id\`: \`outer\` is 1 on the foam's outside, 0 on a wall inside it;
-// \`cover\` is how much of the pixel it covers.
-void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover) {
+// \`cover\` is how much of the pixel it covers; \`edge\` the distance to
+// the nearest border on the outside (NO_EDGE: none).
+void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover, float edge) {
     vec3 nf = dot(n, rd) > 0.0 ? -n : n;
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
     float th = filmThickness((p - center) / cellSize, id);
+    // The border: the water gathered where two bubbles meet. The film
+    // thickens towards it, and a narrow line of it scatters white light.
+    float line = 0.0;
+    if (edge < borderWidth) {
+        float f = 1.0 - edge / borderWidth;
+        th = min(th + borderThickness * f * f, THICKNESS_MAX);
+        // A gaussian of the line's width, blurred by the pixel's
+        // footprint on the film (longer at a grazing angle): thinner than
+        // a pixel, it fades instead of breaking up.
+        float wl = borderWidth * BORDER_LINE;
+        float fp = pixCone * length(p - ro) / max(cosI, 0.25);
+        float s2 = wl * wl + fp * fp;
+        line = wl * inversesqrt(s2) * exp(-edge * edge / s2);
+    }
     vec3 R = mix(
         vec3(plainFilm(cosI)),
         textureLod(filmLut, vec2(th / THICKNESS_MAX, cosI), 0.0).rgb,
@@ -493,6 +540,13 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
     float k = (1.0 - exp(-tintStrength * 0.03 / max(cosI * cosI, 0.1))) * cover;
     col += remain * T * k * tint;
     remain *= T * (1.0 - k);
+    if (line > 0.0) {
+        // An even white, lit like the sky the films reflect: it takes
+        // from what passes, and shows on the body too.
+        float a = clamp(borderStrength * line, 0.0, 1.0) * cover;
+        col += remain * a * (0.3 + 0.55 * lightIntensity);
+        remain *= 1.0 - a;
+    }
     if (entering && opacity > 0.0) {
         // A matte, softly lit body: wrapped diffuse from the upper left,
         // a little rim light.
@@ -579,6 +633,59 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
     }
 }
 
+// ---- borders: where two bubbles meet ----
+
+// The distance from q, in the cell of sphere \`own\` (whose power at q is
+// powI), to the wall it shares with sphere s: walls lie on radical
+// planes, so it is exact. NO_EDGE for the owner itself.
+float wallDist(vec3 q, vec4 own, float powI, vec4 s) {
+    vec3 dc = s.xyz - own.xyz;
+    float d2 = dot(dc, dc);
+    if (d2 < 1e-12) {
+        return NO_EDGE;
+    }
+    vec3 m = q - s.xyz;
+    return (dot(m, m) - s.w * s.w - powI) * 0.5 * inversesqrt(d2);
+}
+
+// The distance from q to the nearest wall of its owner's cell, over
+// every sphere the grid cell of q lists (as \`_sphere-foam.ts\`'s
+// borderDist). A sphere that could bound the cell at q contains q or is
+// close to it, so it reaches into that grid cell and is listed. The list
+// is read again here: the one loaded for the ray keeps only the spheres
+// the ray passes through.
+float borderDist(vec3 q, vec4 own) {
+    ivec3 C = ivec3(floor((q - gridOrigin) / gridCell));
+    if (any(lessThan(C, ivec3(0))) || any(greaterThanEqual(C, gridDims))) {
+        return NO_EDGE;
+    }
+    vec4 head = texelFetch(cellTex, texel(C.x + gridDims.x * (C.y + gridDims.y * C.z)), 0);
+    cost += 1.0;
+    int off = int(head.x);
+    int count = min(int(head.y), MAX_CAND);
+    vec3 mo = q - own.xyz;
+    float powI = dot(mo, mo) - own.w * own.w;
+    float e = NO_EDGE;
+    vec4 idx = vec4(0.0);
+    for (int j = 0; j < MAX_CAND; j++) {
+        if (j >= count) {
+            break;
+        }
+        int k = off + j;
+        if (j == 0 || (k & 3) == 0) {
+            idx = texelFetch(indexTex, texel(k >> 2), 0);
+            cost += 1.0;
+        }
+        int i = int(idx[k & 3]);
+        vec4 sph = texelFetch(sphereTex, texel(i), 0);
+        cost += 1.0;
+        vec4 h = hash4(uvec3(uint(i), 977u, 31u));
+        sph.xyz += drift(h, wobble * sph.w);
+        e = min(e, wallDist(q, own, powI, sph));
+    }
+    return max(e, 0.0);
+}
+
 bool sphereInside = false;
 // The cell that owns the end of the last segment (an index into cand).
 int segOwn = 0;
@@ -588,13 +695,15 @@ void wallFilm(int i, float t, bool entering) {
     vec3 p = ro + rd * t;
     vec4 s = sdf3(p);
     cost += 1.0;
-    shadeFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0);
+    float edge = borderWidth > 0.0 ? borderDist(p, cand[i]) : NO_EDGE;
+    shadeFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0, edge);
 }
 
 // Shade a sphere's own surface at t.
 void sphereFilm(int i, float t, bool entering, float cover) {
     vec3 p = ro + rd * t;
-    shadeFilm(p, (p - cand[i].xyz) / cand[i].w, cand[i].xyz, candId[i], 1.0, entering, cover);
+    float edge = borderWidth > 0.0 ? borderDist(p, cand[i]) : NO_EDGE;
+    shadeFilm(p, (p - cand[i].xyz) / cand[i].w, cand[i].xyz, candId[i], 1.0, entering, cover, edge);
 }
 
 // The films of the foam on [t0, t1] with the spheres loaded: the lower
@@ -672,7 +781,7 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
             // One flat wall on the radical plane, shared by both cells.
             vec3 p = ro + rd * ts;
             vec3 c = 0.5 * (cand[own].xyz + cand[next].xyz);
-            shadeFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0);
+            shadeFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0, NO_EDGE);
         }
         own = next;
         segOwn = own;
@@ -741,6 +850,14 @@ float shV;
 float shDist;
 bool shIn;
 
+// Only the bubbles that poke out through this side of the shape are
+// squashed towards it: their centres lie behind the surface under p (the
+// field there is shS). One across a gap belongs to the other side;
+// pushed this far, the point would show it stuck to this one.
+bool shellSkip(int i, vec3 p) {
+    return shS.x > 0.0 && dot(cand[i].xyz - p, shS.yzw) + shS.x > 0.5 * cand[i].w;
+}
+
 void shellEval(float t) {
     vec3 p = ro + rd * t;
     shS = sdf3(p);
@@ -751,7 +868,6 @@ void shellEval(float t) {
         loadCell(C, 0.0, 0.0, true);
         shC = C;
     }
-    bool outside = shS.x > 0.0;
     shV = 1e30;
     shDist = 1e30;
     shSph = vec4(0.0);
@@ -760,11 +876,7 @@ void shellEval(float t) {
         if (i >= nCand) {
             break;
         }
-        // Only the bubbles that poke out through this side of the shape
-        // are squashed towards it: their centres lie behind the surface
-        // under p. One across a gap belongs to the other side; pushed
-        // this far, the point would show it stuck to this one.
-        if (outside && dot(cand[i].xyz - p, shS.yzw) + shS.x > 0.5 * cand[i].w) {
+        if (shellSkip(i, p)) {
             continue;
         }
         vec3 m = shQ - cand[i].xyz;
@@ -778,6 +890,23 @@ void shellEval(float t) {
         shDist = min(shDist, sqrt(d2) - cand[i].w);
     }
     shIn = shV < 0.0;
+}
+
+// The distance from the point shown, at the last point evaluated, to the
+// nearest wall of its owner's cell, among the same spheres that compete
+// for it (the whole grid cell's list is loaded).
+float shellBorderDist(float t) {
+    vec3 p = ro + rd * t;
+    float e = NO_EDGE;
+    for (int i = 0; i < MAX_CAND; i++) {
+        if (i >= nCand) {
+            break;
+        }
+        if (!shellSkip(i, p)) {
+            e = min(e, wallDist(shQ, shSph, shV, cand[i]));
+        }
+    }
+    return max(e, 0.0);
 }
 
 // The normal, at the last point evaluated, of a surface whose normal is
@@ -858,7 +987,9 @@ bool shellMarch(inout float t, float tEnd, int layers) {
                 // against what comes from the other side.
                 bool crease = -shV > 0.08 * shSph.w * shSph.w;
                 vec3 n = crease ? normalize(shS.yzw - nOut + 1e-5 * m) : shellNormal(m);
-                shadeFilm(p, n, p - m, shId, 1.0, !in0, 1.0);
+                // No border on a crease: it is the gap's middle.
+                float edge = borderWidth > 0.0 && !crease ? shellBorderDist(tf) : NO_EDGE;
+                shadeFilm(p, n, p - m, shId, 1.0, !in0, 1.0, edge);
             }
             shellEval(t);
         } else if (shIn && shId != id0) {
@@ -888,7 +1019,7 @@ bool shellMarch(inout float t, float tEnd, int layers) {
                 vec3 n = wall
                     ? shellNormal(shSph.xyz - sph0.xyz)
                     : normalize(nA - shS.yzw + 1e-5 * (shSph.xyz - sph0.xyz));
-                shadeFilm(p, n, p - (shQ - mid), id0 + shId, 0.0, false, 1.0);
+                shadeFilm(p, n, p - (shQ - mid), id0 + shId, 0.0, false, 1.0, NO_EDGE);
             }
             shellEval(t);
         }
@@ -1054,6 +1185,7 @@ void main() {
     }
     // Radius of the pixel's cone per unit of distance.
     float cone = pixelSize / focalPx;
+    pixCone = cone;
     if (clipOn != 0) {
         traceContained(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
     } else {
@@ -1283,6 +1415,21 @@ export class BubbleEffect implements Effect {
         };
     }
 
+    // The borders, in world units; a width of 0 skips them in the shader.
+    #borderUniforms(cellSize: number) {
+        const p = this.params;
+        const d = DEFAULT_PARAMS;
+        const strength = clamp(p.borderStrength, 0, 2, d.borderStrength);
+        const thickness = clamp(p.borderThickness, 0, 1500, d.borderThickness);
+        const width = clamp(p.borderWidth, 0, 0.5, d.borderWidth) * cellSize;
+        const on = width > 0 && (strength > 0 || thickness > 0);
+        return {
+            borderWidth: on ? width : 0,
+            borderStrength: strength,
+            borderThickness: thickness,
+        };
+    }
+
     // The bubbles for the params: placed again when a placement param
     // changes, the grid built again when the drift's reach does.
     #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
@@ -1450,6 +1597,7 @@ export class BubbleEffect implements Effect {
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),
                 opacity: clamp(p.opacity, 0, 1, d.opacity),
                 bodyColor: colorOf(p.color, d.color),
+                ...this.#borderUniforms(r.cellSize),
                 ...this.#backdrop.uniforms(p, t, r.halfDepth + reach, sdfTex),
                 debugView: this.#debugView(),
             },

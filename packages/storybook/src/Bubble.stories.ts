@@ -212,6 +212,15 @@ export const contained: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { containment: 1 } },
 };
 
+// White borders on the foam's outside, where two bubbles meet: the
+// water gathered there scatters light, and the film thickens towards it.
+export const borders: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        params: { containment: 1, borderStrength: 1 },
+    },
+};
+
 // The same with radii that vary more.
 export const random: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { cellSizeRandomness: 0.6 } },

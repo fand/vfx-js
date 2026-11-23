@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+    borderDist,
     type FoamSphere,
     type SphereFilm,
     sphereFilms,
@@ -127,5 +128,80 @@ describe("sphereFilms", () => {
     test("starting inside: only the way out", () => {
         const r = sphereFilms([0, 0, 0], D, [[0, 0, 0, 1]], 0, 5);
         expect(kinds(r.films)).toEqual(["out 0"]);
+    });
+});
+
+describe("borderDist", () => {
+    // Two overlapping unit spheres along x: the radical plane is x = 0.75,
+    // the surfaces meet on a circle of radius sqrt(1 - 0.75^2) there.
+    const two: FoamSphere[] = [
+        [0, 0, 0, 1],
+        [1.5, 0, 0, 1],
+    ];
+    const ring = Math.sqrt(1 - 0.75 * 0.75);
+
+    test("two spheres: the distance to the radical plane", () => {
+        for (const q of [
+            [0, 0, 0],
+            [0.2, 0.5, -0.1],
+            [-0.6, 0.3, 0.4],
+        ] as const) {
+            const { e, across } = borderDist(q, 0, two);
+            expect(e).toBeCloseTo(0.75 - q[0]);
+            expect(across).toBe(1);
+        }
+    });
+
+    test("two spheres: 0 on the circle where the surfaces meet", () => {
+        for (let a = 0; a < 6; a++) {
+            const q = [0.75, ring * Math.cos(a), ring * Math.sin(a)] as const;
+            expect(borderDist(q, 0, two).e).toBeCloseTo(0);
+            expect(borderDist(q, 1, two).e).toBeCloseTo(0);
+        }
+    });
+
+    test("two spheres: symmetric from both cells", () => {
+        // Mirrored points across the plane are as far from it.
+        const a = borderDist([0.5, 0.3, 0.1], 0, two);
+        const b = borderDist([1.0, 0.3, 0.1], 1, two);
+        expect(a.e).toBeCloseTo(0.25);
+        expect(b.e).toBeCloseTo(0.25);
+        expect(b.across).toBe(0);
+    });
+
+    test("unequal radii: the plane moves, the distance stays exact", () => {
+        const s: FoamSphere[] = [
+            [0, 0, 0, 1.2],
+            [1.5, 0, 0, 0.8],
+        ];
+        // Radical plane: x = (1.5^2 + 1.2^2 - 0.8^2) / (2 * 1.5).
+        const x = (2.25 + 1.44 - 0.64) / 3;
+        const { e } = borderDist([0.1, 0.4, 0.2], 0, s);
+        expect(e).toBeCloseTo(x - 0.1);
+        // On the surface of sphere 0, where it meets sphere 1.
+        const y = Math.sqrt(1.44 - x * x);
+        expect(borderDist([x, y, 0], 0, s).e).toBeCloseTo(0);
+    });
+
+    test("three spheres: the nearest wall wins", () => {
+        const s: FoamSphere[] = [
+            [0, 0, 0, 1],
+            [1.5, 0, 0, 1],
+            [0, 1.2, 0, 1],
+        ];
+        // Walls of cell 0: x = 0.75 (with 1) and y = 0.6 (with 2).
+        const a = borderDist([0.6, 0.1, 0], 0, s);
+        expect(a.e).toBeCloseTo(0.15);
+        expect(a.across).toBe(1);
+        const b = borderDist([0.1, 0.5, 0], 0, s);
+        expect(b.e).toBeCloseTo(0.1);
+        expect(b.across).toBe(2);
+    });
+
+    test("alone: no wall", () => {
+        expect(borderDist([0, 0, 0], 0, [[0, 0, 0, 1]])).toEqual({
+            e: Infinity,
+            across: -1,
+        });
     });
 });
