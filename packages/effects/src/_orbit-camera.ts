@@ -22,10 +22,10 @@
 // moving the eye sideways only moves the vanishing point.
 //
 // Hit geometry: the DOM element stays flat where it was, so the browser
-// hit tests its untransformed box. With `hitGeometry` on, the effect
-// reports the matrix that lays the box over the drawn front face
-// (`elementGeometryMatrix`) with `ctx.setElementGeometry`, and VFX-JS
-// hands it to the browser for elements added with `addHTML`.
+// hit tests its untransformed box. `elementGeometryMatrix` is the matrix
+// that lays the box over the drawn front face; an effect reports it with
+// `ctx.setElementGeometry`, and VFX-JS hands it to the browser for
+// elements added with `addHTML` (GlassEffect's `hitGeometry`).
 
 import type { EffectDims } from "@vfx-js/core";
 
@@ -104,22 +104,6 @@ export type OrbitCameraParams = {
      * `pointer` modes say what it does for them.
      */
     pointerStrength: number;
-    /**
-     * Make the browser's hit testing (clicks, `:hover`, the cursor) and
-     * accessibility bounds follow the drawn shape instead of the
-     * element's flat box. Default `false`.
-     *
-     * Each frame the effect reports where the front face of the shape is
-     * drawn (the flat cap at `depth / 2` in front of the mid-plane; a
-     * `bulge` or `relief` is not followed), and while the face points
-     * away from the camera, a box that catches nothing. The element's
-     * own `getBoundingClientRect()` follows it too.
-     *
-     * Works only for an element added with `vfx.addHTML()`, in a browser
-     * with `HTMLCanvasElement.updateElementGeometry` (Chrome 157+); a
-     * no-op otherwise (see `EffectContext.setElementGeometry`).
-     */
-    hitGeometry: boolean;
 };
 
 type NumKey =
@@ -181,7 +165,6 @@ export function resolveOrbitCamera(
                 : defaults[k];
     }
     out.drag = !!p.drag;
-    out.hitGeometry = !!p.hitGeometry;
     out.cameraOrigin =
         p.cameraOrigin === "viewport" || p.cameraOrigin === "element"
             ? p.cameraOrigin

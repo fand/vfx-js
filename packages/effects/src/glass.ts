@@ -260,6 +260,22 @@ export type GlassParams = OrbitCameraParams & {
      */
     pointer: GlassPointer;
     /**
+     * Make the browser's hit testing (clicks, `:hover`, the cursor) and
+     * accessibility bounds follow the drawn shape instead of the
+     * element's flat box. Default `false`.
+     *
+     * Each frame the glass reports where the front face of its shape is
+     * drawn (the flat cap at `depth / 2` in front of the mid-plane; a
+     * `bulge` or `relief` is not followed), and while the face points
+     * away from the camera, a box that catches nothing. The element's
+     * own `getBoundingClientRect()` follows it too.
+     *
+     * Works only for an element added with `vfx.addHTML()`, in a browser
+     * with `HTMLCanvasElement.updateElementGeometry` (Chrome 157+); a
+     * no-op otherwise (see `EffectContext.setElementGeometry`).
+     */
+    hitGeometry: boolean;
+    /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
      * the whole canvas.
      */

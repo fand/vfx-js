@@ -10,4 +10,4 @@ Add `ctx.setElementGeometry(matrix | null)`, so an effect can tell the browser w
 - Only for elements added with `vfx.addHTML`, in browsers with `HTMLCanvasElement.updateElementGeometry` (Chrome 157+). Elsewhere, and in post effects, it does nothing.
 - The element's own `getBoundingClientRect()` follows the geometry. The rect VFX-JS draws into does not: it measures the wrapper canvas.
 
-`GlassEffect` and `SwirlParticleEffect` take `hitGeometry: true` to report their front face with it, and a box that catches nothing while the face points away.
+`GlassEffect` takes `hitGeometry: true` to report its front face with it, and a box that catches nothing while the face points away.

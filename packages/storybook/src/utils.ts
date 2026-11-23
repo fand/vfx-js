@@ -970,7 +970,6 @@ export function attachSwirlParticlePane(
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");
     bind(camera, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
-    bind(camera, "hitGeometry");
 
     const pointer = pane.addFolder({ title: "Pointer" });
     bind(pointer, "pointer", {

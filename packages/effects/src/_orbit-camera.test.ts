@@ -27,7 +27,6 @@ const PARAMS: OrbitCameraParams = {
     drag: false,
     cameraOrigin: "element",
     pointerStrength: 1,
-    hitGeometry: false,
 };
 
 // The matrix as it was built before the camera moved here, radians.
@@ -722,14 +721,5 @@ describe("elementGeometryMatrix", () => {
         for (const p of BOX_POINTS) {
             expectClose(applyMatrix(m, p), [100, 50]);
         }
-    });
-
-    test("hitGeometry resolves to a boolean", () => {
-        const r = (v: unknown) =>
-            resolveOrbitCamera({ ...PARAMS, hitGeometry: v as boolean }, PARAMS)
-                .hitGeometry;
-        expect(r(true)).toBe(true);
-        expect(r(undefined)).toBe(false);
-        expect(r(1)).toBe(true);
     });
 });
