@@ -138,8 +138,8 @@ export type BubbleParams = {
      * (1 - containment) h. At 1 the bubbles are pressed flat against the
      * shape, like a foam blown up inside a mould. They are also blown up
      * a little, which closes the smallest gaps and leaves creases
-     * between them. The squashed part is ray marched, so values between
-     * 0 and 1 cost more than either end.
+     * between them. Values between 0 and 1 cost a little more than
+     * either end.
      */
     containment: number;
     /**
@@ -366,7 +366,11 @@ const BUBBLE_MASK_LONG = 512;
 const SMOOTH_RADIUS = 2;
 const SMOOTH_PASSES = 2;
 
-const FRAG_BUBBLE = `#version 300 es
+// The shader per containment mode: 0 none, 1 the shape cuts the foam
+// flat, 2 the foam out of the shape is squashed. Each mode compiles only
+// its own path, which keeps the others light on registers.
+const fragBubble = (mode: 0 | 1 | 2) => `#version 300 es
+#define CONTAIN ${mode}
 precision highp float;
 precision highp int;
 precision highp sampler2D;
@@ -403,16 +407,15 @@ uniform float gridCell;
 uniform ivec3 gridDims;
 // How far any sphere can reach out of the shape, drift included.
 uniform float reachMax;
-// The container: with clipOn, the foam ends where the shape's field
-// reaches clipOff (0: the shape itself).
-uniform int clipOn;
+// The container: the foam ends where the shape's field reaches clipOff
+// (0: the shape itself).
 uniform float clipOff;
 // Below containment 1 the part of the foam outside the shape is not cut
 // but squashed towards it: a point at distance S from the shape shows
 // the foam at S / (1 - containment). warpK = containment / (1 -
-// containment); wallOn (containment 1) cuts flat instead.
+// containment). At 1 (WALL_ON) it is cut flat instead.
 uniform float warpK;
-uniform int wallOn;
+#define WALL_ON (CONTAIN == 1)
 
 uniform sampler2D filmLut;
 uniform float iridescence;
@@ -629,14 +632,41 @@ float frothAt(vec3 q, vec3 nq, inout vec3 nf, float e, float fp, inout float th)
     return cov * rim * FROTH_RIM + avg;
 }
 
+// The shell's warp along a piece of the ray, where it is linear: with
+// warpOn, ro and rd are the piece in the unsquashed foam (t scaled by
+// warpL), roReal and rdReal the ray seen. The push is along warpG (out of
+// the side walls) and warpZ (out of the front or back), each when active.
+// The outline is taken as straight: its field is warpA0 + warpGrad . xy.
+bool warpOn = false;
+vec3 roReal;
+vec3 rdReal;
+float warpL;
+vec3 warpG;
+vec3 warpZ;
+vec2 warpGrad;
+float warpA0;
+// A flat film the first cell of the next walk starts with (a bubble cut
+// at the middle of a gap), and its normal.
+bool capOn = false;
+vec3 capN;
+
 // Shade a film at p with normal n, of the cell round \`center\` with id
 // \`id\`: \`outer\` is 1 on the foam's outside, 0 on a wall inside it;
 // \`cover\` is how much of the pixel it covers; \`edge\` the distance to
 // the nearest border on the outside (NO_EDGE: none).
 void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover, float edge) {
+    float th = filmThickness((p - center) / cellSize, id);
+    // In the warped shell, shade the point and normal as seen.
+    vec3 roWarp = ro;
+    vec3 rdWarp = rd;
+    if (warpOn) {
+        p = roReal + rdReal * (dot(p - ro, rd) / warpL);
+        n = normalize(n + warpK * (warpG * dot(warpG, n) + warpZ * dot(warpZ, n)));
+        ro = roReal;
+        rd = rdReal;
+    }
     vec3 nf = dot(n, rd) > 0.0 ? -n : n;
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
-    float th = filmThickness((p - center) / cellSize, id);
     // White light scattered by the water along the borders.
     float white = 0.0;
     if (edge < edgeReach) {
@@ -695,6 +725,8 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
         firstId = id;
     }
     films++;
+    ro = roWarp;
+    rd = rdWarp;
 }
 
 // ---- the foam: a power diagram of spheres, found through a grid ----
@@ -739,6 +771,10 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
         cost += 1.0;
         vec4 h = hash4(uvec3(uint(i), 977u, 31u));
         sph.xyz += drift(h, wobble * sph.w);
+        // In the shell, only the bubbles poking out through this side.
+        if (warpOn && warpA0 + dot(warpGrad, sph.xy) > 0.5 * sph.w) {
+            continue;
+        }
         vec3 oc = ro - sph.xyz;
         vec2 bk = vec2(2.0 * dot(rd, oc), dot(oc, oc) - sph.w * sph.w);
         if (all) {
@@ -818,6 +854,9 @@ float borderDist(vec3 q, vec4 own) {
         cost += 1.0;
         vec4 h = hash4(uvec3(uint(i), 977u, 31u));
         sph.xyz += drift(h, wobble * sph.w);
+        if (warpOn && warpA0 + dot(warpGrad, sph.xy) > 0.5 * sph.w) {
+            continue;
+        }
         nearWall(e, q, own, powI, sph);
     }
     return max(e, 0.0);
@@ -826,6 +865,10 @@ float borderDist(vec3 q, vec4 own) {
 bool sphereInside = false;
 // The cell that owns the end of the last segment (an index into cand).
 int segOwn = 0;
+// Whether the last grid walk ended inside a bubble, and that bubble.
+bool endInside = false;
+vec4 endSph;
+float endId;
 
 // Shade the container's wall at t, where it cuts the cell of sphere i.
 void wallFilm(int i, float t, bool entering) {
@@ -879,8 +922,10 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
     segOwn = own;
     if (first) {
         sphereInside = t0 * t0 + lo < 0.0;
-        if (sphereInside && wallOn != 0) {
+        if (sphereInside && WALL_ON) {
             wallFilm(own, t0, true);
+        } else if (sphereInside && capOn) {
+            shadeFilm(ro + rd * t0, capN, cand[own].xyz, candId[own], 1.0, true, 1.0, NO_EDGE);
         }
     }
     float ta = t0;
@@ -944,8 +989,8 @@ float clipField(float t) {
 }
 
 // Walk the grid on [a, b], a stretch of the ray inside the shape (or,
-// with wallOn, inside the container): the foam's films there. With
-// wallOn, a cell cut by the container gets a film on its wall.
+// with WALL_ON, inside the container): the foam's films there. With
+// WALL_ON, a cell cut by the container gets a film on its wall.
 void walkGrid(float a, float b, float cone, int layers) {
     vec3 d = mix(rd, vec3(1e-7), lessThan(abs(rd), vec3(1e-7)));
     vec3 inv = 1.0 / d;
@@ -967,7 +1012,7 @@ void walkGrid(float a, float b, float cone, int layers) {
         sphereSegment(tw, te, cone, layers, first);
         first = false;
         if (tn >= b) {
-            if (sphereInside && films < layers && nCand > 0 && wallOn != 0) {
+            if (sphereInside && films < layers && nCand > 0 && WALL_ON) {
                 wallFilm(segOwn, b, false);
             }
             break;
@@ -980,214 +1025,150 @@ void walkGrid(float a, float b, float cone, int layers) {
             break;
         }
     }
+    endInside = sphereInside && nCand > 0;
+    if (endInside) {
+        endSph = cand[segOwn];
+        endId = candId[segOwn];
+    }
     sphereInside = false;
 }
 
+// Walk [ta, tb] of the shell. Out of an extruded shape the push along
+// its field splits into one out of the side walls (by the outline's
+// field) and one out of the front or back (by |z| - halfDepth), even
+// round its edges. With the outline taken as straight near the ray, both
+// are linear in t between the points where each starts, so the ray is
+// straight in the unsquashed foam on each piece, and the pieces join.
+void shellWalk(float ta, float tb, float cone, int layers) {
+    roReal = ro;
+    rdReal = rd;
+    vec3 pm = ro + rd * (0.5 * (ta + tb));
+    vec3 s2 = sd2(pm.xy);
+    cost += 1.0;
+    vec2 g = s2.yz;
+    warpGrad = g;
+    warpA0 = s2.x - dot(g, pm.xy);
+    // The outline's field along the ray, a + b t.
+    float a = warpA0 + dot(g, ro.xy);
+    float b = dot(g, rd.xy);
+    float bp[3];
+    bp[0] = abs(b) > 1e-6 ? -a / b : 1e30;
+    bp[1] = abs(rd.z) > 1e-6 ? (halfDepth - ro.z) / rd.z : 1e30;
+    bp[2] = abs(rd.z) > 1e-6 ? (-halfDepth - ro.z) / rd.z : 1e30;
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2 - i; j++) {
+            if (bp[j] > bp[j + 1]) {
+                float x = bp[j];
+                bp[j] = bp[j + 1];
+                bp[j + 1] = x;
+            }
+        }
+    }
+    float t0 = ta;
+    for (int i = 0; i <= 3; i++) {
+        float t1 = i < 3 ? clamp(bp[i], ta, tb) : tb;
+        if (t1 > t0 + 1e-6) {
+            float tc = 0.5 * (t0 + t1);
+            float zc = roReal.z + rdReal.z * tc;
+            float sz = zc >= 0.0 ? 1.0 : -1.0;
+            float xy = a + b * tc > 0.0 ? 1.0 : 0.0;
+            float zz = abs(zc) > halfDepth ? 1.0 : 0.0;
+            vec3 G = vec3(g, 0.0) * xy;
+            vec3 Z = vec3(0.0, 0.0, sz) * zz;
+            vec3 q0 = roReal + warpK * (a * G + (sz * roReal.z - halfDepth) * Z);
+            vec3 dq = rdReal + warpK * (b * G + sz * rdReal.z * Z);
+            float L = length(dq);
+            ro = q0;
+            rd = dq / L;
+            warpL = L;
+            warpG = G;
+            warpZ = Z;
+            warpOn = true;
+            walkGrid(t0 * L, t1 * L, cone / L, layers);
+            warpOn = false;
+            capOn = false;
+            ro = roReal;
+            rd = rdReal;
+            if (films >= layers) {
+                return;
+            }
+        }
+        t0 = max(t0, t1);
+    }
+}
+
+
 // ---- the squashed shell outside the shape ----
 
-// The foam at a point of the ray outside the shape: the shape's field
-// there, the point it shows (pushed out along the field), and the cell
-// that owns that: its sphere and id, its power, whether the point is in
-// the foam, and the distance to the nearest sphere.
-ivec3 shC = ivec3(-9999);
-vec4 shS;
-vec3 shQ;
-vec4 shSph;
-float shId;
-float shV;
-float shDist;
-bool shIn;
-
-// Only the bubbles that poke out through this side of the shape are
-// squashed towards it: their centres lie behind the surface under p (the
-// field there is shS). One across a gap belongs to the other side;
-// pushed this far, the point would show it stuck to this one.
-bool shellSkip(int i, vec3 p) {
-    return shS.x > 0.0 && dot(cand[i].xyz - p, shS.yzw) + shS.x > 0.5 * cand[i].w;
-}
-
-void shellEval(float t) {
-    vec3 p = ro + rd * t;
-    shS = sdf3(p);
-    cost += 1.0;
-    shQ = p + shS.yzw * (max(shS.x, 0.0) * warpK);
-    ivec3 C = ivec3(floor((shQ - gridOrigin) / gridCell));
-    if (C != shC) {
-        loadCell(C, 0.0, 0.0, true);
-        shC = C;
-    }
-    shV = 1e30;
-    shDist = 1e30;
-    shSph = vec4(0.0);
-    shId = -1.0;
-    for (int i = 0; i < MAX_CAND; i++) {
-        if (i >= nCand) {
-            break;
-        }
-        if (shellSkip(i, p)) {
-            continue;
-        }
-        vec3 m = shQ - cand[i].xyz;
-        float d2 = dot(m, m);
-        float pw = d2 - cand[i].w * cand[i].w;
-        if (pw < shV) {
-            shV = pw;
-            shSph = cand[i];
-            shId = candId[i];
-        }
-        shDist = min(shDist, sqrt(d2) - cand[i].w);
-    }
-    shIn = shV < 0.0;
-}
-
-// The distance from the point shown, at the last point evaluated, to the
-// nearest wall of its owner's cell, among the same spheres that compete
-// for it (the whole grid cell's list is loaded).
-float shellBorderDist(float t) {
-    vec3 p = ro + rd * t;
-    float e = NO_EDGE;
-    for (int i = 0; i < MAX_CAND; i++) {
-        if (i >= nCand) {
-            break;
-        }
-        if (!shellSkip(i, p)) {
-            nearWall(e, shQ, shSph, shV, cand[i]);
-        }
-    }
-    return max(e, 0.0);
-}
-
-// The normal, at the last point evaluated, of a surface whose normal is
-// m where it is shown: the push is p + k S n, so its transpose Jacobian
-// (without the field's curvature) turns m into m + k n (n . m).
-vec3 shellNormal(vec3 m) {
-    vec3 n = shS.x > 0.0 ? shS.yzw : vec3(0.0);
-    return normalize(m + warpK * n * dot(n, m));
-}
-
-// March the shell from t: the films of the squashed foam, until the ray
-// enters the shape (true, t there) or leaves the container or tEnd
-// (false).
-bool shellMarch(inout float t, float tEnd, int layers) {
-    float scale = 1.0 / (1.0 + warpK);
-    float stepMin = max(clipOff / 24.0, 2e-4);
-    float stepMax = max(0.35 * gridCell * scale, stepMin);
-    shellEval(t);
-    if (shS.x < 0.0) {
-        return true;
-    }
-    for (int i = 0; i < 96; i++) {
-        if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
-            return false;
-        }
-        bool in0 = shIn;
-        float v0 = shV;
-        float id0 = shId;
-        vec4 sph0 = shSph;
-        float t0 = t;
-        float s0 = shS.x;
-        // A safe step where it is shown, scaled back to the ray.
-        float stp = in0 ? shSph.w - length(shQ - shSph.xyz) : min(shDist, gridCell);
-        t += clamp(stp * scale * 0.9, stepMin, stepMax);
-        if (t > tEnd) {
-            return false;
-        }
-        shellEval(t);
-        if (shS.x - clipOff > 1e-3) {
-            return false;
-        }
-        bool entered = shS.x < 0.0;
-        if (entered) {
-            t = t0 + (t - t0) * s0 / (s0 - shS.x);
-            shellEval(t);
-        }
-        if (in0 != shIn) {
-            // The foam's outside: a root of the owner's power. Across a
-            // crease of the shape's field (the middle of a gap, where the
-            // nearest side changes) the point shown jumps and the power
-            // with it, so every other step bisects.
-            float ta = t0;
-            float va = v0;
-            float tc = t;
-            float vc = shV;
-            for (int k = 0; k < 5; k++) {
-                float tm = (k & 1) == 1
-                    ? 0.5 * (ta + tc)
-                    : ta + (tc - ta) * va / (va - vc);
-                shellEval(tm);
-                if ((shV < 0.0) == in0) {
-                    ta = tm;
-                    va = shV;
-                } else {
-                    tc = tm;
-                    vc = shV;
-                }
-            }
-            // Shade from the side inside the foam, which has the owner.
-            shellEval(in0 ? tc : ta);
-            vec3 nOut = shS.yzw;
-            float tf = in0 ? ta : tc;
-            shellEval(tf);
-            if (shIn) {
-                vec3 m = shQ - shSph.xyz;
-                vec3 p = ro + rd * tf;
-                // At a crease the bubble ends on the gap's middle, flat
-                // against what comes from the other side.
-                bool crease = -shV > 0.08 * shSph.w * shSph.w;
-                vec3 n = crease ? normalize(shS.yzw - nOut + 1e-5 * m) : shellNormal(m);
-                // No border on a crease: it is the gap's middle.
-                float edge = NO_EDGE;
-                if (edgeReach > 0.0 && !crease) {
-                    edge = shellBorderDist(tf);
-                    filmQ = shQ;
-                    filmQN = normalize(m);
-                }
-                shadeFilm(p, n, p - m, shId, 1.0, !in0, 1.0, edge);
-            }
-            shellEval(t);
-        } else if (shIn && shId != id0) {
-            // A wall between two cells: bisect for where the owner changes.
-            float ta = t0;
-            float tc = t;
-            for (int k = 0; k < 5; k++) {
-                float tm = 0.5 * (ta + tc);
-                shellEval(tm);
-                if (shId == id0) {
-                    ta = tm;
-                } else {
-                    tc = tm;
-                }
-            }
-            shellEval(ta);
-            vec3 nA = shS.yzw;
-            shellEval(tc);
-            if (shIn && shId != id0 && films < layers) {
-                // A real wall has both cells' powers equal; otherwise it
-                // is a crease, and the wall is the gap's middle.
-                vec3 m0 = shQ - sph0.xyz;
-                float pw0 = dot(m0, m0) - sph0.w * sph0.w;
-                bool wall = abs(pw0 - shV) < 0.08 * (sph0.w * sph0.w + shSph.w * shSph.w);
-                vec3 mid = 0.5 * (sph0.xyz + shSph.xyz);
-                vec3 p = ro + rd * tc;
-                vec3 n = wall
-                    ? shellNormal(shSph.xyz - sph0.xyz)
-                    : normalize(nA - shS.yzw + 1e-5 * (shSph.xyz - sph0.xyz));
-                shadeFilm(p, n, p - (shQ - mid), id0 + shId, 0.0, false, 1.0, NO_EDGE);
-            }
-            shellEval(t);
-        }
-        if (entered) {
+// The squashed shell from t, where the ray is outside the shape and in
+// the container. Its stretch is found by tracing the shape's field, then
+// walked by shellWalk. True when the ray enters the shape (t there).
+bool shellStretch(inout float t, float tEnd, float cone, int layers) {
+    float stepMin = max(clipOff / 16.0, 2e-4);
+    for (int part = 0; part < 3; part++) {
+        float ta = t;
+        vec4 s = sdf3(ro + rd * t);
+        cost += 1.0;
+        if (s.x < 0.0) {
             return true;
         }
+        vec3 n0 = s.yzw;
+        int how = 0;
+        for (int i = 0; i < 48; i++) {
+            float tp = t;
+            float sp = s.x;
+            t += max(s.x, stepMin);
+            if (t >= tEnd) {
+                t = tEnd;
+                break;
+            }
+            s = sdf3(ro + rd * t);
+            cost += 1.0;
+            if (s.x < 0.0) {
+                // Into the shape.
+                t = tp + (t - tp) * sp / (sp - s.x);
+                how = 1;
+                break;
+            }
+            if (s.x > clipOff) {
+                // Out of the container.
+                t = tp + (t - tp) * (clipOff - sp) / (s.x - sp);
+                break;
+            }
+            if (dot(s.yzw, n0) < 0.0) {
+                // A crease: the middle of a gap, the nearest side changes.
+                t = 0.5 * (tp + t);
+                how = 2;
+                break;
+            }
+        }
+        if (t > ta) {
+            shellWalk(ta, t, cone, layers);
+        }
+        if (how == 1) {
+            return true;
+        }
+        if (how != 2 || films >= layers) {
+            return false;
+        }
+        // The near bubble ends flat at the crease; the far side starts
+        // with one.
+        vec3 nc = normalize(n0 - s.yzw + 1e-5 * rd);
+        if (endInside) {
+            shadeFilm(ro + rd * t, nc, endSph.xyz, endId, 1.0, false, 1.0, NO_EDGE);
+        }
+        capOn = true;
+        capN = nc;
+        t += 1e-4;
     }
     return false;
 }
 
 // The foam inside the container. The ray's stretches inside it are
-// found by tracing the shape's field. With wallOn each is walked through
+// found by tracing the shape's field. With WALL_ON each is walked through
 // the grid and cut flat by the container. Otherwise the stretches inside
 // the shape are walked the same way, and those between the shape and the
-// container, where the foam is squashed, are marched.
+// container, where the foam is squashed, by shellStretch.
 void traceContained(vec2 tb, float cone, int layers) {
     float t = max(tb.x, 0.0);
     float eps = 1e-3;
@@ -1202,14 +1183,14 @@ void traceContained(vec2 tb, float cone, int layers) {
             return;
         }
         for (int k = 0; k < 4; k++) {
-            if (wallOn == 0) {
-                if (!shellMarch(t, tb.y, layers)) {
-                    break;
-                }
+#if CONTAIN == 2
+            if (!shellStretch(t, tb.y, cone, layers)) {
+                break;
             }
-            // Through the container (wallOn) or the shape, to where the
+#endif
+            // Through the container (WALL_ON) or the shape, to where the
             // ray leaves it.
-            float off = wallOn != 0 ? clipOff : 0.0;
+            float off = WALL_ON ? clipOff : 0.0;
             float a = t;
             float tp = t;
             float gp = 0.0;
@@ -1230,9 +1211,8 @@ void traceContained(vec2 tb, float cone, int layers) {
                 }
             }
             walkGrid(a, b, cone, layers);
-            shC = ivec3(-9999);
-            t = b + (wallOn != 0 ? 4.0 * eps : 1e-4);
-            if (wallOn != 0 || films >= layers || t >= tb.y) {
+            t = b + (WALL_ON ? 4.0 * eps : 1e-4);
+            if (WALL_ON || films >= layers || t >= tb.y) {
                 break;
             }
         }
@@ -1339,11 +1319,11 @@ void main() {
     // Radius of the pixel's cone per unit of distance.
     float cone = pixelSize / focalPx;
     pixCone = cone;
-    if (clipOn != 0) {
-        traceContained(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
-    } else {
-        traceSpheres(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
-    }
+#if CONTAIN == 0
+    traceSpheres(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
+#else
+    traceContained(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
+#endif
 
     if (debugView == 1) {
         outColor = heat(cost);
@@ -1370,6 +1350,7 @@ void main() {
     }
 }
 `;
+const FRAG_BUBBLES = [fragBubble(0), fragBubble(1), fragBubble(2)] as const;
 
 type Phase = "capture" | "reading" | "ready";
 
@@ -1712,9 +1693,10 @@ export class BubbleEffect implements Effect {
         const reach =
             foam.fill.reach + foam.grow + r.wobble * maxR + 0.02 * r.cellSize;
         const containment = r.containment;
+        const mode = containment <= 0 ? 0 : containment >= 0.995 ? 1 : 2;
 
         ctx.draw({
-            frag: FRAG_BUBBLE,
+            frag: FRAG_BUBBLES[mode],
             uniforms: {
                 sdfTex,
                 sdfRect: shape.sdfRect,
@@ -1738,10 +1720,8 @@ export class BubbleEffect implements Effect {
                 gridCell: grid.cell,
                 gridDims: grid.dims,
                 reachMax: reach,
-                clipOn: containment > 0 ? 1 : 0,
                 clipOff: (1 - containment) * reach,
                 warpK: containment / Math.max(1 - containment, 1e-3),
-                wallOn: containment >= 0.995 ? 1 : 0,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),
