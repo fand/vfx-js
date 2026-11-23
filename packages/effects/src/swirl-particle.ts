@@ -1,10 +1,11 @@
 // Particles that crawl and curl over an extruded silhouette.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
-// 1. The silhouette is read back from the element (`ctx.src` alpha), and a
-//    2D signed distance field is built on the CPU. The 3D shape is the
-//    analytic extrusion of that field, so its SDF and normal are cheap to
-//    evaluate anywhere in the shaders.
+// 1. The silhouette is read back from the element (`ctx.src` alpha, or
+//    the channel `sourceChannel` picks), and a 2D signed distance field
+//    is built on the CPU. The 3D shape is the analytic extrusion of that
+//    field, so its SDF and normal are cheap to evaluate anywhere in the
+//    shaders.
 // 2. Spawn points are scattered over the extruded surface (both caps and
 //    the side walls), weighted by area.
 // 3. A fragment-shader simulation (MRT: position + age, velocity +
@@ -32,8 +33,13 @@ import {
     GLSL_BLOOM_KNEE,
     upsampleBloomPyramid,
 } from "./_bloom-common.js";
-import { captureContent } from "./_capture.js";
 import { parseHexColor } from "./_figma-common.js";
+import {
+    ORBIT_CAMERA_RANGE,
+    OrbitCamera,
+    type OrbitCameraParams,
+    type OrbitCameraView,
+} from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
 import {
@@ -42,8 +48,12 @@ import {
     MASK_LONG,
     type ShapeData,
     SPAWN_SIZE,
-    viewMatrix,
 } from "./_silhouette.js";
+import {
+    SourceCapture,
+    type SourceChannel,
+    sourceChannelOf,
+} from "./_source.js";
 
 /**
  * One stop of a {@link SwirlParticleParams.palette} gradient, like a
@@ -119,7 +129,14 @@ export const SWIRL_PARTICLE_PALETTES: Readonly<
     ]),
 });
 
-export type SwirlParticleParams = {
+/** What the pointer does to a {@link SwirlParticleEffect}. */
+export type SwirlParticlePointer = "none" | "repel" | "tilt";
+
+/**
+ * The params of {@link SwirlParticleEffect}: the particles' own, and the
+ * camera's ({@link OrbitCameraParams}).
+ */
+export type SwirlParticleParams = OrbitCameraParams & {
     /**
      * Number of particles, at most 1,048,576 (2^20). Live: lowering it
      * draws fewer particles without freeing memory; raising it past what
@@ -188,6 +205,14 @@ export type SwirlParticleParams = {
      */
     sourceColor: number;
     /**
+     * Which channel of the element is read as the silhouette: `"alpha"`
+     * (where it is opaque; default), `"luminance"` (where it is bright,
+     * so the text or the light parts of an opaque image) or `"none"` (the
+     * whole element rect). A change reads the element back again, like
+     * {@link SwirlParticleEffect.refresh | refresh()}.
+     */
+    sourceChannel: SourceChannel;
+    /**
      * Direction towards the light, in view space: +x right, +y up, +z
      * towards the viewer. It stays fixed to the screen while the camera
      * orbits. Normalised internally.
@@ -210,7 +235,7 @@ export type SwirlParticleParams = {
     /**
      * Cast a soft shadow onto the page behind the shape. The page is a
      * plane parallel to the screen, {@link shadowDistance} behind the
-     * shape's centre, lit by {@link lightDirection}. A light from behind
+     * shape's front face, lit by {@link lightDirection}. A light from behind
      * (z ≤ 0) casts no shadow. The shadow is clipped to the output rect
      * (see {@link pad}). Fireflies cast none.
      */
@@ -220,78 +245,47 @@ export type SwirlParticleParams = {
     /** Blur radius of the shadow (gaussian sigma), in CSS px. */
     shadowSoftness: number;
     /**
-     * Distance from the shape's centre to the page behind it, in world
-     * units (the long side of the element is 2). Further means a larger
-     * offset.
+     * Distance from the shape's front face to the page behind it, in
+     * world units (the long side of the element is 2). The front face is
+     * where the front cap is when the shape is seen front-on, `depth / 2`
+     * in front of its centre; the page does not turn with the shape.
+     * At 0 the page touches the front face, so only the particles that
+     * peel off towards the viewer cast a shadow; at `depth` it touches
+     * the back. Further means a larger offset.
      */
     shadowDistance: number;
     /** Shadow colour, CSS hex. */
     shadowColor: string;
     /**
-     * Camera yaw in degrees. 0 looks straight at the front cap; positive
-     * turns the front cap to the right.
-     */
-    yaw: number;
-    /**
-     * Camera pitch in degrees. 0 looks straight at the front cap;
-     * positive turns the front cap down, showing the top.
-     */
-    pitch: number;
-    /**
-     * Amplitude of the slow camera wobble, in degrees of yaw (the pitch
-     * wobbles 0.3 times as far). 0 keeps the camera still (pointer drags
-     * still orbit it when {@link drag} is on).
-     */
-    orbit: number;
-    /**
-     * Field of view in degrees, measured across the element's long side.
-     * The camera moves so the z = 0 plane keeps the element's size, so this
-     * only changes the strength of the perspective (like a dolly zoom).
-     */
-    fov: number;
-    /** Camera zoom. 1 = the z = 0 plane matches the element size. */
-    zoom: number;
-    /**
-     * Orbit the camera by dragging the pointer. A drag starts on the
-     * element's box and can then leave it. While on, it listens for
-     * pointer events on `window`; UI on top of the element that should
-     * not orbit can stop `pointerdown` propagation.
-     */
-    drag: boolean;
-    /**
      * How the particles react to the pointer hovering over the page:
      *
      * - `"none"` (default): they don't.
-     * - `"repel"`: particles near the cursor on screen (within
-     *   {@link mouseRadius}) are pushed away from it, opening a hole the
-     *   flow goes around. The hole stays while the pointer rests and
-     *   refills once it leaves the page.
-     * - `"tilt"`: hover parallax. The shape turns to face the cursor,
-     *   up to 20° × {@link mouseStrength} when the cursor is
-     *   half a viewport away from the element's centre, and back to
-     *   front-on once the pointer leaves the page. Adds to
-     *   {@link yaw} / {@link pitch}, the {@link orbit} wobble and drags.
+     * - `"repel"`: particles near the pointer on screen (within
+     *   {@link pointerRadius}) are pushed away from it, opening a hole the
+     *   flow goes around. {@link OrbitCameraParams.pointerStrength |
+     *   pointerStrength} scales the push: at 1 the hole opens to about
+     *   `pointerRadius` at the default `speed`. The hole stays while the
+     *   pointer rests and refills once it leaves the page.
+     * - `"tilt"`: hover parallax. The shape turns to face the pointer,
+     *   up to 20° × {@link OrbitCameraParams.pointerStrength |
+     *   pointerStrength} (capped at 90°), reached when the pointer is
+     *   half a viewport away from the element's centre.
      *
      * Both ease in and out. Ignored by still frames. While not `"none"`,
      * it listens for pointer events on `window` to tell when the pointer
      * leaves the page.
      */
-    mouse: "none" | "repel" | "tilt";
-    /** Radius of the `"repel"` hole, in CSS px on screen. */
-    mouseRadius: number;
-    /**
-     * Strength of the pointer interaction. `"repel"`: scales the push;
-     * at 1 the hole opens to about {@link mouseRadius} at the default
-     * `speed`. `"tilt"`: scales the largest tilt angle (20° at 1).
-     */
-    mouseStrength: number;
+    pointer: SwirlParticlePointer;
+    /** Radius of the `pointer: "repel"` hole, in CSS px on screen. */
+    pointerRadius: number;
     /**
      * Extra pad around the element in CSS px for the particles, bloom and
      * shadow to draw into, or `"fullscreen"` to draw over the whole
      * canvas. The default, 200, holds the wisps and the drop shadow of
      * the default look on elements up to about 1000 px wide. A smaller
-     * pad, a larger element, `zoom`, strong tilts or a long
-     * `shadowDistance` clip them.
+     * pad, a larger element, `zoom`, a large tilt, a long
+     * `shadowDistance` or `cameraOrigin: "viewport"` on an element away
+     * from the viewport's centre clip them.
      */
     pad: number | "fullscreen";
     /**
@@ -309,7 +303,8 @@ export type SwirlParticleEffectOptions = {
     /**
      * Render a still frame: simulate a fixed number of steps once, then
      * stop. The frame is drawn again only when params or the element's
-     * size change, so a video source's colours stay as they were. For
+     * size change (or, with `cameraOrigin: "viewport"`, its position in
+     * the viewport), so a video source's colours stay as they were. For
      * visual tests and `prefers-reduced-motion`.
      */
     still?: boolean;
@@ -334,6 +329,7 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     bloom: 0.9,
     palette: "nebula",
     sourceColor: 0,
+    sourceChannel: "alpha",
     lightDirection: [-0.45, 0.75, 0.55],
     lightColor: "#ffffff",
     lightIntensity: 1,
@@ -343,32 +339,25 @@ const DEFAULT_PARAMS: SwirlParticleParams = {
     shadow: false,
     shadowOpacity: 0.35,
     shadowSoftness: 14,
-    shadowDistance: 0.15,
+    shadowDistance: 0.26,
     shadowColor: "#1c2233",
     yaw: 0,
     pitch: 0,
-    orbit: 23,
+    orbitAnimation: 23,
+    orbitSpeed: 1,
     fov: 35,
     zoom: 1.0,
     drag: false,
-    mouse: "none",
-    mouseRadius: 120,
-    mouseStrength: 1,
+    cameraOrigin: "element",
+    pointer: "none",
+    pointerRadius: 120,
+    pointerStrength: 1,
     pad: 200,
     antialias: false,
 };
 
 // Largest `count`: 2^20, a 1024² state texture.
 const MAX_COUNT = 1 << 20;
-// Frames to wait before reading the silhouette back, and the most frames
-// between retries while it is empty (the gap doubles from the first).
-const CAPTURE_DELAY = 3;
-const CAPTURE_RETRY_MAX = 120;
-// Recapture when the element's aspect ratio drifts this far (relative)
-// from the one the shape was built with, once the size has held still
-// for RESIZE_SETTLE frames.
-const ASPECT_TOLERANCE = 0.01;
-const RESIZE_SETTLE = 5;
 const BLOOM_LEVELS = 6;
 // How much of each coarser bloom level adds into the next finer one.
 const BLOOM_SCATTER = 0.85;
@@ -385,8 +374,6 @@ const SIM_STEP = 1 / 30;
 // = clampDt's 0.1 s cap / SIM_STEP.
 const MAX_SUBSTEPS = 3;
 const STILL_STEPS = 90;
-// Pitch wobble relative to the yaw wobble.
-const PITCH_WOBBLE = 0.3;
 // Near / far planes relative to the camera distance.
 const NEAR_K = 0.05 / 3.2;
 const FAR_K = 1 + 6 / 3.2;
@@ -419,18 +406,13 @@ const SHADOW_MAX_SIGMA = 6;
 // simulation. The binary coverage has holes that move every frame; the
 // average hides them, at the cost of the shadow trailing a fast move.
 const SHADOW_TAU = 0.1;
-// Pointer interaction (`mouse`). Seconds for the force to fade in / out.
-const MOUSE_FADE = 0.15;
-// Time constant of the smoothed cursor that "repel" pushes from, seconds.
+// `pointer: "repel"`: seconds for the push to fade in / out.
+const REPEL_FADE = 0.15;
+// Time constant of the smoothed pointer that "repel" pushes from, seconds.
 const REPEL_POS_TAU = 0.06;
-// Push speed at the cursor, in radii (at the particle's depth) per second,
-// at mouseStrength 1.
+// Push speed at the pointer, in radii (at the particle's depth) per
+// second, at pointerStrength 1.
 const REPEL_K = 4;
-// Largest tilt at mouseStrength 1, degrees, and its time constant.
-const TILT_MAX = 20;
-const TILT_TAU = 0.25;
-// Degrees to radians: the camera angles in params are degrees.
-const DEG = Math.PI / 180;
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -558,15 +540,16 @@ uniform float curlScale;
 uniform float speed;
 uniform float attract;
 uniform float peel;
-// Pointer repel: strength × fade (0 = off), the smoothed cursor and the
+// Pointer repel: strength × fade (0 = off), the smoothed pointer and the
 // radius in buffer px, and the camera that draws the particles.
-uniform float mouseForce;
-uniform vec2 mousePx;
-uniform float mouseRadiusPx;
+uniform float repelForce;
+uniform vec2 repelPx;
+uniform float repelRadiusPx;
 uniform mat3 viewRot;
 uniform float camDist;
 uniform float focalPx;
-uniform vec2 centerPx;
+uniform vec2 eye;
+uniform vec2 principalPx;
 
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outVel;
@@ -699,20 +682,20 @@ void main() {
     // Repel: measured on screen, with the camera that draws the particle,
     // pushed in the view plane. The push is in radii (at the particle's
     // depth) per second, so the hole is the same on any element size.
-    if (mouseForce > 0.0) {
+    if (repelForce > 0.0) {
         vec3 qv = viewRot * p;
         float depth = camDist - qv.z;
         if (depth > 1e-3) {
-            vec2 dd = centerPx + qv.xy * focalPx / depth - mousePx;
-            float r = length(dd) / mouseRadiusPx;
+            vec2 dd = principalPx + (qv.xy - eye) * focalPx / depth - repelPx;
+            float r = length(dd) / repelRadiusPx;
             if (r < 1.0) {
                 float f = 1.0 - r * r;
                 f *= f;
                 float a = rnd(id * 97u + 1u) * 6.2831853;
-                vec2 dir = r > 1e-3 ? dd / (r * mouseRadiusPx) : vec2(cos(a), sin(a));
-                float radiusW = mouseRadiusPx * depth / focalPx;
+                vec2 dir = r > 1e-3 ? dd / (r * repelRadiusPx) : vec2(cos(a), sin(a));
+                float radiusW = repelRadiusPx * depth / focalPx;
                 // Inverse rotation: view plane → world.
-                target += (vec3(dir, 0.0) * viewRot) * (mouseForce * ${REPEL_K.toFixed(1)} * radiusW * f);
+                target += (vec3(dir, 0.0) * viewRot) * (repelForce * ${REPEL_K.toFixed(1)} * radiusW * f);
             }
         }
     }
@@ -847,7 +830,8 @@ uniform float occlusion;
 uniform float glintAmount;
 #endif
 #ifdef SHADOW
-// Towards the light, z > 0; the page is at view z = -shadowDepth.
+// Towards the light, z > 0; the page is at view z = -shadowDepth
+// (shadowDistance behind the front face, so shadowDepth can be negative).
 uniform vec3 shadowLight;
 uniform float shadowDepth;
 #endif
@@ -859,7 +843,10 @@ uniform float camDist;
 uniform float camNear;
 uniform float camFar;
 uniform float focalPx;
-uniform vec2 centerPx;
+// The eye in view space is (eye, camDist); its axis meets the buffer at
+// principalPx (see _orbit-camera.ts).
+uniform vec2 eye;
+uniform vec2 principalPx;
 uniform vec2 bufferPx;
 uniform float pointPx;
 
@@ -883,11 +870,12 @@ vec3 project(vec3 p) {
     vec3 q = viewRot * p;
 #ifdef SHADOW
     // Flatten onto the page along the light. Points behind the page
-    // (the page cuts the shape when shadowDepth is small) lie on it.
+    // (the page cuts the shape when shadowDistance is under depth) lie
+    // on it.
     q -= shadowLight * (max(q.z + shadowDepth, 0.0) / shadowLight.z);
 #endif
     float depth = camDist - q.z;
-    return vec3(centerPx + q.xy * focalPx / max(depth, 1e-3), depth);
+    return vec3(principalPx + (q.xy - eye) * focalPx / max(depth, 1e-3), depth);
 }
 
 #ifndef FIREFLY
@@ -1301,13 +1289,8 @@ const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
     shadowOpacity: [0, 1],
     shadowSoftness: [0, 500],
     shadowDistance: [0, 100],
-    yaw: [-36000, 36000],
-    pitch: [-36000, 36000],
-    orbit: [-720, 720],
-    fov: [1, 150],
-    zoom: [0.01, 100],
-    mouseRadius: [0, 10000],
-    mouseStrength: [0, 100],
+    ...ORBIT_CAMERA_RANGE,
+    pointerRadius: [0, 10000],
 };
 const NUM_KEYS = Object.keys(NUM_RANGE) as NumKey[];
 const MAX_PAD = 10000;
@@ -1317,8 +1300,9 @@ type Resolved = Record<NumKey, number> & {
     pad: number | "fullscreen";
     shadow: boolean;
     drag: boolean;
+    cameraOrigin: SwirlParticleParams["cameraOrigin"];
     antialias: boolean;
-    mouse: SwirlParticleParams["mouse"];
+    pointer: SwirlParticlePointer;
     /** Unit vector towards the light. */
     light: Rgb;
     lightColor: Rgb;
@@ -1389,8 +1373,10 @@ function resolveParams(p: SwirlParticleParams, out?: Resolved): Resolved {
     r.pad = padOf(p.pad);
     r.shadow = !!p.shadow;
     r.drag = !!p.drag;
+    r.cameraOrigin = p.cameraOrigin === "viewport" ? "viewport" : "element";
     r.antialias = !!p.antialias;
-    r.mouse = p.mouse === "repel" || p.mouse === "tilt" ? p.mouse : "none";
+    r.pointer =
+        p.pointer === "repel" || p.pointer === "tilt" ? p.pointer : "none";
     lightUnit(p.lightDirection, r.light);
     r.lightColor = rgbOf(p.lightColor, DEFAULT_PARAMS.lightColor);
     r.fireflyColor = rgbOf(p.fireflyColor, DEFAULT_PARAMS.fireflyColor);
@@ -1477,22 +1463,9 @@ function smoothstep(e0: number, e1: number, x: number): number {
 // Effect
 // ---------------------------------------------------------------------------
 
-// Silhouette capture: waiting to capture, a readback in flight, or
-// nothing to do. Drawing only needs a shape, so a recapture keeps the
-// current one on screen.
-type Phase = "capture" | "reading" | "idle";
-
 type ShadowLevel = {
     a: EffectRenderTarget;
     b: EffectRenderTarget;
-};
-
-type Camera = {
-    viewRot: number[];
-    camDist: number;
-    focalPx: number;
-    centerPx: [number, number];
-    origin: readonly [number, number];
 };
 
 // What the composite reads: the bloom and the blurred shadow coverage,
@@ -1515,13 +1488,19 @@ const NO_LAYERS: Layers = { bloom: null, shadow: null, shadowAmount: 0 };
  * vfx.add(img, { effect: new SwirlParticleEffect({ palette: "ember" }) });
  * ```
  *
- * The silhouette is the element's alpha, read back when the effect starts
- * and again when the element's aspect ratio changes. Call
+ * The silhouette is the element's alpha (or the channel
+ * {@link SwirlParticleParams.sourceChannel | sourceChannel} picks), read
+ * back when the effect starts and again when the element's aspect ratio
+ * changes. Call
  * {@link SwirlParticleEffect.refresh | refresh()} after its content
  * changes. An opaque photo becomes an extruded slab. The particles are
  * born over the first {@link SwirlParticleParams.intro | intro} seconds
  * (1.5 by default). The output is premultiplied over transparency, so set
- * the page background yourself. Camera angles are in degrees.
+ * the page background yourself. The camera
+ * ({@link OrbitCameraParams}) is the one {@link GlassEffect} has, with
+ * angles in degrees; `pointer: "tilt"` turns it towards the pointer. With
+ * `cameraOrigin: "viewport"`, the default `pad` of 200 can clip an
+ * element near the edge of the viewport.
  *
  * All params, `count` and `fireflyRatio` included, are read every frame,
  * so you can mutate `params` live. Numbers that are not finite fall back
@@ -1538,17 +1517,14 @@ export class SwirlParticleEffect implements Effect {
     // This frame's params, checked (see resolveParams).
     readonly #r: Resolved;
 
-    // Bumped by dispose and context restore, so a silhouette readback
-    // started before them is dropped.
-    #token = 0;
-    #phase: Phase = "capture";
-    #srcFrames = 0;
-    // Frames to wait before the next capture; doubles while it's empty.
-    #captureGap = CAPTURE_DELAY;
-    // Element size last frame, and frames it has held still: a changed
-    // aspect is recaptured once it settles.
-    #lastSize: [number, number] = [0, 0];
-    #settled = 0;
+    // Reads the silhouette back: when the effect starts, on refresh(),
+    // and when the element's aspect ratio changes.
+    readonly #source = new SourceCapture({
+        longSide: MASK_LONG,
+        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+    });
+    // `sourceChannel` of the last shape read; a change reads it again.
+    #channel: SourceChannel | null = null;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
     #needsReset = true;
@@ -1581,7 +1557,7 @@ export class SwirlParticleEffect implements Effect {
     // Seconds the simulation advanced this frame.
     #frameDt = 0;
     // Camera of the last drawn frame; "repel" pushes in its view.
-    #cam: Camera | null = null;
+    #cam: OrbitCameraView | null = null;
     // Per particle colour, written once a frame (see FRAG_ATTR).
     #attrA: EffectRenderTarget | null = null;
     #attrB: EffectRenderTarget | null = null;
@@ -1618,30 +1594,14 @@ export class SwirlParticleEffect implements Effect {
         attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
     };
 
-    // Pointer drag. Window listeners while `drag` is on.
-    #dragYaw = 0;
-    #dragPitch = 0;
-    #dragging = false;
-    #lastPointer: [number, number] = [0, 0];
-    #unlistenDrag: (() => void) | null = null;
     #unsubRestored: (() => void) | null = null;
-    // Last frame's map from viewport to element-local px (bottom-left
-    // origin, physical): add to (clientX, innerHeight - clientY) × pr.
-    #toElement: [number, number] = [0, 0];
-    #pixelRatio = 1;
-    #elementPx: [number, number] = [0, 0];
-
-    // Pointer interaction (`mouse`). The core has no "pointer left"
-    // signal, so #pointerIn comes from window listeners, there while
-    // `mouse` is not "none".
-    #pointerIn = false;
-    #unlistenHover: (() => void) | null = null;
-    // Smoothed repel cursor, element-local physical px, and the fade.
+    // The camera: drags, the "tilt" and whether the pointer is in the
+    // page, with window listeners while `drag` is on or `pointer` is not
+    // "none".
+    readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
+    // Smoothed repel pointer, element-local physical px, and the fade.
     #repelPos: [number, number] = [0, 0];
     #repelAmount = 0;
-    // Smoothed tilt offsets, radians.
-    #tiltYaw = 0;
-    #tiltPitch = 0;
 
     constructor(
         initial: Partial<SwirlParticleParams> = {},
@@ -1666,7 +1626,7 @@ export class SwirlParticleEffect implements Effect {
         this.#unsubRestored = ctx.onContextRestored(() => {
             // Raw textures are gone; upload them again. A readback in
             // flight was rejected; start over if it was the first.
-            this.#token++;
+            this.#source.contextRestored();
             this.#gl = ctx.gl;
             this.#halfState = !ctx.gl.getExtension("OES_texture_float_linear");
             this.#sdfRaw = null;
@@ -1677,10 +1637,6 @@ export class SwirlParticleEffect implements Effect {
             this.#paletteTex = null;
             this.#paletteSrc = null;
             this.#pending = this.#pending ?? this.#shape;
-            if (this.#phase === "reading") {
-                this.#phase = "capture";
-                this.#srcFrames = 0;
-            }
             // The state and trail history targets come back empty:
             // respawn and mark every history slot stale.
             this.#needsReset = true;
@@ -1775,12 +1731,6 @@ export class SwirlParticleEffect implements Effect {
             return;
         }
         const r = resolveParams(this.params, this.#r);
-        this.#syncListeners();
-        this.#toElement[0] = ctx.mouse[0] - ctx.mouseViewport[0];
-        this.#toElement[1] = ctx.mouse[1] - ctx.mouseViewport[1];
-        this.#pixelRatio = ctx.pixelRatio;
-        this.#elementPx[0] = ctx.dims.elementPixel[0];
-        this.#elementPx[1] = ctx.dims.elementPixel[1];
 
         // `antialias` changed: a new buffer with the other sample count.
         const scene =
@@ -1788,11 +1738,16 @@ export class SwirlParticleEffect implements Effect {
                 ? this.#scene
                 : this.#createScene(ctx);
 
-        if (this.#phase === "idle" && !this.#pending) {
-            this.#watchAspect(ctx);
+        if (
+            this.#source.phase === "idle" &&
+            this.#channel !== null &&
+            sourceChannelOf(this.params.sourceChannel) !== this.#channel
+        ) {
+            this.#source.refresh();
         }
-        if (this.#phase === "capture") {
-            this.#capture(ctx);
+        // The aspect watch waits while a shape read back waits to upload.
+        if (this.#source.phase !== "idle" || !this.#pending) {
+            this.#source.update(ctx);
         }
         if (this.#pending && this.#upload(ctx, this.#pending)) {
             // The first shape spawns every particle. A new one takes over
@@ -1833,12 +1788,12 @@ export class SwirlParticleEffect implements Effect {
                 keyChanged
             ) {
                 // Capped like the sim, so a stall doesn't teleport the
-                // particles; the camera wobble and fireflies follow the
+                // particles; the orbit animation and fireflies follow the
                 // sim time.
                 const dt = clampDt(ctx.deltaTime) || 0;
-                this.#updateMouse(ctx, dt);
+                this.#updateRepel(ctx, dt);
                 this.#simulate(ctx, dt);
-                this.#cam = this.#camera(ctx);
+                this.#cam = this.#updateCamera(ctx, dt);
                 const shadow = this.#drawParticles(ctx, scene, this.#cam);
                 this.#layers = {
                     bloom: this.#drawBloom(ctx, scene),
@@ -1901,73 +1856,13 @@ export class SwirlParticleEffect implements Effect {
         put(dims.elementPixel[1]);
         put(ox);
         put(oy);
+        // "viewport": the camera follows the element's place in it.
+        put(r.cameraOrigin);
+        if (r.cameraOrigin === "viewport") {
+            put(dims.canvasRect[0] + dims.canvasRect[2] / 2);
+            put(dims.canvasRect[1] + dims.canvasRect[3] / 2);
+        }
         return changed;
-    }
-
-    // Add or remove the window listeners `drag` and `mouse` need.
-    #syncListeners(): void {
-        const r = this.#r;
-        const live = !this.#still && typeof window !== "undefined";
-        if (live && r.drag) {
-            this.#listenDrag();
-        } else if (this.#unlistenDrag) {
-            this.#unlistenDrag();
-            this.#unlistenDrag = null;
-            this.#dragging = false;
-        }
-        if (live && r.mouse !== "none") {
-            this.#listenHover();
-        } else if (this.#unlistenHover) {
-            this.#unlistenHover();
-            this.#unlistenHover = null;
-            this.#pointerIn = false;
-        }
-    }
-
-    #listenDrag(): void {
-        if (this.#unlistenDrag) {
-            return;
-        }
-        const down = (e: PointerEvent) => {
-            if (!this.#onElement(e.clientX, e.clientY)) {
-                return;
-            }
-            this.#dragging = true;
-            this.#lastPointer = [e.clientX, e.clientY];
-        };
-        const move = (e: PointerEvent) => {
-            if (!this.#dragging) {
-                return;
-            }
-            const dx = e.clientX - this.#lastPointer[0];
-            const dy = e.clientY - this.#lastPointer[1];
-            this.#lastPointer = [e.clientX, e.clientY];
-            this.#dragYaw += dx * 0.006;
-            this.#dragPitch = clamp(this.#dragPitch + dy * 0.006, -1.2, 1.2);
-        };
-        const up = () => {
-            this.#dragging = false;
-        };
-        window.addEventListener("pointerdown", down);
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", up);
-        window.addEventListener("pointercancel", up);
-        this.#unlistenDrag = () => {
-            window.removeEventListener("pointerdown", down);
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerup", up);
-            window.removeEventListener("pointercancel", up);
-        };
-    }
-
-    // Whether a client point is on the element's box, as of the last
-    // frame. Same mapping as `ctx.mouse`.
-    #onElement(clientX: number, clientY: number): boolean {
-        const pr = this.#pixelRatio;
-        const x = clientX * pr + this.#toElement[0];
-        const y = (window.innerHeight - clientY) * pr + this.#toElement[1];
-        const [ew, eh] = this.#elementPx;
-        return x >= 0 && y >= 0 && x <= ew && y <= eh;
     }
 
     /**
@@ -1985,105 +1880,32 @@ export class SwirlParticleEffect implements Effect {
      * capture is pending restarts it, so the latest content wins.
      */
     refresh(): void {
-        this.#recapture();
+        this.#source.refresh();
     }
 
-    // Start a new capture in CAPTURE_DELAY frames, dropping a readback in
-    // flight.
-    #recapture(): void {
-        if (this.#phase === "reading") {
-            this.#token++;
-        }
-        this.#phase = "capture";
-        this.#srcFrames = 0;
-        this.#captureGap = CAPTURE_DELAY;
-    }
-
-    // Recapture once the element's aspect ratio has drifted from the
-    // shape's and its size has held still for RESIZE_SETTLE frames, so a
-    // resize animation reads back once, at the end. The shape is in units
-    // of the element's long side, so a change of scale alone keeps it.
-    #watchAspect(ctx: EffectContext): void {
-        const shape = this.#shape;
-        const [ew, eh] = ctx.dims.elementPixel;
-        if (!shape || !(ew >= 1 && eh >= 1)) {
-            return;
-        }
-        const moved = ew !== this.#lastSize[0] || eh !== this.#lastSize[1];
-        this.#lastSize[0] = ew;
-        this.#lastSize[1] = eh;
-        this.#settled = moved ? 0 : this.#settled + 1;
-        if (
-            this.#settled >= RESIZE_SETTLE &&
-            Math.abs(ew / eh / shape.aspect - 1) > ASPECT_TOLERANCE
-        ) {
-            this.#recapture();
-        }
-    }
-
-    // Read the element's alpha back to build the shape.
-    #capture(ctx: EffectContext): void {
-        const [ew, eh] = ctx.dims.elementPixel;
-        if (
-            ctx.src.width === 0 ||
-            ctx.src.height === 0 ||
-            !(ew >= 1 && eh >= 1)
-        ) {
-            return;
-        }
-        // Give the source a few frames to upload.
-        if (++this.#srcFrames < this.#captureGap) {
-            return;
-        }
-        const aspect = ew / eh;
-        const mw = Math.max(
-            1,
-            aspect >= 1 ? MASK_LONG : Math.round(MASK_LONG * aspect),
+    // Build the shape from the element read back. False when the
+    // silhouette is empty, to try again later.
+    #onRead(
+        px: Uint8Array | Float32Array,
+        mw: number,
+        mh: number,
+        aspect: number,
+    ): boolean {
+        const channel = sourceChannelOf(this.params.sourceChannel);
+        const shape = buildShape(
+            px,
+            mw,
+            mh,
+            channel,
+            this.#r.depth / 2,
+            aspect,
         );
-        const mh = Math.max(
-            1,
-            aspect >= 1 ? Math.round(MASK_LONG / aspect) : MASK_LONG,
-        );
-        const mask = ctx.createRenderTarget({ size: [mw, mh] });
-        captureContent(ctx, mask);
-        this.#phase = "reading";
-        const token = this.#token;
-        const halfDepth = this.#r.depth / 2;
-        // The read copies the pixels now, so the mask can go.
-        const read = ctx.readPixels(mask);
-        mask.dispose();
-        const retry = (backoff: boolean) => {
-            this.#srcFrames = 0;
-            if (backoff) {
-                this.#captureGap = Math.min(
-                    this.#captureGap * 2,
-                    CAPTURE_RETRY_MAX,
-                );
-            }
-            this.#phase = "capture";
-        };
-        read.then(
-            (px) => {
-                if (token !== this.#token) {
-                    return;
-                }
-                const shape = buildShape(px, mw, mh, halfDepth, aspect);
-                if (shape) {
-                    this.#pending = shape;
-                    this.#phase = "idle";
-                } else {
-                    // Nothing drawn yet: try again later, less often, in
-                    // case it's a late-loading image.
-                    retry(true);
-                }
-            },
-            () => {
-                // Disposed or context lost.
-                if (token === this.#token) {
-                    retry(false);
-                }
-            },
-        );
+        if (!shape) {
+            return false;
+        }
+        this.#pending = shape;
+        this.#channel = channel;
+        return true;
     }
 
     // Upload the SDF and spawn textures, replacing the current ones.
@@ -2316,51 +2138,17 @@ export class SwirlParticleEffect implements Effect {
         return uniforms;
     }
 
-    #listenHover(): void {
-        if (this.#unlistenHover) {
-            return;
-        }
-        // A move inside the viewport means the pointer is over the page;
-        // leaving the document (relatedTarget null: out of the window,
-        // or a touch that ended) or losing focus means it is gone.
-        const move = (e: PointerEvent) => {
-            this.#pointerIn =
-                e.clientX >= 0 &&
-                e.clientY >= 0 &&
-                e.clientX < window.innerWidth &&
-                e.clientY < window.innerHeight;
-        };
-        const out = (e: PointerEvent) => {
-            if (!e.relatedTarget) {
-                this.#pointerIn = false;
-            }
-        };
-        const blur = () => {
-            this.#pointerIn = false;
-        };
-        window.addEventListener("pointermove", move, { passive: true });
-        window.addEventListener("pointerout", out, { passive: true });
-        window.addEventListener("blur", blur);
-        this.#unlistenHover = () => {
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerout", out);
-            window.removeEventListener("blur", blur);
-        };
-    }
-
-    // Once a frame: ease the repel force and the tilt towards what the
-    // pointer asks for, over the frame's dt (the one the sim advances by).
+    // Once a frame: ease the repel force towards what the pointer asks
+    // for, over the frame's dt (the one the sim advances by).
     // Frame-rate independent.
-    #updateMouse(ctx: EffectContext, dt: number): void {
+    #updateRepel(ctx: EffectContext, dt: number): void {
         const r = this.#r;
-        const mode = this.#still ? "none" : r.mouse;
-        const hover = this.#pointerIn && !this.#still;
-        const [mx, my] = ctx.mouse;
-
-        const repel = hover && mode === "repel";
+        const repel =
+            !this.#still && r.pointer === "repel" && this.#camera.pointerIn;
         if (repel) {
+            const [mx, my] = ctx.mouse;
             if (this.#repelAmount <= 0) {
-                // Appear under the cursor, not sweep in from where it left.
+                // Appear under the pointer, not sweep in from where it left.
                 this.#repelPos = [mx, my];
             } else {
                 const k = 1 - Math.exp(-dt / REPEL_POS_TAU);
@@ -2368,67 +2156,28 @@ export class SwirlParticleEffect implements Effect {
                 this.#repelPos[1] += (my - this.#repelPos[1]) * k;
             }
         }
-        const step = dt / MOUSE_FADE;
+        const step = dt / REPEL_FADE;
         this.#repelAmount = repel
             ? Math.min(this.#repelAmount + step, 1)
             : Math.max(this.#repelAmount - step, 0);
-
-        // Tilt: the cursor relative to the element's centre, over half the
-        // viewport. Positive yaw turns the front cap to the right,
-        // positive pitch down, so the shape faces the cursor.
-        let yawT = 0;
-        let pitchT = 0;
-        if (hover && mode === "tilt") {
-            const [ew, eh] = ctx.dims.elementPixel;
-            const pr = ctx.pixelRatio;
-            const vw =
-                typeof window !== "undefined"
-                    ? window.innerWidth * pr
-                    : ctx.dims.canvasPixel[0];
-            const vh =
-                typeof window !== "undefined"
-                    ? window.innerHeight * pr
-                    : ctx.dims.canvasPixel[1];
-            const nx = clamp((mx - ew / 2) / Math.max(vw / 2, 1), -1, 1);
-            const ny = clamp((my - eh / 2) / Math.max(vh / 2, 1), -1, 1);
-            const max = TILT_MAX * DEG * r.mouseStrength;
-            yawT = max * nx;
-            pitchT = -max * ny;
-        }
-        const k = 1 - Math.exp(-dt / TILT_TAU);
-        this.#tiltYaw += (yawT - this.#tiltYaw) * k;
-        this.#tiltPitch += (pitchT - this.#tiltPitch) * k;
     }
 
-    // Camera: base angles and the wobble (params, degrees), pointer drag
-    // and tilt (radians).
-    #camera(ctx: EffectContext): Camera {
+    // The camera at the current sim time; eases the "tilt" over `dt`.
+    // Also keeps the window listeners in step with `drag` and `pointer`.
+    #updateCamera(ctx: EffectContext, dt: number): OrbitCameraView {
         const r = this.#r;
-        const t = this.#simTime;
-        const yaw =
-            (r.yaw + r.orbit * Math.sin(t * 0.13)) * DEG +
-            this.#dragYaw +
-            this.#tiltYaw;
-        const pitch =
-            (r.pitch + r.orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3)) *
-                DEG +
-            this.#dragPitch +
-            this.#tiltPitch;
-
-        // Distance so that the long side (2 world units) spans `fov`.
-        const camDist = 1 / Math.tan((r.fov * Math.PI) / 360);
-
-        const dims = ctx.dims;
-        const [ew, eh] = dims.elementPixel;
-        const [ox, oy] = padOutputRect(r.pad, dims);
-        const unitPx = (Math.max(ew, eh) / 2) * r.zoom;
-        return {
-            viewRot: viewMatrix(yaw, pitch),
-            camDist,
-            focalPx: camDist * unitPx,
-            centerPx: [ew / 2 - ox, eh / 2 - oy],
-            origin: [ox, oy],
-        };
+        return this.#camera.update(r, {
+            time: this.#simTime,
+            dt,
+            dims: ctx.dims,
+            outputRect: padOutputRect(r.pad, ctx.dims),
+            mouse: ctx.mouse,
+            mouseViewport: ctx.mouseViewport,
+            pixelRatio: ctx.pixelRatio,
+            live: !this.#still,
+            tilt: r.pointer === "tilt",
+            trackPointer: r.pointer !== "none",
+        });
     }
 
     // Uniforms of every FRAG_SIM draw but the state and the step.
@@ -2523,23 +2272,24 @@ export class SwirlParticleEffect implements Effect {
         this.#stillCount = this.#r.count;
     }
 
-    // Sim uniforms for "repel": the cursor in buffer px and the camera
+    // Sim uniforms for "repel": the pointer in buffer px and the camera
     // of the last drawn frame, which is where the user sees the particles.
     #repelUniforms(ctx: EffectContext): EffectUniforms {
         const r = this.#r;
-        const cam = this.#cam ?? this.#camera(ctx);
+        const cam = this.#cam ?? this.#updateCamera(ctx, 0);
         return {
-            mouseForce:
-                r.mouseRadius > 0 ? this.#repelAmount * r.mouseStrength : 0,
-            mousePx: [
+            repelForce:
+                r.pointerRadius > 0 ? this.#repelAmount * r.pointerStrength : 0,
+            repelPx: [
                 this.#repelPos[0] - cam.origin[0],
                 this.#repelPos[1] - cam.origin[1],
             ],
-            mouseRadiusPx: Math.max(r.mouseRadius * ctx.pixelRatio, 1),
+            repelRadiusPx: Math.max(r.pointerRadius * ctx.pixelRatio, 1),
             viewRot: cam.viewRot,
             camDist: cam.camDist,
             focalPx: cam.focalPx,
-            centerPx: cam.centerPx,
+            eye: [cam.eye[0], cam.eye[1]],
+            principalPx: cam.principalPx,
         };
     }
 
@@ -2618,7 +2368,7 @@ export class SwirlParticleEffect implements Effect {
     #drawParticles(
         ctx: EffectContext,
         scene: EffectRenderTarget,
-        cam: Camera,
+        cam: OrbitCameraView,
     ): { tex: EffectRenderTarget; amount: number } | null {
         const pos = this.#pos;
         const vel = this.#vel;
@@ -2653,7 +2403,8 @@ export class SwirlParticleEffect implements Effect {
             camNear: camDist * NEAR_K,
             camFar: camDist * FAR_K,
             focalPx: cam.focalPx,
-            centerPx: cam.centerPx,
+            eye: [cam.eye[0], cam.eye[1]] as [number, number],
+            principalPx: cam.principalPx,
             bufferPx: [scene.width, scene.height] as [number, number],
             pointPx: r.pointSize * ctx.pixelRatio,
         };
@@ -2738,7 +2489,7 @@ export class SwirlParticleEffect implements Effect {
         const tex = this.#drawShadow(ctx, scene, heads, {
             ...trail,
             shadowLight: [light[0], light[1], Math.max(light[2], 0.02)],
-            shadowDepth: r.shadowDistance,
+            shadowDepth: r.shadowDistance - r.depth / 2,
         });
         return tex ? { tex, amount } : null;
     }
@@ -2935,10 +2686,7 @@ export class SwirlParticleEffect implements Effect {
     }
 
     dispose(): void {
-        this.#unlistenDrag?.();
-        this.#unlistenDrag = null;
-        this.#unlistenHover?.();
-        this.#unlistenHover = null;
+        this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
         this.#deleteShapeTextures();
@@ -2971,12 +2719,8 @@ export class SwirlParticleEffect implements Effect {
         this.#nFire = -1;
 
         // Start over like a new instance if it is added again.
-        this.#token++;
-        this.#phase = "capture";
-        this.#srcFrames = 0;
-        this.#captureGap = CAPTURE_DELAY;
-        this.#lastSize.fill(0);
-        this.#settled = 0;
+        this.#source.reset();
+        this.#channel = null;
         this.#pending = null;
         this.#shape = null;
         this.#needsReset = true;
@@ -2993,15 +2737,7 @@ export class SwirlParticleEffect implements Effect {
         this.#lastPush = -Infinity;
         this.#paletteSrc = null;
         this.#paletteSnap = [];
-        this.#dragYaw = 0;
-        this.#dragPitch = 0;
-        this.#dragging = false;
-        this.#toElement.fill(0);
-        this.#elementPx.fill(0);
-        this.#pointerIn = false;
         this.#repelPos = [0, 0];
         this.#repelAmount = 0;
-        this.#tiltYaw = 0;
-        this.#tiltPitch = 0;
     }
 }

@@ -42,21 +42,28 @@ import {
     placeBubbles,
     type SphereGrid,
 } from "./_bubble-fill.js";
-import { captureContent } from "./_capture.js";
+import {
+    OrbitCamera,
+    type OrbitCameraParams,
+    type OrbitCameraView,
+} from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
-    cameraUniforms,
     clampInt,
     GLSL_HEAT,
     GLSL_SCENE,
     hexToRgb,
-    OrbitDrag,
     SceneBackdrop,
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
 import { buildShape, GLSL_SDF, type ShapeData } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
+import {
+    SourceCapture,
+    type SourceChannel,
+    sourceChannelOf,
+} from "./_source.js";
 import {
     THIN_FILM_LUT_H,
     THIN_FILM_LUT_W,
@@ -77,19 +84,38 @@ import {
  */
 export type BubbleDebugView = "off" | "cost" | "layers" | "cells";
 
+/** What the pointer does to a {@link BubbleEffect}. */
+export type BubblePointer = "none" | "tilt";
+
 /**
- * Params of {@link BubbleEffect}. All are read every frame. The
- * placement params (`depth`, `cellSize`, `cellSizeRandomness`,
+ * Params of {@link BubbleEffect}: the foam's own, and the camera's
+ * ({@link OrbitCameraParams}). All are read every frame. The placement
+ * params (`depth`, `bevel`, `cellSize`, `cellSizeRandomness`,
  * `roundness`, `jitter`, `seed`, `skin`, `minSize`) place the bubbles
  * again on the CPU when they change, which takes a few to a few tens of
  * milliseconds.
  */
-export type BubbleParams = {
+export type BubbleParams = OrbitCameraParams & {
+    /**
+     * Which channel of the element is read as the silhouette: `"alpha"`
+     * (where it is opaque; default), `"luminance"` (where it is bright,
+     * so the text or the light parts of an opaque image) or `"none"` (the
+     * whole element rect). A change reads the element back again, like
+     * {@link BubbleEffect.refresh | refresh()}.
+     */
+    sourceChannel: SourceChannel;
     /**
      * Extrusion depth, relative to the long side of the element (= 2).
      * Placement param.
      */
     depth: number;
+    /**
+     * Radius of the rounded edges of the extruded shape, in the same units
+     * as `depth`, up to half of it. The bubbles fill the rounded shape,
+     * and a container (`containment`) rounds them off along its edges.
+     * Placement param.
+     */
+    bevel: number;
 
     /**
      * Size of the big bubbles: the spacing of the lattice they sit on, in
@@ -261,23 +287,23 @@ export type BubbleParams = {
     /** Softness of the lights' edges, 0 to 1. */
     lightSoftness: number;
 
-    /** Camera yaw in radians. 0 looks straight at the front. */
-    yaw: number;
-    /** Camera pitch in radians. 0 looks straight at the front. */
-    pitch: number;
-    /** Amplitude of a slow camera wobble, in radians. */
-    orbit: number;
-    /** Vertical field of view in degrees. */
-    fov: number;
-    /** Size of the shape relative to the element. */
-    zoom: number;
-    /** Orbit the camera with pointer drags. */
-    drag: boolean;
-
     /** Render scale, 0.25 to 2. Below 1 is cheaper and softer. */
     resolution: number;
     /** Smooth the remaining stair steps with FXAA. */
-    fxaa: boolean;
+    antialias: boolean;
+    /**
+     * How the foam reacts to the pointer hovering over the page:
+     *
+     * - `"none"` (default): it doesn't.
+     * - `"tilt"`: hover parallax. The shape turns to face the pointer,
+     *   up to 20° × {@link OrbitCameraParams.pointerStrength | pointerStrength}
+     *   (capped at 90°), reached when the pointer is half a viewport
+     *   away from the element's centre.
+     *
+     * Ignored by still frames. While `"tilt"`, it listens for pointer
+     * events on `window` to tell when the pointer leaves the page.
+     */
+    pointer: BubblePointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
      * the whole canvas.
@@ -298,7 +324,9 @@ export type BubbleEffectOptions = {
 };
 
 const DEFAULT_PARAMS: BubbleParams = {
+    sourceChannel: "alpha",
     depth: 0.1,
+    bevel: 0.02,
     cellSize: 0.1,
     cellSizeRandomness: 0.25,
     roundness: 0.3,
@@ -337,14 +365,18 @@ const DEFAULT_PARAMS: BubbleParams = {
     backdropSoftness: 0.03,
     lightIntensity: 1.2,
     lightSoftness: 0.8,
-    yaw: 0.35,
-    pitch: 0.2,
-    orbit: 0.2,
+    yaw: 20,
+    pitch: 11.5,
+    orbitAnimation: 11.5,
+    orbitSpeed: 3.3,
     fov: 30,
     zoom: 0.75,
     drag: false,
+    cameraOrigin: "element",
+    pointer: "none",
+    pointerStrength: 1,
     resolution: 1,
-    fxaa: true,
+    antialias: true,
     pad: "fullscreen",
     debug: "off",
 };
@@ -389,7 +421,10 @@ uniform float boxMargin;
 uniform mat3 viewRot;
 uniform float camDist;
 uniform float focalPx;
-uniform vec2 centerPx;
+// The camera (see _orbit-camera.ts): the eye in view space is
+// (eye, camDist), and its axis meets the output at principalPx.
+uniform vec2 eye;
+uniform vec2 principalPx;
 uniform vec2 bufferPx;
 uniform float pixelSize;
 
@@ -1353,8 +1388,8 @@ vec2 boundsHit() {
 
 void main() {
     vec2 px = uv * bufferPx;
-    vec3 rdV = normalize(vec3((px - centerPx) / focalPx, -1.0));
-    vec3 roV = vec3(0.0, 0.0, camDist);
+    vec3 rdV = normalize(vec3((px - principalPx) / focalPx, -1.0));
+    vec3 roV = vec3(eye, camDist);
     // viewRot maps object to view; its transpose maps back.
     ro = roV * viewRot;
     rd = rdV * viewRot;
@@ -1414,8 +1449,6 @@ void main() {
 }
 `;
 const FRAG_BUBBLES = [fragBubble(0), fragBubble(1), fragBubble(2)] as const;
-
-type Phase = "capture" | "reading" | "ready";
 
 function finite(v: number, fallback: number): number {
     return Number.isFinite(v) ? v : fallback;
@@ -1501,10 +1534,20 @@ type Foam = {
  * flat-walled foam to nearly separate spheres. The films are found
  * exactly along each ray.
  *
- * The silhouette is read once when the effect starts. Films do not bend
+ * The silhouette is the element's alpha (or the channel
+ * {@link BubbleParams.sourceChannel | sourceChannel} picks), read back
+ * when the effect starts and again when the element's aspect ratio
+ * changes. Call {@link BubbleEffect.refresh | refresh()} after its
+ * content changes. Films do not bend
  * light, so the page shows through the foam, dimmed by what the films
  * reflect; the output is premultiplied over it. With `backdropVisible`,
  * a backdrop is drawn behind the foam instead.
+ *
+ * The camera ({@link OrbitCameraParams}: `yaw`, `pitch`,
+ * `orbitAnimation`, `fov`, …) works as in {@link GlassEffect}, with
+ * angles in degrees. Set `drag: true` to orbit it with pointer drags that
+ * start on the element, and `pointer: "tilt"` to turn it towards the
+ * pointer.
  *
  * All params are read every frame, so you can mutate `params` live. The
  * bubbles are placed on the CPU, again whenever a placement param
@@ -1514,11 +1557,16 @@ export class BubbleEffect implements Effect {
     params: BubbleParams;
     readonly #still: boolean;
 
-    #phase: Phase = "capture";
-    #srcFrames = 0;
+    // Reads the silhouette back: when the effect starts, on refresh(),
+    // and when the element's aspect ratio changes.
+    readonly #source = new SourceCapture({
+        longSide: BUBBLE_MASK_LONG,
+        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+    });
+    // `sourceChannel` of the last shape read; a change reads it again.
+    #channel: SourceChannel | null = null;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
-    #mask: EffectRenderTarget | null = null;
     readonly #passes = new ScenePasses();
 
     #gl: WebGL2RenderingContext | null = null;
@@ -1529,7 +1577,9 @@ export class BubbleEffect implements Effect {
     readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
 
     #time = 0;
-    readonly #drag = new OrbitDrag();
+    // Drags, the "tilt", and the window listeners while `drag` is on or
+    // `pointer` is "tilt".
+    readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
     #unsubRestored: (() => void) | null = null;
 
     constructor(
@@ -1547,18 +1597,17 @@ export class BubbleEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // The raw textures are gone; upload them again.
+            // The raw textures are gone; upload them again. A readback in
+            // flight was rejected; start it over.
+            this.#source.contextRestored();
             this.#gl = ctx.gl;
             this.#raw = [];
             this.#sdfTex = null;
             this.#lutTex = null;
             this.#foamData = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#shape;
+            this.#pending = this.#pending ?? this.#shape;
         });
-        if (!this.#still) {
-            this.#drag.listen(() => this.params.drag);
-        }
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
@@ -1566,23 +1615,39 @@ export class BubbleEffect implements Effect {
     }
 
     render(ctx: EffectContext): void {
-        if (this.#phase === "capture") {
-            this.#capture(ctx);
+        if (
+            this.#source.phase === "idle" &&
+            this.#channel !== null &&
+            sourceChannelOf(this.params.sourceChannel) !== this.#channel
+        ) {
+            this.#source.refresh();
         }
+        this.#source.update(ctx);
+        // A new shape replaces the current one once it has been read back.
         if (this.#pending) {
             this.#upload(ctx, this.#pending);
             this.#shape = this.#pending;
             this.#pending = null;
-            this.#phase = "ready";
         }
         this.#backdrop.update(ctx, this.params);
         if (!this.#still) {
             this.#time += Math.min(ctx.deltaTime, 0.1);
         }
-        const scene = this.#draw(ctx);
+        const cam = this.#camera.update(this.params, {
+            time: this.#time,
+            dt: this.#still ? 0 : ctx.deltaTime,
+            dims: ctx.dims,
+            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            mouse: ctx.mouse,
+            mouseViewport: ctx.mouseViewport,
+            pixelRatio: ctx.pixelRatio,
+            live: !this.#still,
+            tilt: this.params.pointer === "tilt",
+        });
+        const scene = this.#draw(ctx, cam);
         this.#passes.output(ctx, scene, {
             pad: this.params.pad,
-            fxaa: this.params.fxaa,
+            antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
     }
@@ -1600,6 +1665,7 @@ export class BubbleEffect implements Effect {
         const cellSize = Math.max(finite(p.cellSize, d.cellSize), 0.02);
         const fill: FillOptions = {
             halfDepth,
+            bevel: clamp(p.bevel, 0, halfDepth, Math.min(d.bevel, halfDepth)),
             cellSize,
             jitter: clamp(p.jitter, 0, JITTER_MAX, d.jitter),
             roundness: clamp(p.roundness, 0, 1, d.roundness),
@@ -1843,11 +1909,11 @@ export class BubbleEffect implements Effect {
         this.#foamData = null;
     }
 
-    #draw(ctx: EffectContext): EffectRenderTarget | null {
+    #draw(ctx: EffectContext, cam: OrbitCameraView): EffectRenderTarget | null {
         const shape = this.#shape;
         const sdfTex = this.#sdfTex;
         const lutTex = this.#lutTex;
-        if (this.#phase !== "ready" || !shape || !sdfTex || !lutTex) {
+        if (!shape || !sdfTex || !lutTex) {
             return null;
         }
         const foam = this.#foam(ctx, shape);
@@ -1857,11 +1923,11 @@ export class BubbleEffect implements Effect {
         const p = this.params;
         const d = DEFAULT_PARAMS;
         const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        if (!scene) {
+        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }
         const t = this.#time;
-        const cam = cameraUniforms(p, t, this.#drag, ctx.dims);
         const r = this.#resolved();
         const grid = foam.grid;
         let maxR = 0;
@@ -1882,12 +1948,16 @@ export class BubbleEffect implements Effect {
                 sdfTex,
                 sdfRect: shape.sdfRect,
                 halfDepth: r.halfDepth,
-                // The shape is only used to skip empty space: sharp edges.
-                rounding: 0,
+                rounding: r.fill.bevel ?? 0,
                 shapeHalf: shape.shapeHalf,
                 boxMargin: reach,
-                ...cam,
-                pixelSize: cam.bufferPx[0] / scene.width,
+                viewRot: cam.viewRot,
+                camDist: cam.camDist,
+                focalPx: cam.focalPx,
+                eye: [cam.eye[0], cam.eye[1]],
+                principalPx: cam.principalPx,
+                bufferPx: [ow, oh],
+                pixelSize: ow / scene.width,
                 maxLayers: clampInt(p.maxLayers, 1, MAX_LAYERS, d.maxLayers),
                 seed: r.fill.seed,
                 cellSize: r.cellSize,
@@ -1933,56 +2003,49 @@ export class BubbleEffect implements Effect {
         return scene;
     }
 
-    // Read the element's alpha back once to build the shape.
-    #capture(ctx: EffectContext): void {
-        if (ctx.src.width === 0 || ctx.src.height === 0) {
-            return;
-        }
-        // Give the source a couple of frames to upload.
-        if (++this.#srcFrames < 3) {
-            return;
-        }
-        const [ew, eh] = ctx.dims.elementPixel;
-        const aspect = ew / Math.max(eh, 1);
-        const mw =
-            aspect >= 1
-                ? BUBBLE_MASK_LONG
-                : Math.round(BUBBLE_MASK_LONG * aspect);
-        const mh =
-            aspect >= 1
-                ? Math.round(BUBBLE_MASK_LONG / aspect)
-                : BUBBLE_MASK_LONG;
-        if (
-            !this.#mask ||
-            this.#mask.width !== mw ||
-            this.#mask.height !== mh
-        ) {
-            this.#mask?.dispose();
-            this.#mask = ctx.createRenderTarget({ size: [mw, mh] });
-        }
-        captureContent(ctx, this.#mask);
-        this.#phase = "reading";
-        ctx.readPixels(this.#mask).then(
-            (px) => {
-                const shape = buildShape(
-                    px,
-                    mw,
-                    mh,
-                    this.params.depth / 2,
-                    aspect,
-                    SMOOTH_RADIUS,
-                    SMOOTH_PASSES,
-                );
-                if (shape) {
-                    this.#pending = shape;
-                } else {
-                    // Nothing drawn yet: try again on a later frame.
-                    this.#srcFrames = 0;
-                    this.#phase = "capture";
-                }
-            },
-            () => {},
+    /**
+     * Capture the element's silhouette again, for when its content
+     * changed: an image's `src` swapped, a text edit. For an `<img>`,
+     * call it after `vfx.update(img)` has reloaded the image.
+     *
+     * The foam keeps the current shape until the new one has been read
+     * back (a few frames later), then switches to it and places its
+     * bubbles again. A change of the element's aspect ratio is
+     * recaptured automatically once its size settles; a change of size
+     * alone needs none.
+     *
+     * Safe to call at any time and any number of times; a call while a
+     * capture is pending restarts it, so the latest content wins.
+     */
+    refresh(): void {
+        this.#source.refresh();
+    }
+
+    // Build the shape from the element read back. False when the
+    // silhouette is empty, to try again later.
+    #onRead(
+        px: Uint8Array | Float32Array,
+        mw: number,
+        mh: number,
+        aspect: number,
+    ): boolean {
+        const channel = sourceChannelOf(this.params.sourceChannel);
+        const shape = buildShape(
+            px,
+            mw,
+            mh,
+            channel,
+            this.params.depth / 2,
+            aspect,
+            SMOOTH_RADIUS,
+            SMOOTH_PASSES,
         );
+        if (!shape) {
+            return false;
+        }
+        this.#pending = shape;
+        this.#channel = channel;
+        return true;
     }
 
     #upload(ctx: EffectContext, shape: ShapeData): void {
@@ -2021,7 +2084,7 @@ export class BubbleEffect implements Effect {
     }
 
     dispose(): void {
-        this.#drag.dispose();
+        this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
         if (this.#gl) {
@@ -2035,12 +2098,11 @@ export class BubbleEffect implements Effect {
         this.#freeFoam();
         this.#backdrop.dispose(this.#gl);
         this.#gl = null;
-        this.#mask?.dispose();
-        this.#mask = null;
         this.#passes.dispose();
         this.#shape = null;
         this.#pending = null;
-        this.#phase = "capture";
-        this.#srcFrames = 0;
+        // Start over like a new instance if it is added again.
+        this.#source.reset();
+        this.#channel = null;
     }
 }

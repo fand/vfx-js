@@ -1,9 +1,10 @@
 // Dispersive glass in the shape of an extruded silhouette.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
-// 1. The silhouette is read back from the element (`ctx.src` alpha) and
-//    turned into a 2D signed distance field; the 3D shape is its analytic
-//    extrusion (see `_silhouette.ts`).
+// 1. The silhouette is read back from the element (`ctx.src` alpha, or
+//    the channel `sourceChannel` picks) and turned into a 2D signed
+//    distance field; the 3D shape is its analytic extrusion (see
+//    `_silhouette.ts`).
 // 2. One fragment shader sphere-traces the shape from the camera, then
 //    follows the refracted ray inside it: total internal reflections
 //    bounce, and the ray leaves where it can refract out.
@@ -21,15 +22,17 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
-import { captureContent } from "./_capture.js";
+import {
+    OrbitCamera,
+    type OrbitCameraParams,
+    type OrbitCameraView,
+} from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
-    cameraUniforms,
     clampInt,
     GLSL_HEAT,
     GLSL_SCENE,
     hexToRgb,
-    OrbitDrag,
     SceneBackdrop,
     ScenePasses,
     uploadFloatTexture,
@@ -41,6 +44,11 @@ import {
     type ShapeData,
 } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
+import {
+    SourceCapture,
+    type SourceChannel,
+    sourceChannelOf,
+} from "./_source.js";
 
 /**
  * A procedural {@link GlassParams.backdrop}, coloured through the
@@ -87,7 +95,22 @@ export type GlassDebugView = "off" | "outer" | "inner" | "total";
  */
 export type GlassBevelShape = "round" | "chamfer";
 
-export type GlassParams = {
+/** What the pointer does to a {@link GlassEffect}. */
+export type GlassPointer = "none" | "tilt";
+
+/**
+ * The params of {@link GlassEffect}: the glass's own, and the camera's
+ * ({@link OrbitCameraParams}).
+ */
+export type GlassParams = OrbitCameraParams & {
+    /**
+     * Which channel of the element is read as the silhouette: `"alpha"`
+     * (where it is opaque; default), `"luminance"` (where it is bright,
+     * so the text or the light parts of an opaque image) or `"none"` (the
+     * whole element rect). A change reads the element back again, like
+     * {@link GlassEffect.refresh | refresh()}.
+     */
+    sourceChannel: SourceChannel;
     /** Extrusion depth, relative to the long side of the element (= 2). */
     depth: number;
     /**
@@ -113,7 +136,8 @@ export type GlassParams = {
      * from the element's luminance: positive raises the bright parts,
      * negative the dark ones (by sinking the bright ones). It makes a
      * button's label or a photo's content show as shape. 0 is off. Read
-     * once with the silhouette, so a video gives a still relief.
+     * back with the silhouette (see {@link GlassEffect.refresh | refresh()}),
+     * so a video gives a still relief.
      */
     relief: number;
     /**
@@ -215,30 +239,33 @@ export type GlassParams = {
     /** Softness of the lights' edges, 0 to 1. */
     lightSoftness: number;
 
-    /** Camera yaw in radians. 0 looks straight at the front cap. */
-    yaw: number;
-    /** Camera pitch in radians. 0 looks straight at the front cap. */
-    pitch: number;
-    /** Amplitude of a slow camera wobble, in radians. */
-    orbit: number;
-    /** Vertical field of view in degrees. */
-    fov: number;
-    /** Size of the shape relative to the element. */
-    zoom: number;
-    /** Orbit the camera with pointer drags. */
-    drag: boolean;
-
     /**
      * Render scale, 0.25 to 2. Below 1 is cheaper and softer; 2
      * supersamples the silhouette's edge.
      */
     resolution: number;
     /**
-     * Smooth the remaining stair steps with FXAA. Refraction on a narrow
-     * bevel changes faster than the pixels can follow; this is the cheap
-     * fix, `resolution: 2` the thorough one.
+     * Smooth the edges with FXAA, a cheap pass over the final image. The
+     * glass is ray-marched in one pass, so multisampling would not help;
+     * the march already blends the silhouette by coverage, and FXAA
+     * smooths what is left, mostly the refraction on a narrow bevel,
+     * which changes faster than the pixels can follow. `resolution: 2`
+     * is the thorough (and costly) fix.
      */
-    fxaa: boolean;
+    antialias: boolean;
+    /**
+     * How the glass reacts to the pointer hovering over the page:
+     *
+     * - `"none"` (default): it doesn't.
+     * - `"tilt"`: hover parallax. The shape turns to face the pointer,
+     *   up to 20° × {@link OrbitCameraParams.pointerStrength | pointerStrength}
+     *   (capped at 90°), reached when the pointer is half a viewport
+     *   away from the element's centre.
+     *
+     * Ignored by still frames. While `"tilt"`, it listens for pointer
+     * events on `window` to tell when the pointer leaves the page.
+     */
+    pointer: GlassPointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
      * the whole canvas.
@@ -258,6 +285,7 @@ export type GlassEffectOptions = {
 };
 
 const DEFAULT_PARAMS: GlassParams = {
+    sourceChannel: "alpha",
     depth: 0.2,
     bevel: 0.03,
     bevelShape: "round",
@@ -287,14 +315,18 @@ const DEFAULT_PARAMS: GlassParams = {
     backdropSoftness: 0.03,
     lightIntensity: 1.5,
     lightSoftness: 0.15,
-    yaw: 0.5,
-    pitch: 0.25,
-    orbit: 0.35,
+    yaw: 29,
+    pitch: 14,
+    orbitAnimation: 20,
+    orbitSpeed: 3.3,
     fov: 30,
     zoom: 0.7,
     drag: false,
+    cameraOrigin: "element",
+    pointer: "none",
+    pointerStrength: 1,
     resolution: 1,
-    fxaa: true,
+    antialias: true,
     pad: "fullscreen",
     debug: "off",
 };
@@ -425,10 +457,13 @@ vec4 sdf3(vec3 p) {
 
 uniform vec2 sdfSize;
 uniform vec2 shapeHalf;
+// The camera (see _orbit-camera.ts): the eye in view space is
+// (eye, camDist), and its axis meets the output at principalPx.
 uniform mat3 viewRot;
 uniform float camDist;
 uniform float focalPx;
-uniform vec2 centerPx;
+uniform vec2 eye;
+uniform vec2 principalPx;
 uniform vec2 bufferPx;
 // Size of a pixel of the target, in output px.
 uniform float pixelSize;
@@ -665,8 +700,8 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
 
 void main() {
     vec2 px = uv * bufferPx;
-    vec3 rdV = normalize(vec3((px - centerPx) / focalPx, -1.0));
-    vec3 roV = vec3(0.0, 0.0, camDist);
+    vec3 rdV = normalize(vec3((px - principalPx) / focalPx, -1.0));
+    vec3 roV = vec3(eye, camDist);
     // viewRot maps object to view; its transpose maps back.
     vec3 ro = roV * viewRot;
     vec3 rd = rdV * viewRot;
@@ -885,8 +920,6 @@ function capLipschitz(k: number): number {
     return Math.sqrt((2 + k * k + k * Math.sqrt(k * k + 4)) / 2);
 }
 
-type Phase = "capture" | "reading" | "ready";
-
 /**
  * Turns the element's silhouette into a block of dispersive glass: the
  * alpha is extruded into 3D and ray-traced with refraction, internal
@@ -896,10 +929,24 @@ type Phase = "capture" | "reading" | "ready";
  * vfx.add(img, { effect: new GlassEffect({ backdrop: "grid" }) });
  * ```
  *
- * The silhouette is read once when the effect starts. An opaque photo
- * becomes a slab. The glass shows a `backdrop` behind it, a procedural
- * pattern or an image, not the page: the output is opaque where the
- * backdrop is seen and premultiplied over transparency elsewhere.
+ * The silhouette is the element's alpha (or the channel
+ * {@link GlassParams.sourceChannel | sourceChannel} picks), read back
+ * when the effect starts and again when the element's aspect ratio
+ * changes. Call {@link GlassEffect.refresh | refresh()} after its
+ * content changes. An opaque photo becomes a slab. The glass shows a
+ * `backdrop` behind it, a procedural pattern or an image, not the page:
+ * the output is opaque where the backdrop is seen and premultiplied over
+ * transparency elsewhere.
+ *
+ * The camera ({@link OrbitCameraParams}: `yaw`, `pitch`,
+ * `orbitAnimation`, `fov`, …) works as in {@link SwirlParticleEffect},
+ * with angles in degrees. Its defaults here: the glass turned by `yaw` 29
+ * and `pitch` 14, a faster orbit animation (`orbitSpeed` 3.3), and
+ * `zoom` 0.7, so the glass is a little smaller than the element. Set `drag: true` to orbit it with
+ * pointer drags that start on the element, and `pointer: "tilt"` to turn
+ * it towards the pointer. The default
+ * `pad: "fullscreen"` leaves room for an off-centre element to lean out
+ * of its rect with `cameraOrigin: "viewport"`.
  *
  * All params are read every frame, so you can mutate `params` live.
  */
@@ -907,11 +954,16 @@ export class GlassEffect implements Effect {
     params: GlassParams;
     readonly #still: boolean;
 
-    #phase: Phase = "capture";
-    #srcFrames = 0;
+    // Reads the silhouette back: when the effect starts, on refresh(),
+    // and when the element's aspect ratio changes.
+    readonly #source = new SourceCapture({
+        longSide: GLASS_MASK_LONG,
+        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+    });
+    // `sourceChannel` of the last shape read; a change reads it again.
+    #channel: SourceChannel | null = null;
     #pending: GlassShape | null = null;
     #shape: GlassShape | null = null;
-    #mask: EffectRenderTarget | null = null;
     readonly #passes = new ScenePasses();
 
     #gl: WebGL2RenderingContext | null = null;
@@ -922,7 +974,9 @@ export class GlassEffect implements Effect {
     readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
 
     #time = 0;
-    readonly #drag = new OrbitDrag();
+    // Drags, the "tilt", and the window listeners while `drag` is on or
+    // `pointer` is "tilt".
+    readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
     #unsubRestored: (() => void) | null = null;
 
     constructor(
@@ -940,18 +994,17 @@ export class GlassEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // The raw SDF texture is gone; upload it again.
+            // The raw SDF texture is gone; upload it again. A readback in
+            // flight was rejected; start it over.
+            this.#source.contextRestored();
             this.#gl = ctx.gl;
             this.#sdfRaw = null;
             this.#sdfTex = null;
             this.#reliefRaw = null;
             this.#reliefTex = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#shape;
+            this.#pending = this.#pending ?? this.#shape;
         });
-        if (!this.#still) {
-            this.#drag.listen(() => this.params.drag);
-        }
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
@@ -959,14 +1012,19 @@ export class GlassEffect implements Effect {
     }
 
     render(ctx: EffectContext): void {
-        if (this.#phase === "capture") {
-            this.#capture(ctx);
+        if (
+            this.#source.phase === "idle" &&
+            this.#channel !== null &&
+            sourceChannelOf(this.params.sourceChannel) !== this.#channel
+        ) {
+            this.#source.refresh();
         }
+        this.#source.update(ctx);
+        // A new shape replaces the current one once it has been read back.
         if (this.#pending) {
             this.#upload(ctx, this.#pending);
             this.#shape = this.#pending;
             this.#pending = null;
-            this.#phase = "ready";
         }
         this.#updateRelief(ctx);
         this.#backdrop.update(ctx, this.params);
@@ -974,10 +1032,21 @@ export class GlassEffect implements Effect {
             this.#time += Math.min(ctx.deltaTime, 0.1);
         }
 
-        const scene = this.#drawGlass(ctx);
+        const cam = this.#camera.update(this.params, {
+            time: this.#time,
+            dt: this.#still ? 0 : ctx.deltaTime,
+            dims: ctx.dims,
+            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            mouse: ctx.mouse,
+            mouseViewport: ctx.mouseViewport,
+            pixelRatio: ctx.pixelRatio,
+            live: !this.#still,
+            tilt: this.params.pointer === "tilt",
+        });
+        const scene = this.#drawGlass(ctx, cam);
         this.#passes.output(ctx, scene, {
             pad: this.params.pad,
-            fxaa: this.params.fxaa,
+            antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
     }
@@ -986,20 +1055,22 @@ export class GlassEffect implements Effect {
         return DEBUG_VIEWS[this.params.debug] ?? 0;
     }
 
-    #drawGlass(ctx: EffectContext): EffectRenderTarget | null {
+    #drawGlass(
+        ctx: EffectContext,
+        cam: OrbitCameraView,
+    ): EffectRenderTarget | null {
         const shape = this.#shape;
         const sdfTex = this.#sdfTex;
-        if (this.#phase !== "ready" || !shape || !sdfTex) {
+        if (!shape || !sdfTex) {
             return null;
         }
         const p = this.params;
         const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        if (!scene) {
+        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }
         const t = this.#time;
-        const cam = cameraUniforms(p, t, this.#drag, ctx.dims);
-
         const halfDepth = Math.max(p.depth / 2, 0.005);
         const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
         const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
@@ -1034,8 +1105,13 @@ export class GlassEffect implements Effect {
                     capLipschitz(bulgeSlope) /
                     capLipschitz(bulgeSlope + reliefSlope),
                 shapeHalf: shape.shapeHalf,
-                ...cam,
-                pixelSize: cam.bufferPx[0] / scene.width,
+                viewRot: cam.viewRot,
+                camDist: cam.camDist,
+                focalPx: cam.focalPx,
+                eye: [cam.eye[0], cam.eye[1]],
+                principalPx: cam.principalPx,
+                bufferPx: [ow, oh],
+                pixelSize: ow / scene.width,
                 ior: Math.max(p.ior, 1.0001),
                 dispersion: p.dispersion,
                 paths: clampInt(p.paths, 1, MAX_PATHS, 2),
@@ -1065,63 +1141,55 @@ export class GlassEffect implements Effect {
         return scene;
     }
 
-    // Read the element's alpha back once to build the shape.
-    #capture(ctx: EffectContext): void {
-        if (ctx.src.width === 0 || ctx.src.height === 0) {
-            return;
-        }
-        // Give the source a couple of frames to upload.
-        if (++this.#srcFrames < 3) {
-            return;
-        }
-        const [ew, eh] = ctx.dims.elementPixel;
-        const aspect = ew / Math.max(eh, 1);
-        const mw =
-            aspect >= 1
-                ? GLASS_MASK_LONG
-                : Math.round(GLASS_MASK_LONG * aspect);
-        const mh =
-            aspect >= 1
-                ? Math.round(GLASS_MASK_LONG / aspect)
-                : GLASS_MASK_LONG;
-        if (
-            !this.#mask ||
-            this.#mask.width !== mw ||
-            this.#mask.height !== mh
-        ) {
-            this.#mask?.dispose();
-            this.#mask = ctx.createRenderTarget({ size: [mw, mh] });
-        }
-        captureContent(ctx, this.#mask);
-        this.#phase = "reading";
-        ctx.readPixels(this.#mask).then(
-            (px) => {
-                const shape = buildShape(
-                    px,
-                    mw,
-                    mh,
-                    this.params.depth / 2,
-                    aspect,
-                    SMOOTH_RADIUS,
-                    SMOOTH_PASSES,
-                );
-                if (shape) {
-                    const lum = reliefLuminance(px, mw, mh, shape);
-                    const radius = reliefRadius(this.params.reliefBlur, shape);
-                    this.#pending = {
-                        ...shape,
-                        reliefLum: lum,
-                        reliefRadius: radius,
-                        ...buildRelief(lum, shape, radius),
-                    };
-                } else {
-                    // Nothing drawn yet: try again on a later frame.
-                    this.#srcFrames = 0;
-                    this.#phase = "capture";
-                }
-            },
-            () => {},
+    /**
+     * Capture the element's silhouette again, for when its content
+     * changed: an image's `src` swapped, a text edit. For an `<img>`,
+     * call it after `vfx.update(img)` has reloaded the image.
+     *
+     * The glass keeps the current shape until the new one has been read
+     * back (a few frames later), then switches to it. A change of the
+     * element's aspect ratio is recaptured automatically once its size
+     * settles; a change of size alone needs none.
+     *
+     * Safe to call at any time and any number of times; a call while a
+     * capture is pending restarts it, so the latest content wins.
+     */
+    refresh(): void {
+        this.#source.refresh();
+    }
+
+    // Build the shape and the relief's luminance from the element read
+    // back. False when the silhouette is empty, to try again later.
+    #onRead(
+        px: Uint8Array | Float32Array,
+        mw: number,
+        mh: number,
+        aspect: number,
+    ): boolean {
+        const channel = sourceChannelOf(this.params.sourceChannel);
+        const shape = buildShape(
+            px,
+            mw,
+            mh,
+            channel,
+            this.params.depth / 2,
+            aspect,
+            SMOOTH_RADIUS,
+            SMOOTH_PASSES,
         );
+        if (!shape) {
+            return false;
+        }
+        const lum = reliefLuminance(px, mw, mh, shape);
+        const radius = reliefRadius(this.params.reliefBlur, shape);
+        this.#pending = {
+            ...shape,
+            reliefLum: lum,
+            reliefRadius: radius,
+            ...buildRelief(lum, shape, radius),
+        };
+        this.#channel = channel;
+        return true;
     }
 
     #upload(ctx: EffectContext, shape: GlassShape): void {
@@ -1186,7 +1254,7 @@ export class GlassEffect implements Effect {
     }
 
     dispose(): void {
-        this.#drag.dispose();
+        this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
         if (this.#gl && this.#sdfRaw) {
@@ -1201,12 +1269,11 @@ export class GlassEffect implements Effect {
         this.#gl = null;
         this.#sdfRaw = null;
         this.#sdfTex = null;
-        this.#mask?.dispose();
-        this.#mask = null;
         this.#passes.dispose();
         this.#shape = null;
         this.#pending = null;
-        this.#phase = "capture";
-        this.#srcFrames = 0;
+        // Start over like a new instance if it is added again.
+        this.#source.reset();
+        this.#channel = null;
     }
 }

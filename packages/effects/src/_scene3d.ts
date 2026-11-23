@@ -1,16 +1,14 @@
 // The scene around the 3D silhouette effects (GlassEffect, BubbleEffect):
-// the backdrop plane and its palette, the soft box lights, the orbit
-// camera, and the output passes (tone map, FXAA). Zero runtime deps.
+// the backdrop plane and its palette, the soft box lights, and the output
+// passes (tone map, FXAA). Zero runtime deps.
 import type {
     EffectContext,
-    EffectDims,
     EffectRenderTarget,
     EffectTexture,
     EffectUniformValue,
 } from "@vfx-js/core";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
-import { viewMatrix } from "./_silhouette.js";
 import type {
     GlassImageSource,
     GlassPaletteName,
@@ -40,8 +38,6 @@ const BACKDROP_MIP_LONG = 2048;
 // the backdrop, and the softness of the lights' edges. GLSL floats.
 const FROST_SPREAD = "0.35";
 export const FROST_LIGHT_SOFTNESS = "0.6";
-// Pitch wobble relative to the yaw wobble.
-const PITCH_WOBBLE = 0.3;
 
 /**
  * The backdrop plane and the lights, in view space: `backdrop(p, fw)`,
@@ -729,108 +725,6 @@ export class SceneBackdrop {
 }
 
 /**
- * Orbit the camera with pointer drags on the window, while `enabled()`.
- * `yaw` and `pitch` are added to the params' own.
- */
-export class OrbitDrag {
-    yaw = 0;
-    pitch = 0;
-    #dragging = false;
-    #lastPointer: [number, number] = [0, 0];
-    #unlisten: (() => void) | null = null;
-
-    listen(enabled: () => boolean): void {
-        this.dispose();
-        if (typeof window === "undefined") {
-            return;
-        }
-        const down = (e: PointerEvent) => {
-            if (!enabled()) {
-                return;
-            }
-            this.#dragging = true;
-            this.#lastPointer = [e.clientX, e.clientY];
-        };
-        const move = (e: PointerEvent) => {
-            if (!this.#dragging) {
-                return;
-            }
-            const dx = e.clientX - this.#lastPointer[0];
-            const dy = e.clientY - this.#lastPointer[1];
-            this.#lastPointer = [e.clientX, e.clientY];
-            this.yaw += dx * 0.006;
-            this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch + dy * 0.006));
-        };
-        const up = () => {
-            this.#dragging = false;
-        };
-        window.addEventListener("pointerdown", down);
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", up);
-        window.addEventListener("pointercancel", up);
-        this.#unlisten = () => {
-            window.removeEventListener("pointerdown", down);
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerup", up);
-            window.removeEventListener("pointercancel", up);
-        };
-    }
-
-    dispose(): void {
-        this.#unlisten?.();
-        this.#unlisten = null;
-        this.#dragging = false;
-    }
-}
-
-/** The camera params, as in GlassParams. */
-export type CameraParams = {
-    yaw: number;
-    pitch: number;
-    orbit: number;
-    fov: number;
-    zoom: number;
-    pad: number | "fullscreen";
-};
-
-/**
- * The orbit camera's uniforms: object-to-view rotation, distance, focal
- * length in output px, and where the element's centre is on the output.
- */
-export function cameraUniforms(
-    p: CameraParams,
-    time: number,
-    drag: OrbitDrag,
-    dims: EffectDims,
-): {
-    viewRot: number[];
-    camDist: number;
-    focalPx: number;
-    centerPx: [number, number];
-    bufferPx: [number, number];
-} {
-    const [ox, oy, ow, oh] = padOutputRect(p.pad, dims);
-    const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
-    const yaw = p.yaw + orbit * Math.sin(time * 0.43) + drag.yaw;
-    const pitch =
-        p.pitch +
-        orbit * PITCH_WOBBLE * Math.sin(time * 0.31 + 1.3) +
-        drag.pitch;
-    // Distance so that the long side (2 world units) spans `fov`.
-    const fov = Math.min(Math.max(p.fov, 1), 150);
-    const camDist = 1 / Math.tan((fov * Math.PI) / 360);
-    const [ew, eh] = dims.elementPixel;
-    const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
-    return {
-        viewRot: viewMatrix(yaw, pitch),
-        camDist,
-        focalPx: camDist * unitPx,
-        centerPx: [ew / 2 - ox, eh / 2 - oy],
-        bufferPx: [ow, oh],
-    };
-}
-
-/**
  * The render targets of a 3D scene: the float scene at `resolution`, and
  * the tone-mapped copy that FXAA reads.
  */
@@ -878,14 +772,14 @@ export class ScenePasses {
     output(
         ctx: EffectContext,
         scene: EffectRenderTarget | null,
-        opts: { pad: number | "fullscreen"; fxaa: boolean; raw: boolean },
+        opts: { pad: number | "fullscreen"; antialias: boolean; raw: boolean },
     ): void {
         // FXAA reads the tone-mapped image, so it gets its own target.
         const [, , ow, oh] = padOutputRect(opts.pad, ctx.dims);
         const lw = Math.round(ow);
         const lh = Math.round(oh);
         const fxaa =
-            opts.fxaa && scene !== null && !opts.raw && lw > 0 && lh > 0;
+            opts.antialias && scene !== null && !opts.raw && lw > 0 && lh > 0;
         if (fxaa && (this.#ldr?.width !== lw || this.#ldr?.height !== lh)) {
             this.#ldr?.dispose();
             this.#ldr = ctx.createRenderTarget({

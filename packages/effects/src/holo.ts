@@ -89,6 +89,7 @@ import {
     type TierConfig,
     type Vec3,
 } from "./_holo/types.js";
+import type { SourceChannel } from "./_source.js";
 
 /** Foil materials of holo.spot. */
 export type HoloMaterial =
@@ -125,7 +126,7 @@ export type HoloQuality = "auto" | "low" | "medium" | "high";
  * Which channel of a source is read as a shape: its alpha, its luminance, or none (the whole rect). The source is the
  * element (where the foil is), or for `emboss` the logo image (where it is pressed).
  */
-export type HoloSourceChannel = "alpha" | "luminance" | "none";
+export type HoloSourceChannel = SourceChannel;
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
 export type HoloVec2 = { x: number; y: number };
 /**
@@ -229,7 +230,12 @@ export type HoloSceneParams = {
      * puts the flashlight at the camera, `"none"` (the port's) ignores the pointer: `motion.pointer`.
      */
     pointer: HoloPointer | null;
-    /** How far the pointer tilts the card, in degrees at the element's edge, 5–35: `motion.tiltRange`. */
+    /**
+     * How far the pointer tilts the card, in degrees, 5–35: `motion.tiltRange`. It is reached at the element's edge
+     * and applies only while the pointer is over the element, unlike the tilt of `GlassEffect` and
+     * `SwirlParticleEffect` (`pointer: "tilt"`: 20° × `pointerStrength`, reached half a viewport from the element's
+     * centre, wherever the pointer is on the page).
+     */
     tiltRange: number | null;
     /** Slow automatic tilt while the pointer is away: `motion.wobble`. */
     wobble: boolean | null;
@@ -299,8 +305,8 @@ export type HoloParams = {
      */
     sizeMm: number | null;
     /**
-     * 4× multisampling of the card target (half float), as holospot renders. Smooths the card's outline when it
-     * turns. Default `true`; `false` saves memory (about 5× the card target's).
+     * Smooth the edges of the card with 4× multisampling (MSAA) of the card target (half float), as holospot renders;
+     * the outline shows once the card turns. Default `true`; `false` saves memory (about 5× the card target's).
      */
     antialias: boolean;
 };

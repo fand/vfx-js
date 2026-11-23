@@ -1,6 +1,9 @@
 // The extruded silhouette shared by the 3D shape effects: a 2D signed
-// distance field built on the CPU from the element's alpha, its GLSL
-// lookup, and the orbit camera rotation.
+// distance field built on the CPU from the element's alpha (or another
+// channel, see SourceChannel) and its GLSL lookup. The camera is in
+// _orbit-camera.ts.
+
+import type { SourceChannel } from "./_source.js";
 
 // Long side of the silhouette read back from the element, in px.
 export const MASK_LONG = 400;
@@ -175,7 +178,37 @@ export function boxBlur1d(
 }
 
 /**
- * Build the SDF and spawn points from RGBA pixels (bottom-up rows).
+ * Whether a pixel of premultiplied RGBA `pixels` (8-bit or float) is
+ * inside the silhouette, for each {@link SourceChannel}:
+ *
+ * - `"alpha"`: alpha ≥ 0.5.
+ * - `"luminance"`: luminance (Rec. 709) times alpha ≥ 0.5. The pixels
+ *   are premultiplied, so that is the luminance of the stored RGB.
+ * - `"none"`: always: the whole rect.
+ */
+function insideTest(
+    pixels: Uint8Array | Float32Array,
+    channel: SourceChannel,
+): (i: number) => boolean {
+    const scale = pixels instanceof Float32Array ? 1 : 1 / 255;
+    if (channel === "none") {
+        return () => true;
+    }
+    if (channel === "luminance") {
+        return (i) =>
+            (0.2126 * pixels[i] +
+                0.7152 * pixels[i + 1] +
+                0.0722 * pixels[i + 2]) *
+                scale >=
+            0.5;
+    }
+    return (i) => pixels[i + 3] * scale >= 0.5;
+}
+
+/**
+ * Build the SDF and spawn points from premultiplied RGBA pixels
+ * (bottom-up rows). `channel` picks what is inside the silhouette (see
+ * {@link SourceChannel}; anything else reads as `"alpha"`).
  * The pixel staircase of the field is softened by `smoothPasses` box
  * blurs of radius `smoothRadius` px: more gives smoother normals and
  * rounder corners.
@@ -185,12 +218,13 @@ export function buildShape(
     pixels: Uint8Array | Float32Array,
     mw: number,
     mh: number,
+    channel: SourceChannel,
     halfDepthHint: number,
     aspect: number,
     smoothRadius = 1,
     smoothPasses = 1,
 ): ShapeData | null {
-    const alphaScale = pixels instanceof Float32Array ? 1 : 1 / 255;
+    const isInside = insideTest(pixels, channel);
     const mLong = Math.max(mw, mh);
     const pad = Math.round(mLong * SDF_PAD);
     const W = mw + pad * 2;
@@ -199,8 +233,7 @@ export function buildShape(
     let insideCount = 0;
     for (let y = 0; y < mh; y++) {
         for (let x = 0; x < mw; x++) {
-            const a = pixels[(y * mw + x) * 4 + 3] * alphaScale;
-            if (a >= 0.5) {
+            if (isInside((y * mw + x) * 4)) {
                 inside[(y + pad) * W + x + pad] = 1;
                 insideCount++;
             }
@@ -330,24 +363,4 @@ export function buildShape(
         spawn,
         aspect,
     };
-}
-
-// Column-major rotation: pitch (around X) after yaw (around Y).
-export function viewMatrix(yaw: number, pitch: number): number[] {
-    const cy = Math.cos(yaw);
-    const sy = Math.sin(yaw);
-    const cp = Math.cos(pitch);
-    const sp = Math.sin(pitch);
-    // R = Rx(pitch) * Ry(yaw)
-    // Ry = [cy 0 sy; 0 1 0; -sy 0 cy], Rx = [1 0 0; 0 cp -sp; 0 sp cp]
-    const r00 = cy;
-    const r01 = 0;
-    const r02 = sy;
-    const r10 = sp * sy;
-    const r11 = cp;
-    const r12 = -sp * cy;
-    const r20 = -cp * sy;
-    const r21 = sp;
-    const r22 = cp * cy;
-    return [r00, r10, r20, r01, r11, r21, r02, r12, r22];
 }

@@ -68,6 +68,8 @@ type Shape2D = Pick<ShapeData, "sdf" | "sdfW" | "sdfH" | "sdfRect">;
 export type FillOptions = {
     /** Half the extrusion depth, world units. */
     halfDepth: number;
+    /** Radius of the rounded edges, world units (0: sharp). */
+    bevel?: number;
     /** Lattice spacing, world units. */
     cellSize: number;
     /** 0 to {@link JITTER_MAX}. */
@@ -99,7 +101,7 @@ export type BubbleFill = {
     capped: boolean;
     /**
      * How far any sphere reaches out of the shape (the extruded 2D field,
-     * sharp edges), world units.
+     * edges rounded by the bevel), world units.
      */
     reach: number;
     /** The fill's voxel size and count (0 without fill). */
@@ -236,17 +238,28 @@ export function insideDistance(
     return Math.min(-sampleSd2(shape, x, y)[0], halfDepth - Math.abs(z));
 }
 
-// The extruded shape's signed distance (sharp edges), positive outside.
+// The extrusion's signed distance from the 2D one (a) and |z| - halfDepth
+// (b), with the edges rounded by `bevel`, positive outside (as the
+// shader's \`extrude\`).
+function extrudeSd(a: number, b: number, bevel: number): number {
+    const wx = a + bevel;
+    const wy = b + bevel;
+    return wx > 0 && wy > 0
+        ? Math.hypot(wx, wy) - bevel
+        : Math.max(wx, wy) - bevel;
+}
+
+// The extruded shape's signed distance, positive outside.
 function sd3(
     shape: Shape2D,
     halfDepth: number,
+    bevel: number,
     x: number,
     y: number,
     z: number,
 ) {
     const a = sampleSd2(shape, x, y)[0];
-    const b = Math.abs(z) - halfDepth;
-    return a > 0 && b > 0 ? Math.hypot(a, b) : Math.max(a, b);
+    return extrudeSd(a, Math.abs(z) - halfDepth, bevel);
 }
 
 // ---- spheres near a point ----
@@ -311,6 +324,7 @@ class CentreGrid {
  */
 export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
     const halfDepth = Math.max(o.halfDepth, 1e-3);
+    const bevel = Math.min(Math.max(o.bevel ?? 0, 0), halfDepth);
     const cell = Math.max(o.cellSize, 1e-3);
     const jitter = Math.min(Math.max(o.jitter, 0), JITTER_MAX);
     const roundness = Math.min(Math.max(o.roundness, 0), 1);
@@ -362,8 +376,12 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
                 let r = sphereR * (1 - radiusVar * (f - Math.floor(f)));
                 r = Math.min(
                     r,
-                    Math.min(depthIn, halfDepth - Math.abs(cz) + bulgeZ) +
-                        protrude,
+                    protrude -
+                        extrudeSd(
+                            -depthIn,
+                            Math.abs(cz) - halfDepth - bulgeZ,
+                            bevel,
+                        ),
                 );
                 if (r > 0) {
                     lat.push(cx, cy, cz, r);
@@ -470,13 +488,16 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
                 const dz = halfDepth - Math.abs(z0 + kk * h);
                 for (let j = 0; j < nxy; j++) {
                     const v = kk * nxy + j;
-                    if (col[j] > 0 && dz > 0) {
+                    // Into the shape, rounded edges included.
+                    const d = -extrudeSd(-col[j], -dz, bevel);
+                    if (d > 0) {
                         // A filling sphere pokes out of the shape by a
                         // share of its radius at most, so the small ones
                         // along the outline keep it crisp.
                         dB[v] = Math.min(
                             col[j] + Math.min(protrude, FILL_POKE_K * col[j]),
                             dz + Math.min(protrude + bulgeZ, FILL_POKE_K * dz),
+                            d + Math.min(protrude, FILL_POKE_K * d),
                         );
                         bMax = Math.max(bMax, dB[v]);
                     } else {
@@ -642,6 +663,7 @@ export function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
         const d = sd3(
             shape,
             halfDepth,
+            bevel,
             spheres[s * 4],
             spheres[s * 4 + 1],
             spheres[s * 4 + 2],
