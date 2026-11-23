@@ -751,6 +751,7 @@ void shellEval(float t) {
         loadCell(C, 0.0, 0.0, true);
         shC = C;
     }
+    bool outside = shS.x > 0.0;
     shV = 1e30;
     shDist = 1e30;
     shSph = vec4(0.0);
@@ -758,6 +759,13 @@ void shellEval(float t) {
     for (int i = 0; i < MAX_CAND; i++) {
         if (i >= nCand) {
             break;
+        }
+        // Only the bubbles that poke out through this side of the shape
+        // are squashed towards it: their centres lie behind the surface
+        // under p. One across a gap belongs to the other side; pushed
+        // this far, the point would show it stuck to this one.
+        if (outside && dot(cand[i].xyz - p, shS.yzw) + shS.x > 0.5 * cand[i].w) {
+            continue;
         }
         vec3 m = shQ - cand[i].xyz;
         float d2 = dot(m, m);
@@ -802,7 +810,7 @@ bool shellMarch(inout float t, float tEnd, int layers) {
         float t0 = t;
         float s0 = shS.x;
         // A safe step where it is shown, scaled back to the ray.
-        float stp = in0 ? shSph.w - length(shQ - shSph.xyz) : shDist;
+        float stp = in0 ? shSph.w - length(shQ - shSph.xyz) : min(shDist, gridCell);
         t += clamp(stp * scale * 0.9, stepMin, stepMax);
         if (t > tEnd) {
             return false;
@@ -817,13 +825,18 @@ bool shellMarch(inout float t, float tEnd, int layers) {
             shellEval(t);
         }
         if (in0 != shIn) {
-            // The foam's outside: a root of the owner's power.
+            // The foam's outside: a root of the owner's power. Across a
+            // crease of the shape's field (the middle of a gap, where the
+            // nearest side changes) the point shown jumps and the power
+            // with it, so every other step bisects.
             float ta = t0;
             float va = v0;
             float tc = t;
             float vc = shV;
-            for (int k = 0; k < 3; k++) {
-                float tm = ta + (tc - ta) * va / (va - vc);
+            for (int k = 0; k < 5; k++) {
+                float tm = (k & 1) == 1
+                    ? 0.5 * (ta + tc)
+                    : ta + (tc - ta) * va / (va - vc);
                 shellEval(tm);
                 if ((shV < 0.0) == in0) {
                     ta = tm;
@@ -834,19 +847,25 @@ bool shellMarch(inout float t, float tEnd, int layers) {
                 }
             }
             // Shade from the side inside the foam, which has the owner.
+            shellEval(in0 ? tc : ta);
+            vec3 nOut = shS.yzw;
             float tf = in0 ? ta : tc;
             shellEval(tf);
             if (shIn) {
                 vec3 m = shQ - shSph.xyz;
                 vec3 p = ro + rd * tf;
-                shadeFilm(p, shellNormal(m), p - m, shId, 1.0, !in0, 1.0);
+                // At a crease the bubble ends on the gap's middle, flat
+                // against what comes from the other side.
+                bool crease = -shV > 0.08 * shSph.w * shSph.w;
+                vec3 n = crease ? normalize(shS.yzw - nOut + 1e-5 * m) : shellNormal(m);
+                shadeFilm(p, n, p - m, shId, 1.0, !in0, 1.0);
             }
             shellEval(t);
         } else if (shIn && shId != id0) {
             // A wall between two cells: bisect for where the owner changes.
             float ta = t0;
             float tc = t;
-            for (int k = 0; k < 4; k++) {
+            for (int k = 0; k < 5; k++) {
                 float tm = 0.5 * (ta + tc);
                 shellEval(tm);
                 if (shId == id0) {
@@ -855,11 +874,21 @@ bool shellMarch(inout float t, float tEnd, int layers) {
                     tc = tm;
                 }
             }
+            shellEval(ta);
+            vec3 nA = shS.yzw;
             shellEval(tc);
             if (shIn && shId != id0 && films < layers) {
+                // A real wall has both cells' powers equal; otherwise it
+                // is a crease, and the wall is the gap's middle.
+                vec3 m0 = shQ - sph0.xyz;
+                float pw0 = dot(m0, m0) - sph0.w * sph0.w;
+                bool wall = abs(pw0 - shV) < 0.08 * (sph0.w * sph0.w + shSph.w * shSph.w);
                 vec3 mid = 0.5 * (sph0.xyz + shSph.xyz);
                 vec3 p = ro + rd * tc;
-                shadeFilm(p, shellNormal(shSph.xyz - sph0.xyz), p - (shQ - mid), id0 + shId, 0.0, false, 1.0);
+                vec3 n = wall
+                    ? shellNormal(shSph.xyz - sph0.xyz)
+                    : normalize(nA - shS.yzw + 1e-5 * (shSph.xyz - sph0.xyz));
+                shadeFilm(p, n, p - (shQ - mid), id0 + shId, 0.0, false, 1.0);
             }
             shellEval(t);
         }
