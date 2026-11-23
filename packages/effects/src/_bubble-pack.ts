@@ -13,9 +13,9 @@
 import type { ShapeData } from "./_silhouette.js";
 
 /** Most cells a foam has. */
-export const FOAM_MAX_CELLS = 256;
+export const FOAM_MAX_CELLS = 1024;
 /** Neighbours listed per cell: four RGBA texels. */
-export const FOAM_NEIGHBOURS = 16;
+export const FOAM_NEIGHBOURS = 24;
 /** Texels per row of the seed texture: the seed, then its neighbours. */
 export const FOAM_SEED_TEXELS = 1 + FOAM_NEIGHBOURS;
 /** Width of the owner texture (four voxels per RGBA texel). */
@@ -135,102 +135,80 @@ export function insideDistance(
 }
 
 /**
- * Nearest-seed queries through a uniform grid with cells of size `g`:
- * each cell lists the seeds that can be nearest to some point in it (no
- * farther from the cell than the best seed's farthest corner).
+ * The nearest seed of every voxel of a grid (nx x ny x nz voxels of size
+ * h from origin o, centres at half steps), as far as `reach` from a seed:
+ * each seed writes its distance into the voxels round it, and the
+ * nearest wins (the lowest index on a tie). Voxels out of every seed's
+ * reach are -1.
  */
-class SeedHash {
-    readonly #g: number;
-    readonly #o: number[];
-    readonly #d: number[];
-    readonly #start: Int32Array;
-    readonly #items: Int32Array;
-    readonly #pos: Float64Array;
-
-    constructor(
-        pos: Float64Array,
-        count: number,
-        lo: number[],
-        hi: number[],
-        g: number,
-    ) {
-        this.#g = g;
-        this.#o = lo;
-        const d = [0, 1, 2].map((a) =>
-            Math.max(1, Math.ceil((hi[a] - lo[a]) / g)),
-        );
-        this.#d = d;
-        this.#pos = pos;
-        const n = d[0] * d[1] * d[2];
-        const start = new Int32Array(n + 1);
-        const items: number[] = [];
-        const near = new Float64Array(count);
-        for (let c = 0; c < n; c++) {
-            const i = c % d[0];
-            const j = Math.floor(c / d[0]) % d[1];
-            const k = Math.floor(c / (d[0] * d[1]));
-            const x0 = lo[0] + i * g;
-            const y0 = lo[1] + j * g;
-            const z0 = lo[2] + k * g;
-            // The best seed's farthest corner bounds the nearest distance
-            // anywhere in the cell.
-            let bound = Infinity;
-            for (let s = 0; s < count; s++) {
-                const px = pos[s * 3];
-                const py = pos[s * 3 + 1];
-                const pz = pos[s * 3 + 2];
-                const fx = Math.max(px - x0, x0 + g - px);
-                const fy = Math.max(py - y0, y0 + g - py);
-                const fz = Math.max(pz - z0, z0 + g - pz);
-                bound = Math.min(bound, fx * fx + fy * fy + fz * fz);
-                const ex = Math.max(x0 - px, 0, px - x0 - g);
-                const ey = Math.max(y0 - py, 0, py - y0 - g);
-                const ez = Math.max(z0 - pz, 0, pz - z0 - g);
-                near[s] = ex * ex + ey * ey + ez * ez;
-            }
-            start[c] = items.length;
-            for (let s = 0; s < count; s++) {
-                if (near[s] <= bound) {
-                    items.push(s);
+function splatNearest(
+    seeds: Float64Array,
+    count: number,
+    o: number[],
+    h: number,
+    dims: number[],
+    reach: number,
+    owner: Int32Array,
+    dist: Float32Array,
+): void {
+    const [nx, ny, nz] = dims;
+    owner.fill(-1);
+    dist.fill(Infinity);
+    const r2 = reach * reach;
+    for (let s = 0; s < count; s++) {
+        const px = seeds[s * 3];
+        const py = seeds[s * 3 + 1];
+        const pz = seeds[s * 3 + 2];
+        const i0 = Math.max(Math.ceil((px - reach - o[0]) / h - 0.5), 0);
+        const i1 = Math.min(Math.floor((px + reach - o[0]) / h - 0.5), nx - 1);
+        const j0 = Math.max(Math.ceil((py - reach - o[1]) / h - 0.5), 0);
+        const j1 = Math.min(Math.floor((py + reach - o[1]) / h - 0.5), ny - 1);
+        const k0 = Math.max(Math.ceil((pz - reach - o[2]) / h - 0.5), 0);
+        const k1 = Math.min(Math.floor((pz + reach - o[2]) / h - 0.5), nz - 1);
+        for (let k = k0; k <= k1; k++) {
+            const dz = o[2] + (k + 0.5) * h - pz;
+            const dz2 = dz * dz;
+            for (let j = j0; j <= j1; j++) {
+                const dy = o[1] + (j + 0.5) * h - py;
+                const dyz = dy * dy + dz2;
+                if (dyz > r2) {
+                    continue;
+                }
+                const row = (k * ny + j) * nx;
+                for (let i = i0; i <= i1; i++) {
+                    const dx = o[0] + (i + 0.5) * h - px;
+                    const d2 = dx * dx + dyz;
+                    const v = row + i;
+                    if (d2 < dist[v] && d2 <= r2) {
+                        dist[v] = d2;
+                        owner[v] = s;
+                    }
                 }
             }
         }
-        start[n] = items.length;
-        this.#start = start;
-        this.#items = new Int32Array(items);
     }
+}
 
-    #axis(v: number, a: number): number {
-        const i = Math.floor((v - this.#o[a]) / this.#g);
-        return Math.min(Math.max(i, 0), this.#d[a] - 1);
-    }
-
-    /**
-     * The nearest seed to (x, y, z), lowest index on a tie, or -1 when
-     * there are none. The point must be inside the grid's box.
-     */
-    nearest(x: number, y: number, z: number): number {
-        const d = this.#d;
-        const c =
-            this.#axis(x, 0) +
-            d[0] * (this.#axis(y, 1) + d[1] * this.#axis(z, 2));
-        const p = this.#pos;
-        const items = this.#items;
-        let best = -1;
-        let bestD2 = Infinity;
-        for (let e = this.#start[c]; e < this.#start[c + 1]; e++) {
-            const s = items[e];
-            const dx = p[s * 3] - x;
-            const dy = p[s * 3 + 1] - y;
-            const dz = p[s * 3 + 2] - z;
-            const d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 < bestD2 || (d2 === bestD2 && s < best)) {
-                bestD2 = d2;
-                best = s;
-            }
+function nearestBrute(
+    seeds: Float64Array,
+    count: number,
+    x: number,
+    y: number,
+    z: number,
+): number {
+    let best = -1;
+    let bd = Infinity;
+    for (let s = 0; s < count; s++) {
+        const d =
+            (seeds[s * 3] - x) ** 2 +
+            (seeds[s * 3 + 1] - y) ** 2 +
+            (seeds[s * 3 + 2] - z) ** 2;
+        if (d < bd) {
+            bd = d;
+            best = s;
         }
-        return best;
     }
+    return best;
 }
 
 /**
@@ -262,7 +240,6 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     const nxy = nx * ny;
     const nVox = nxy * nz;
     const gridLo = [ox, oy, oz];
-    const gridHi = [-ox, -oy, -oz];
 
     // Depth of each voxel centre inside the shape (> 0 inside).
     const col = new Float32Array(nxy);
@@ -280,12 +257,12 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     // Voxels near enough the shape for a cell to reach: only their owner
     // matters to the shader.
     const near = new Uint8Array(nVox);
-    const reach = -(margin + h * 1.5);
+    const nearLim = -(margin + h * 1.5);
     for (let k = 0; k < nz; k++) {
         const dz = halfDepth - Math.abs(oz + (k + 0.5) * h);
         for (let j = 0; j < nxy; j++) {
             const d = Math.min(col[j], dz);
-            if (d > reach) {
+            if (d > nearLim) {
                 near[k * nxy + j] = 1;
             }
             if (d > 0) {
@@ -337,9 +314,12 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     {
         const g = spacing;
         const gd = [0, 1, 2].map((a) => Math.max(1, Math.ceil(size[a] / g)));
-        const buckets = new Map<number, number[]>();
+        // Seeds per bucket as linked lists.
+        const head = new Int32Array(gd[0] * gd[1] * gd[2]).fill(-1);
+        const next: number[] = [];
         const ax = (v: number, a: number) =>
             Math.min(Math.max(Math.floor((v - lo[a]) / g), 0), gd[a] - 1);
+        const g2 = g * g;
         for (let e = 0; e < nIn && pos.length / 3 < FOAM_MAX_CELLS; e++) {
             const v = order[e] % nIn;
             const x = ix[v] + (rand() - 0.5) * h * 0.5;
@@ -350,18 +330,30 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
             const cj = ax(y, 1);
             const ck = ax(z, 2);
             let ok = true;
-            for (let k = ck - 1; k <= ck + 1 && ok; k++) {
-                for (let j = cj - 1; j <= cj + 1 && ok; j++) {
-                    for (let i = ci - 1; i <= ci + 1 && ok; i++) {
-                        const list = buckets.get(i + gd[0] * (j + gd[1] * k));
-                        if (!list) {
-                            continue;
-                        }
-                        for (const s of list) {
-                            const dx = pos[s * 3] - x;
-                            const dy = pos[s * 3 + 1] - y;
-                            const dz = pos[s * 3 + 2] - z;
-                            if (dx * dx + dy * dy + dz * dz < g * g) {
+            for (
+                let k = Math.max(ck - 1, 0);
+                k <= Math.min(ck + 1, gd[2] - 1) && ok;
+                k++
+            ) {
+                for (
+                    let j = Math.max(cj - 1, 0);
+                    j <= Math.min(cj + 1, gd[1] - 1) && ok;
+                    j++
+                ) {
+                    for (
+                        let i = Math.max(ci - 1, 0);
+                        i <= Math.min(ci + 1, gd[0] - 1) && ok;
+                        i++
+                    ) {
+                        for (
+                            let q = head[i + gd[0] * (j + gd[1] * k)];
+                            q >= 0;
+                            q = next[q]
+                        ) {
+                            const dx = pos[q * 3] - x;
+                            const dy = pos[q * 3 + 1] - y;
+                            const dz = pos[q * 3 + 2] - z;
+                            if (dx * dx + dy * dy + dz * dz < g2) {
                                 ok = false;
                                 break;
                             }
@@ -373,9 +365,9 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
                 continue;
             }
             const id = ci + gd[0] * (cj + gd[1] * ck);
-            const list = buckets.get(id) ?? [];
-            buckets.set(id, list);
-            list.push(pos.length / 3);
+            const n = pos.length / 3;
+            next.push(head[id]);
+            head[id] = n;
             pos.push(x, y, z);
         }
     }
@@ -389,10 +381,28 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     );
     const assign = new Int32Array(nIn);
     const sum = new Float64Array(count * 4);
+    const vOwner = new Int32Array(nVox);
+    const vDist = new Float32Array(nVox);
+    // Every inside voxel is within this of a seed: darts leave no hole
+    // as wide as their spacing.
+    const reach = 1.5 * cellSize + 2 * h;
     const assignAll = (): void => {
-        const hash = new SeedHash(seeds, count, gridLo, gridHi, cellSize / 2);
+        splatNearest(
+            seeds,
+            count,
+            gridLo,
+            h,
+            [nx, ny, nz],
+            reach,
+            vOwner,
+            vDist,
+        );
         for (let e = 0; e < nIn; e++) {
-            assign[e] = hash.nearest(ix[e], iy[e], iz[e]);
+            let o = vOwner[inside[e]];
+            if (o < 0) {
+                o = nearestBrute(seeds, count, ix[e], iy[e], iz[e]);
+            }
+            assign[e] = o;
         }
     };
     for (let round = 0; round < rounds && count > 0; round++) {
@@ -460,14 +470,31 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     const owner = new Int32Array(nVox).fill(-1);
     const radius = new Float64Array(count);
     if (count > 0) {
-        const hash = new SeedHash(seeds, count, gridLo, gridHi, cellSize / 2);
+        splatNearest(
+            seeds,
+            count,
+            gridLo,
+            h,
+            [nx, ny, nz],
+            reach + margin,
+            owner,
+            vDist,
+        );
         for (let k = 0, v = 0; k < nz; k++) {
             const z = oz + (k + 0.5) * h;
             for (let j = 0; j < ny; j++) {
                 const y = oy + (j + 0.5) * h;
                 for (let i = 0; i < nx; i++, v++) {
-                    if (near[v]) {
-                        owner[v] = hash.nearest(ox + (i + 0.5) * h, y, z);
+                    if (!near[v]) {
+                        owner[v] = -1;
+                    } else if (owner[v] < 0) {
+                        owner[v] = nearestBrute(
+                            seeds,
+                            count,
+                            ox + (i + 0.5) * h,
+                            y,
+                            z,
+                        );
                     }
                 }
             }
@@ -487,41 +514,37 @@ export function buildFoam(shape: Shape2D, opts: FoamOptions): Foam {
     // Neighbours: cells that touch on the grid, nearest first, then the
     // nearest others, so a seed's drift does not miss a wall.
     const touch = new Uint8Array(count * count);
-    const link = (a: number, b: number) => {
-        if (a !== b) {
-            touch[a * count + b] = 1;
-            touch[b * count + a] = 1;
+    // Half of the 26 neighbours of a voxel, so each pair is seen once:
+    // 6-connected and the diagonals, so a thin face is not missed.
+    const offs: number[] = [];
+    for (let dk = 0; dk <= 1; dk++) {
+        for (let dj = -1; dj <= 1; dj++) {
+            for (let di = -1; di <= 1; di++) {
+                if (dk === 0 && (dj < 0 || (dj === 0 && di <= 0))) {
+                    continue;
+                }
+                offs.push(di, dj, dk);
+            }
         }
-    };
+    }
     for (let k = 0; k < nz; k++) {
         for (let j = 0; j < ny; j++) {
             for (let i = 0; i < nx; i++) {
-                const v = i + nx * (j + ny * k);
-                // 6-connected, and the diagonals within a slice and
-                // across, so a thin face is not missed.
-                for (let dk = 0; dk <= 1; dk++) {
-                    for (let dj = -1; dj <= 1; dj++) {
-                        for (let di = -1; di <= 1; di++) {
-                            if (dk === 0 && (dj < 0 || (dj === 0 && di <= 0))) {
-                                continue;
-                            }
-                            const ii = i + di;
-                            const jj = j + dj;
-                            const kk = k + dk;
-                            if (
-                                ii < 0 ||
-                                ii >= nx ||
-                                jj < 0 ||
-                                jj >= ny ||
-                                kk >= nz
-                            ) {
-                                continue;
-                            }
-                            const w = owner[ii + nx * (jj + ny * kk)];
-                            if (owner[v] >= 0 && w >= 0) {
-                                link(owner[v], w);
-                            }
-                        }
+                const a = owner[i + nx * (j + ny * k)];
+                if (a < 0) {
+                    continue;
+                }
+                for (let o = 0; o < offs.length; o += 3) {
+                    const ii = i + offs[o];
+                    const jj = j + offs[o + 1];
+                    const kk = k + offs[o + 2];
+                    if (ii < 0 || ii >= nx || jj < 0 || jj >= ny || kk >= nz) {
+                        continue;
+                    }
+                    const b = owner[ii + nx * (jj + ny * kk)];
+                    if (b >= 0 && b !== a) {
+                        touch[a * count + b] = 1;
+                        touch[b * count + a] = 1;
                     }
                 }
             }

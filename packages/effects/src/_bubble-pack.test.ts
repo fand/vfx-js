@@ -79,6 +79,51 @@ function voxelCentre(f: Foam, v: number): [number, number, number] {
     ];
 }
 
+// Fine sampling inside the shape: points whose two nearest seeds are
+// nearly tied lie on a wall, and each cell must list the other. Returns
+// the walls found.
+function checkWalls(f: Foam, halfDepth: number, tie: number): number {
+    const K = FOAM_NEIGHBOURS;
+    const list = (s: number) =>
+        Array.from(f.neighbours.subarray(s * K, (s + 1) * K)).filter(
+            (n) => n >= 0,
+        );
+    expect(f.truncated).toBe(0);
+    let walls = 0;
+    const [sx, sy] = shape.shapeHalf;
+    for (let k = 0; k < 20000; k++) {
+        const x = (((k * 0.618034) % 1) * 2 - 1) * sx;
+        const y = (((k * 0.414214) % 1) * 2 - 1) * sy;
+        const z = (((k * 0.732051) % 1) * 2 - 1) * halfDepth;
+        if (insideDistance(shape, halfDepth, x, y, z) <= 0) {
+            continue;
+        }
+        let a = -1;
+        let b = -1;
+        let da = Infinity;
+        let db = Infinity;
+        for (let s = 0; s < f.count; s++) {
+            const [p, q, r] = seed(f, s);
+            const d = Math.hypot(p - x, q - y, r - z);
+            if (d < da) {
+                b = a;
+                db = da;
+                a = s;
+                da = d;
+            } else if (d < db) {
+                b = s;
+                db = d;
+            }
+        }
+        if (db - da < tie) {
+            walls++;
+            expect(list(a)).toContain(b);
+            expect(list(b)).toContain(a);
+        }
+    }
+    return walls;
+}
+
 describe("buildFoam", () => {
     const foam = buildFoam(shape, OPTS);
 
@@ -187,29 +232,7 @@ describe("buildFoam", () => {
             Array.from(foam.neighbours.subarray(s * K, (s + 1) * K)).filter(
                 (n) => n >= 0,
             );
-        expect(foam.truncated).toBe(0);
-        // Fine sampling: points whose two nearest seeds are nearly tied
-        // lie on a wall, and each must list the other.
-        let walls = 0;
-        const [sx, sy] = shape.shapeHalf;
-        for (let k = 0; k < 20000; k++) {
-            const x = (((k * 0.618034) % 1) * 2 - 1) * sx;
-            const y = (((k * 0.414214) % 1) * 2 - 1) * sy;
-            const z = (((k * 0.732051) % 1) * 2 - 1) * HALF_DEPTH;
-            if (insideDistance(shape, HALF_DEPTH, x, y, z) <= 0) {
-                continue;
-            }
-            const d = Array.from({ length: foam.count }, (_, s) => {
-                const [a, b, c] = seed(foam, s);
-                return [Math.hypot(a - x, b - y, c - z), s];
-            }).sort((p, q) => p[0] - q[0]);
-            if (d[1][0] - d[0][0] < 0.01) {
-                walls++;
-                expect(list(d[0][1])).toContain(d[1][1]);
-                expect(list(d[1][1])).toContain(d[0][1]);
-            }
-        }
-        expect(walls).toBeGreaterThan(50);
+        expect(checkWalls(foam, HALF_DEPTH, 0.01)).toBeGreaterThan(50);
         // Seed texture rows: the seed, then its neighbours' seeds and
         // indices, -1 after the last.
         for (let s = 0; s < foam.count; s++) {
@@ -240,6 +263,18 @@ describe("buildFoam", () => {
         expect(rows[0]).toBeCloseTo(foam.seeds[0], 6);
         expect(rows[4]).toBeCloseTo(foam.seeds[j * 4] + off[j * 3], 6);
         expect(rows[6]).toBeCloseTo(foam.seeds[j * 4 + 2] + off[j * 3 + 2], 6);
+    });
+
+    test("small cells fill a thin shape, with every wall listed", () => {
+        // Cells a few times smaller than the strokes, as for a logo.
+        const f = buildFoam(shape, {
+            ...OPTS,
+            halfDepth: 0.05,
+            cellSize: 0.04,
+        });
+        expect(f.count).toBeGreaterThan(300);
+        expect(f.count).toBeLessThanOrEqual(FOAM_MAX_CELLS);
+        expect(checkWalls(f, 0.05, 0.003)).toBeGreaterThan(50);
     });
 
     test("caps the cells", () => {

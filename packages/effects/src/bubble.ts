@@ -7,15 +7,16 @@
 // 2. The volume is split into 3D Voronoi cells. Their seeds are placed on
 //    the CPU, evenly, inside the shape ("packed", see `_bubble-pack.ts`),
 //    or in the shader on a jittered lattice ("grid").
-// 3. Each cell is a rounded bubble: the smooth maximum (log-sum-exp) of
-//    the bisector planes to its neighbours, pushed back by half the gap
-//    between the two films of a wall, of the shape's field, and of a
-//    sphere round its seed. Neighbouring cells share flat double walls;
-//    the outer ones follow the shape and bulge.
+// 3. Each cell is the hard maximum of the bisector planes to its
+//    neighbours (pushed back by half the optional gap), so neighbours
+//    share their walls, and of the shape's field, pushed out in the
+//    middle of each outer face and not at its walls: the foam's outside
+//    is a skin of domes meeting in creases.
 // 4. A soap film is thin, so it does not bend light: each camera ray is
 //    straight. It walks from cell to cell (the exit of a Voronoi region
-//    is a ray / plane hit), sphere traces the cell's field in each, and
-//    composites the films it crosses front to back.
+//    is a ray / plane hit), finds the cell's films with Newton steps on
+//    its field, and composites them front to back; a shared wall is one
+//    film.
 // 5. A film's colour is thin-film interference: a LUT of reflectance by
 //    thickness and angle, baked once from the CIE colour matching
 //    functions (`_thin-film.ts`). It reflects the same backdrop and box
@@ -88,8 +89,9 @@ export type BubbleParams = {
     packing: BubblePacking;
     /**
      * Size of the cells: the distance between neighbouring seeds, in the
-     * same units as `depth`. `"packed"` makes at most 256 cells and
-     * spaces them wider when the shape needs more.
+     * same units as `depth`. Several cells across a stroke make it read
+     * as foam. `"packed"` makes at most 1024 cells and spaces them wider
+     * when the shape needs more.
      */
     cellSize: number;
     /**
@@ -105,16 +107,21 @@ export type BubbleParams = {
     /** Seed of the random placement. */
     seed: number;
     /**
-     * Distance between the two films of a wall, world units: the double
-     * line where two cells meet.
+     * Distance between the two films of a wall, world units. 0 (the
+     * default): neighbours share one film, as in real foam. Above 0, each
+     * cell has its own, and walls show as double lines.
      */
     gap: number;
-    /** Radius of the rounded edges and junctions, world units. */
+    /**
+     * Radius of the creases where the outer faces of neighbouring cells
+     * meet, world units.
+     */
     rounding: number;
     /**
-     * How much the cells bulge, 0 to 1: each is also cut by a sphere round
-     * its seed, so the outer ones are domed instead of following the flat
-     * faces of the extrusion. 0 turns it off.
+     * How much the outer face of each cell bulges, 0 to 1: up to 0.4 cell
+     * sizes in its middle, back to the silhouette at its walls, so the
+     * foam's outside is a skin of domes meeting in creases. 0 keeps the
+     * flat faces of the extrusion.
      */
     roundness: number;
     /**
@@ -130,8 +137,8 @@ export type BubbleParams = {
     /** Speed of the drift, in cycles per second. */
     speed: number;
     /**
-     * Films composited per pixel, front to back, 1 to 16. Each cell the
-     * ray passes has two.
+     * Films composited per pixel, front to back, 1 to 16. A ray through
+     * n cells crosses n + 1 (2n with a `gap`).
      */
     maxLayers: number;
 
@@ -238,15 +245,15 @@ export type BubbleEffectOptions = {
 };
 
 const DEFAULT_PARAMS: BubbleParams = {
-    depth: 0.3,
+    depth: 0.1,
     packing: "packed",
-    cellSize: 0.3,
+    cellSize: 0.05,
     regularity: 0.6,
     jitter: 0.6,
     seed: 1,
-    gap: 0.012,
-    rounding: 0.03,
-    roundness: 0.5,
+    gap: 0,
+    rounding: 0.004,
+    roundness: 0.6,
     skin: 0,
     wobble: 0.05,
     speed: 0.15,
@@ -302,6 +309,13 @@ const SMOOTH_PASSES = 2;
 // The smooth maximum's rho per world unit of `rounding`: log-sum-exp of
 // two perpendicular planes rounds their edge like a circle of ~2.4 rho.
 const ROUNDING_PER_RHO = 2.4;
+// The caps' bulge at roundness 1, and the distance from a wall over
+// which it rises, relative to the cell size.
+const BULGE_MAX = 0.4;
+const BULGE_WIDTH = 0.5;
+// Rounding of the caps' outline: the walls' distance is blended over
+// this, relative to the cell size.
+const BULGE_SOFT = 0.12;
 // "grid": seeds near the shape are pulled in to this depth, and at most
 // this far, relative to the cell size.
 const PULL_DEPTH = 0.1;
@@ -336,8 +350,13 @@ uniform uint seed;
 uniform float cellSize;
 uniform float halfGap;
 uniform float rho;
-uniform float roundness;
 uniform float skin;
+// The caps' bulge: its height, the distance from a wall over which it
+// rises, and the field's Lipschitz bound with it.
+uniform float bulge;
+uniform float bulgeW;
+uniform float bulgeSoft;
+uniform float lipschitz;
 
 // "packed": per cell a row of the seed texture (x, y, z, radius, then
 // the neighbours' indices), and the owner grid: the nearest seed of each
@@ -356,7 +375,6 @@ uniform int latLayers;
 uniform float jitter;
 uniform float pullDepth;
 uniform float pullMax;
-uniform float gridRadius;
 
 uniform sampler2D filmLut;
 uniform float iridescence;
@@ -376,15 +394,16 @@ const int MAX_NB = 26;
 const int MAX_STEPS = 96;
 // Field evaluations per pixel, at most.
 const int MAX_EVALS = 200;
-// Sphere tracing outside a cell steps this much past the safe distance.
-const float RELAX = 1.4;
 const int MAX_LAYERS = ${MAX_LAYERS};
 const int NEIGHBOURS = ${FOAM_NEIGHBOURS};
 const int OWNER_TEX_W = ${FOAM_OWNER_TEX_W};
 const float THICKNESS_MAX = ${THIN_FILM_THICKNESS_MAX.toFixed(1)};
 const float TAU = 6.2831853;
-// Operands this many rho below the max add nothing to the smooth max.
-const float CUT = 6.0;
+// Brightness of the lights in reflections, the most a film reflects, and
+// how much of that the walls inside the foam keep.
+const float LIGHT_GAIN = 8.0;
+const float RIM_MAX = 0.2;
+const float WALL_DIM = 0.35;
 
 ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
@@ -396,11 +415,10 @@ vec3 rd;
 float cost = 0.0;
 int evals = 0;
 
-// The current cell: its seed, the radius of its sphere (0 for none), an
-// id for its film pattern and key, and its neighbours' seeds and keys.
+// The current cell: its seed, an id for its film pattern and key, and
+// its neighbours' seeds and keys.
 // A key is a seed index ("packed") or a lattice cell ("grid").
 vec3 regC;
-float regR;
 float regId;
 ivec3 regKey;
 bool regValid;
@@ -415,7 +433,6 @@ vec2 plAB[MAX_NB];
 int plNb[MAX_NB];
 int nPl = 0;
 bool useS;
-bool useR;
 
 uvec3 pcg3d(uvec3 v) {
     v = v * 1664525u + 1013904223u;
@@ -453,7 +470,6 @@ void loadPacked(int i) {
     vec4 s = texelFetch(seedTex, ivec2(0, i), 0);
     cost += 1.0;
     regC = s.xyz;
-    regR = s.w * roundness;
     regId = float(i);
     regValid = true;
     nNb = 0;
@@ -516,7 +532,6 @@ bool gridSeed(ivec3 L, out vec3 c, out vec4 h) {
 void loadGrid(ivec3 L) {
     regKey = L;
     regValid = false;
-    regR = gridRadius;
     nNb = 0;
     int span = latLayers == 1 ? 2 : 1;
     for (int z = -1; z <= 1; z++) {
@@ -599,8 +614,9 @@ bool locateAt(vec3 p) {
 
 // Set up the segment of the ray in the current cell's Voronoi region,
 // from t: returns where it leaves it (tEnd at most), and which neighbour
-// it enters there (-1 for none). Keeps only the walls and operands that
-// can matter on the way.
+// it enters there (-1 for none). Keeps only the walls that can be the
+// nearest on the way, and the shape when it can matter. s0 = the shape's
+// field (+ skin) at t.
 float setupSegment(float t, float tEnd, float s0, out int exitK) {
     float tOut = tEnd;
     exitK = -1;
@@ -624,8 +640,9 @@ float setupSegment(float t, float tEnd, float s0, out int exitK) {
         }
     }
     // Compact: the planes are linear along the ray, so their largest
-    // value on the segment is at one of its ends.
-    float lim = -CUT * rho;
+    // value on the segment is at one of its ends. Inside its region, a
+    // point is never this far from its cell's nearest wall.
+    float lim = -1.5 * cellSize;
     nPl = 0;
     for (int k = 0; k < MAX_NB; k++) {
         if (k >= nNb) {
@@ -638,82 +655,88 @@ float setupSegment(float t, float tEnd, float s0, out int exitK) {
             nPl++;
         }
     }
-    // The shape's field and the sphere are 1-Lipschitz: from their value
-    // at t, they cannot climb more than the segment's length.
-    float len = tOut - t;
-    useS = s0 + len > lim;
-    useR = false;
-    if (regR > 0.0) {
-        float r0 = length(ro + rd * t - regC) - regR;
-        useR = r0 + len > lim;
-    }
+    // The shape's field is 1-Lipschitz: from its value at t, it cannot
+    // climb more than the segment's length.
+    useS = s0 - bulge + (tOut - t) > lim;
     return tOut;
 }
 
-// The cell's field at t (negative inside): the smooth maximum of its
-// walls, the shape and the sphere. x = the field, y = its derivative
-// along the ray (the softmax-weighted sum of theirs); fieldS = the
-// shape's weight. With \`normal\`, cellNormal is its gradient.
+// The cell's field at t (negative inside). Its walls are a hard maximum
+// of the bisector planes, so neighbours share them with no room between.
+// The outside is the shape's field, pushed out by up to \`bulge\` in the
+// middle of each face and not at all at its walls: the caps bulge and
+// meet their neighbours in creases. Walls and shape meet in a smooth
+// maximum of radius rho (the crease's rounding).
+// x = the field, y = its derivative along the ray; fieldS = the shape's
+// weight, cellNormal = the gradient (the wall's normal needs \`normal\`).
 float fieldS;
 vec3 cellNormal;
 
 vec2 cellField(float t, bool normal) {
     evals++;
     vec3 p = ro + rd * t;
-    float m = -1e9;
+    float mp = -1e9;
+    int km = -1;
     for (int k = 0; k < MAX_NB; k++) {
         if (k >= nPl) {
             break;
         }
-        m = max(m, plAB[k].x + plAB[k].y * t);
+        float x = plAB[k].x + plAB[k].y * t;
+        if (x > mp) {
+            mp = x;
+            km = k;
+        }
     }
-    vec4 s = vec4(-1e9, 0.0, 0.0, 0.0);
-    if (useS) {
-        s = sdf3(p);
-        s.x += skin;
-        cost += 1.0;
-        m = max(m, s.x);
+    float slopeP = km >= 0 ? plAB[km].y : 0.0;
+    vec3 nP = normal && km >= 0 ? normalize(nbC[plNb[km]] - regC) : vec3(0.0);
+    if (!useS) {
+        fieldS = 0.0;
+        cellNormal = nP;
+        return vec2(mp, slopeP);
     }
-    vec3 dr = p - regC;
-    float lr = length(dr);
-    vec3 nr = dr / max(lr, 1e-6);
-    float xr = useR ? lr - regR : -1e9;
-    m = max(m, xr);
-    float lim = m - CUT * rho;
-    float sum = 0.0;
-    float slope = 0.0;
-    vec3 g = vec3(0.0);
+    vec4 s = sdf3(p);
+    cost += 1.0;
+    // Distance to the walls, softened round the corners (a smooth maximum
+    // of the planes) so the caps are round domes, not pyramids, and the
+    // bulge there.
+    float sum = 1.0;
+    float sl = slopeP;
+    vec3 gw = nP;
+    // Far from every wall the bulge is at its full height: no need to
+    // blend them.
+    bool near = nPl > 0 && halfGap - mp - bulgeSoft * log(float(nPl)) < bulgeW;
+    if (near) {
+        sum = 0.0;
+        sl = 0.0;
+        gw = vec3(0.0);
+    }
     for (int k = 0; k < MAX_NB; k++) {
-        if (k >= nPl) {
+        if (!near || k >= nPl) {
             break;
         }
         vec2 ab = plAB[k];
-        float x = ab.x + ab.y * t;
-        if (x > lim) {
-            float w = exp((x - m) / rho);
-            sum += w;
-            slope += w * ab.y;
-            if (normal) {
-                g += w * normalize(nbC[plNb[k]] - regC);
-            }
+        float w = exp((ab.x + ab.y * t - mp) / bulgeSoft);
+        sum += w;
+        sl += w * ab.y;
+        if (normal) {
+            gw += w * normalize(nbC[plNb[k]] - regC);
         }
     }
-    float ws = 0.0;
-    if (s.x > lim) {
-        ws = exp((s.x - m) / rho);
-        sum += ws;
-        slope += ws * dot(s.yzw, rd);
-        g += ws * s.yzw;
-    }
-    if (xr > lim) {
-        float w = exp((xr - m) / rho);
-        sum += w;
-        slope += w * dot(nr, rd);
-        g += w * nr;
-    }
-    fieldS = ws / sum;
-    cellNormal = g / sum;
-    return vec2(m + rho * log(sum), slope / sum);
+    float e = nPl > 0 ? halfGap - mp - bulgeSoft * log(sum) : bulgeW;
+    float u = clamp(e / bulgeW, 0.0, 1.0);
+    float f = 1.0 - (1.0 - u) * (1.0 - u);
+    float df = e > 0.0 && u < 1.0 ? 2.0 * (1.0 - u) / bulgeW : 0.0;
+    float sb = s.x + skin - bulge * f;
+    // The gradient of the distance is minus the planes' blended normal.
+    vec3 gS = s.yzw + (nPl > 0 ? bulge * df * gw / sum : vec3(0.0));
+    float slopeS = dot(s.yzw, rd) + (nPl > 0 ? bulge * df * sl / sum : 0.0);
+    float m = max(mp, sb);
+    float wp = exp((mp - m) / rho);
+    float ws = exp((sb - m) / rho);
+    float ww = wp + ws;
+    fieldS = ws / ww;
+    cellNormal = (wp * nP + ws * gS) / ww;
+    return vec2(m + rho * log(ww), (wp * slopeP + ws * slopeS) / ww);
 }
 
 // A root of the cell's field between a and b, where it has opposite
@@ -761,13 +784,17 @@ float plainFilm(float c) {
     return 2.0 * f / (1.0 + f);
 }
 
-// The light a film reflects: the scene's lights and backdrop, squeezed
-// so a light box never burns a rim white, over a soft studio sky.
-vec3 environment(vec3 pV, vec3 dV) {
+// The light a film of reflectance R reflects: a soft studio sky, and the
+// scene's lights (or the backdrop). The lights are much brighter than
+// their surroundings, as studio lights are, so a cap facing one shows a
+// highlight at the few percent a film reflects head on; past that, a
+// grazing film reflects them no more, so rims stay soft.
+vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
     vec3 L = radiance(pV, dV, 0.0);
-    L = L / (1.0 + 0.6 * L);
-    float sky = 0.3 + 0.7 * smoothstep(-0.7, 0.9, dV.y);
-    return 0.6 * L + vec3(lightIntensity * 0.4 * sky);
+    bool lit = backdropMode == 0 || dV.z >= -1e-4;
+    float sky = lightIntensity * 0.35 * (0.3 + 0.7 * smoothstep(-0.7, 0.9, dV.y));
+    vec3 r = lit ? min(R, vec3(0.05)) * LIGHT_GAIN * L : R * L;
+    return r + R * sky;
 }
 
 void film(float t, bool entering) {
@@ -782,12 +809,16 @@ void film(float t, bool entering) {
         textureLod(filmLut, vec2(th / THICKNESS_MAX, cosI), 0.0).rgb,
         iridescence
     );
+    // Grazing films reflect most, but a foam is mostly grazing films:
+    // their reflectance is held down, more for the walls inside it.
+    R = min(R, vec3(RIM_MAX)) * mix(WALL_DIM, 1.0, fieldS);
     vec3 rv = viewRot * reflect(rd, nf);
-    col += remain * R * environment(viewRot * p, rv) * reflection;
+    vec3 refl = reflected(R, viewRot * p, rv) * reflection;
+    col += remain * refl / (1.0 + refl);
     // The light that passes: some of it scattered in the tint, more at a
     // grazing angle, where the path through the film is longer.
     vec3 T = 1.0 - R;
-    float k = 1.0 - exp(-tintStrength * 0.03 / max(cosI * cosI, 0.01));
+    float k = 1.0 - exp(-tintStrength * 0.03 / max(cosI * cosI, 0.1));
     col += remain * T * k * tint;
     remain *= T * (1.0 - k);
     if (entering && opacity > 0.0) {
@@ -849,6 +880,10 @@ void main() {
     bool inRegion = false;
     float tOut = 0.0;
     int exitK = -1;
+    // Without a gap, the wall a ray leaves one cell by is the wall it
+    // enters the next by: one film, shaded once.
+    bool shared = halfGap < 1e-5;
+    float lastExit = -1.0;
     for (int i = 0; i < MAX_STEPS; i++) {
         if (t > tb.y || films >= layers || evals > MAX_EVALS
             || max(remain.r, max(remain.g, remain.b)) < 0.02) {
@@ -856,13 +891,14 @@ void main() {
         }
         float eps = 0.5 * t * cone + 1e-4;
         if (!inRegion) {
-            // Cells only lie where the shape's field (+ skin) is <= 0.
+            // Cells only lie where the shape's field (+ skin) is below
+            // the bulge.
             vec3 p = ro + rd * t;
             float s = sdf3(p).x + skin;
             cost += 1.0;
             evals++;
-            if (s > eps) {
-                t += s;
+            if (s - bulge > eps) {
+                t += s - bulge;
                 continue;
             }
             if (!locateAt(p)) {
@@ -891,12 +927,15 @@ void main() {
             }
             float step;
             if (f.y < -1e-3) {
-                step = f.x / -f.y;
+                // Newton, but not much past the safe distance: the bulge
+                // is not convex, and a grazing ray would leap over a cap.
+                step = min(f.x / -f.y, f.x / lipschitz + 0.15 * cellSize);
             } else if (fieldS < 0.2) {
                 t = tOut;
                 break;
             } else {
-                step = f.x;
+                // Sphere tracing, safe for the bulge's steeper slope.
+                step = f.x / lipschitz;
             }
             tp = t;
             dp = f.x;
@@ -906,7 +945,9 @@ void main() {
             }
         }
         if (tIn >= 0.0) {
-            film(tIn, true);
+            if (!shared || tIn - lastExit > 4.0 * eps) {
+                film(tIn, true);
+            }
             // The exit: Newton steps back from the region's far end, where
             // the field is at least half the gap. From that side they never
             // pass the last film either.
@@ -923,7 +964,11 @@ void main() {
                 }
                 float tn = th - f.x / f.y;
                 if (tn <= tIn) {
-                    tEx = tIn;
+                    // Past the entry (the bulge is not convex): bracket
+                    // from just inside instead.
+                    float lo = tIn + 2.0 * eps;
+                    float dLo = cellField(lo, false).x;
+                    tEx = dLo < 0.0 && lo < th ? refineRoot(lo, dLo, th, f.x, eps) : tIn;
                     break;
                 }
                 vec2 fn = cellField(tn, false);
@@ -934,9 +979,11 @@ void main() {
                 th = tn;
                 f = fn;
             }
+            tEx = tEx < 0.0 ? th : tEx;
             if (films < layers) {
-                film(tEx < 0.0 ? th : tEx, false);
+                film(tEx, false);
             }
+            lastExit = tEx;
             t = tOut;
         }
         if (t >= tOut) {
@@ -949,7 +996,7 @@ void main() {
             float s = sdf3(q).x + skin;
             cost += 1.0;
             evals++;
-            if (s > 2.0 * rho + 4.0 * eps || !locate(nbKey[exitK], q)) {
+            if (s - bulge > 2.0 * rho + 4.0 * eps || !locate(nbKey[exitK], q)) {
                 inRegion = false;
                 continue;
             }
@@ -1061,12 +1108,13 @@ function colorOf(hex: string, fallback: string): [number, number, number] {
  * transparent soap bubbles in thin-film colours.
  *
  * ```ts
- * vfx.add(img, { effect: new BubbleEffect({ cellSize: 0.25 }) });
+ * vfx.add(img, { effect: new BubbleEffect({ cellSize: 0.04 }) });
  * ```
  *
  * The silhouette is read once when the effect starts. Its volume is
- * split into 3D Voronoi cells, each a rounded bubble: neighbours share
- * flat double walls, and the outer cells bulge out along the shape. The
+ * split into 3D Voronoi cells, each a bubble: neighbours share flat
+ * walls with no room between them, and each outer face bulges into a
+ * dome that meets its neighbours in a crease. The
  * seeds are placed evenly inside the shape on the CPU (`packing:
  * "packed"`), or on a jittered lattice in the shader (`"grid"`). Films
  * do not bend light, so the page shows through the foam, dimmed by what
@@ -1186,6 +1234,7 @@ export class BubbleEffect implements Effect {
         const cellSize = Math.max(finite(p.cellSize, d.cellSize), 0.02);
         const rounding = clamp(p.rounding, 0, cellSize / 2, d.rounding);
         const skin = clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin);
+        const roundness = clamp(p.roundness, 0, 1, d.roundness);
         return {
             halfDepth,
             cellSize,
@@ -1197,8 +1246,11 @@ export class BubbleEffect implements Effect {
             jitter: clamp(p.jitter, 0, JITTER_MAX, d.jitter),
             wobbleAmp: clamp(p.wobble, 0, WOBBLE_MAX, d.wobble) * cellSize,
             seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
-            // How far a cell can reach out of the shape.
-            margin: Math.max(-skin, 0) + 0.02,
+            bulge: roundness * BULGE_MAX * cellSize,
+            bulgeW: BULGE_WIDTH * cellSize,
+            // How far a cell can reach out of the shape, whatever the
+            // roundness (so changing it does not place the seeds again).
+            margin: Math.max(-skin, 0) + BULGE_MAX * cellSize + 0.01,
         };
     }
 
@@ -1228,10 +1280,6 @@ export class BubbleEffect implements Effect {
         // a cell size thick.
         const layers = Math.max(1, Math.round((2 * r.halfDepth) / r.cellSize));
         const zCell = (2 * r.halfDepth) / layers;
-        const roundness = clamp(p.roundness, 0, 1, d.roundness);
-        // The sphere: 0.65 of the cell's radius at roundness 1, wider below.
-        const sphere = roundness > 0 ? 0.65 + 0.65 * (1 - roundness) : 0;
-        const gridRadius = Math.hypot(0.62 * r.cellSize, zCell / 2) * sphere;
 
         ctx.draw({
             frag: FRAG_BUBBLE,
@@ -1254,8 +1302,11 @@ export class BubbleEffect implements Effect {
                 cellSize: r.cellSize,
                 halfGap: r.gap / 2,
                 rho: r.rho,
-                roundness: sphere,
                 skin: r.skin,
+                bulge: r.bulge,
+                bulgeW: r.bulgeW,
+                bulgeSoft: BULGE_SOFT * r.cellSize,
+                lipschitz: 1 + (2 * r.bulge) / r.bulgeW,
                 seedTex: this.#seedTex ?? sdfTex,
                 ownerTex: this.#ownerTex ?? sdfTex,
                 cellCount: foam?.count ?? 0,
@@ -1268,7 +1319,6 @@ export class BubbleEffect implements Effect {
                 jitter: r.jitter,
                 pullDepth: PULL_DEPTH * r.cellSize,
                 pullMax: PULL_MAX * r.cellSize,
-                gridRadius,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),

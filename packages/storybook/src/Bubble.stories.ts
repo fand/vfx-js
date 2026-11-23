@@ -201,8 +201,8 @@ export const htmlText: StoryObj<Args> = {
     args: {
         source: "HTML text",
         params: {
-            cellSize: 0.2,
-            depth: 0.2,
+            cellSize: 0.06,
+            depth: 0.12,
             yaw: 0.2,
             pitch: 0.12,
             orbit: 0.15,
@@ -222,24 +222,24 @@ export const image: StoryObj<Args> = {
             backdropColors: "pastel",
             backdropSoftness: 1,
             backdropScale: 0.5,
-            cellSize: 0.35,
-            depth: 0.5,
+            cellSize: 0.1,
+            depth: 0.25,
         },
     },
 };
 
-// A close-up of a few large cells on a pale page: glassy foam with
-// double walls.
+// A close-up of a few large cells on a pale page: glassy foam, its
+// walls drawn as double films by a small gap.
 export const closeUp: StoryObj<Args> = {
     args: {
         source: "cloud",
         background: "linear-gradient(#c3d0fb, #a9b9ec)",
         params: {
-            cellSize: 0.36,
-            depth: 0.45,
-            gap: 0.008,
-            rounding: 0.014,
-            roundness: 0.9,
+            cellSize: 0.34,
+            depth: 0.4,
+            gap: 0.006,
+            rounding: 0.01,
+            roundness: 0.8,
             iridescence: 0.2,
             tint: "#3d5fc4",
             tintStrength: 0.6,
@@ -257,11 +257,10 @@ export const opaque: StoryObj<Args> = {
     args: {
         source: "cloud",
         params: {
-            cellSize: 0.32,
-            depth: 0.45,
-            gap: 0.01,
-            rounding: 0.06,
-            roundness: 0.8,
+            cellSize: 0.22,
+            depth: 0.4,
+            rounding: 0.01,
+            roundness: 1,
             opacity: 1,
             color: "#2f7fe0",
             yaw: 0.45,
