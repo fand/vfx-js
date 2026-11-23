@@ -16,10 +16,16 @@ type Source =
     | { src: string; style: string }
     | { tag: "h1"; text: string; style: string };
 
-// The element whose silhouette the bubbles fill.
+// A soft cloud of blobs, for the close-ups.
+const CLOUD = `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220"><g fill="#fff"><ellipse cx="200" cy="140" rx="180" ry="70"/><circle cx="120" cy="105" r="70"/><circle cx="215" cy="85" r="80"/><circle cx="305" cy="110" r="65"/></g></svg>`,
+)}`;
+
+// The element whose silhouette the foam fills.
 const SOURCES = {
     "VFX-JS logo": { src: Logo, style: "width: min(80vw, 960px)" },
     amagi: { src: Amagi, style: "height: min(70vh, 640px)" },
+    cloud: { src: CLOUD, style: "width: min(80vw, 900px)" },
     "HTML text": {
         tag: "h1",
         text: "Bubbles",
@@ -44,6 +50,8 @@ type Args = {
     source: SourceKey;
     /** A pattern name or a key of `IMAGES`. */
     backdrop?: string;
+    /** Page colour behind the element (CSS). */
+    background?: string;
     /** Overrides of the effect defaults for this story. */
     params?: Partial<Omit<BubbleParams, "backdrop">>;
 };
@@ -84,8 +92,7 @@ export default {
     parameters: { layout: "fullscreen", controls: { disable: true } },
     render: (args) => {
         const root = document.createElement("div");
-        root.style.cssText =
-            "position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000";
+        root.style.cssText = `position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: ${args.background ?? "#000"}`;
 
         const vfx = initVFX();
         const still = isChromatic();
@@ -179,26 +186,23 @@ export default {
     },
 } satisfies Meta<Args>;
 
-// Bubbles on a jittered lattice, made in the shader.
-export const grid: StoryObj<Args> = {
+// The VFX-JS logo as a foam of cells placed on the CPU (the default).
+export const packed: StoryObj<Args> = {
     args: { source: "VFX-JS logo" },
 };
 
-// Bubbles packed on the CPU, large ones first, small ones in the gaps.
-export const packed: StoryObj<Args> = {
-    args: { source: "VFX-JS logo", params: { packing: "packed" } },
+// The same with seeds on a jittered lattice, made in the shader.
+export const grid: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", params: { packing: "grid" } },
 };
 
-// Plain HTML text, filled with small packed bubbles, seen nearly from
-// the front so the letters read.
+// Plain HTML text, seen nearly from the front so the letters read.
 export const htmlText: StoryObj<Args> = {
     args: {
         source: "HTML text",
         params: {
-            packing: "packed",
-            bubbleSize: 0.07,
-            count: 1024,
-            depth: 0.16,
+            cellSize: 0.2,
+            depth: 0.2,
             yaw: 0.2,
             pitch: 0.12,
             orbit: 0.15,
@@ -218,29 +222,70 @@ export const image: StoryObj<Args> = {
             backdropColors: "pastel",
             backdropSoftness: 1,
             backdropScale: 0.5,
-            bubbleSize: 0.3,
-            depth: 0.6,
+            cellSize: 0.35,
+            depth: 0.5,
         },
     },
 };
 
-// Bubbles that pass through each other instead of sharing walls.
-export const separate: StoryObj<Args> = {
+// A close-up of a few large cells on a pale page: glassy foam with
+// double walls.
+export const closeUp: StoryObj<Args> = {
     args: {
-        source: "VFX-JS logo",
-        params: { packing: "packed", contact: "separate", overlap: 1.4 },
+        source: "cloud",
+        background: "linear-gradient(#c3d0fb, #a9b9ec)",
+        params: {
+            cellSize: 0.36,
+            depth: 0.45,
+            gap: 0.008,
+            rounding: 0.014,
+            roundness: 0.9,
+            iridescence: 0.2,
+            tint: "#3d5fc4",
+            tintStrength: 0.6,
+            lightSoftness: 1,
+            yaw: 0.1,
+            pitch: 0.12,
+            orbit: 0.1,
+            zoom: 0.8,
+        },
     },
 };
 
-// The cost of each pixel: texture lookups spent finding the bubbles.
+// Opaque cells: matte pillows packed in the shape.
+export const opaque: StoryObj<Args> = {
+    args: {
+        source: "cloud",
+        params: {
+            cellSize: 0.32,
+            depth: 0.45,
+            gap: 0.01,
+            rounding: 0.06,
+            roundness: 0.8,
+            opacity: 1,
+            color: "#2f7fe0",
+            yaw: 0.45,
+            pitch: 0.3,
+            orbit: 0.1,
+            zoom: 0.8,
+        },
+    },
+};
+
+// Each cell in a flat colour, where the ray first meets it.
+export const debugCells: StoryObj<Args> = {
+    args: { source: "VFX-JS logo", params: { debug: "cells" } },
+};
+
+// The cost of each pixel: texture lookups spent on the foam.
 export const debugCost: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { debug: "cost" } },
 };
 
-// The same for the packed bubbles.
-export const debugCostPacked: StoryObj<Args> = {
+// The same with the lattice seeds.
+export const debugCostGrid: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",
-        params: { packing: "packed", debug: "cost" },
+        params: { packing: "grid", debug: "cost" },
     },
 };

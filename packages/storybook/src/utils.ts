@@ -1210,30 +1210,33 @@ export function attachBubblePane(
 
     const bubbles = pane.addFolder({ title: "Bubbles" });
     bind(bubbles, "packing", {
-        options: { grid: "grid", packed: "packed" },
+        options: { packed: "packed", grid: "grid" },
     });
     bind(bubbles, "depth", range(0.02, 1.5, 0.01));
-    bind(bubbles, "bubbleSize", range(0.03, 1, 0.005));
-    bind(bubbles, "sizeVariation", range(0, 1, 0.01));
-    bind(bubbles, "overlap", range(0.5, 1.6, 0.01));
-    bind(bubbles, "contact", {
-        options: { clip: "clip", separate: "separate" },
-    });
-    bind(bubbles, "count", range(1, 1024, 1));
+    bind(bubbles, "cellSize", range(0.05, 1.5, 0.005));
+    bind(bubbles, "regularity", range(0, 1, 0.01));
+    bind(bubbles, "jitter", range(0, 0.9, 0.01));
     bind(bubbles, "seed", range(0, 100, 1));
-    bind(bubbles, "jitter", range(0, 1, 0.01));
-    bind(bubbles, "wobble", range(0, 0.2, 0.005));
+    bind(bubbles, "gap", range(0, 0.06, 0.001));
+    bind(bubbles, "rounding", range(0, 0.15, 0.001));
+    bind(bubbles, "roundness", range(0, 1, 0.01));
+    bind(bubbles, "skin", range(-0.1, 0.1, 0.001));
+    bind(bubbles, "wobble", range(0, 0.15, 0.005));
     bind(bubbles, "speed", range(0, 2, 0.01));
     bind(bubbles, "maxLayers", range(1, 16, 1));
 
     const film = pane.addFolder({ title: "Film" });
+    bind(film, "iridescence", range(0, 1, 0.01));
     bind(film, "thickness", range(0, 1500, 5));
     bind(film, "thicknessVariation", range(0, 1, 0.01));
     bind(film, "drain", range(0, 1, 0.01));
     bind(film, "swirlScale", range(0, 6, 0.05));
     bind(film, "swirlSpeed", range(-1, 1, 0.01));
-    bind(film, "filmGain", range(0, 10, 0.1));
-    bind(film, "reflection", range(0, 8, 0.05));
+    bind(film, "reflection", range(0, 4, 0.05));
+    bind(film, "tint", { view: "color" });
+    bind(film, "tintStrength", range(0, 1, 0.01));
+    bind(film, "opacity", range(0, 1, 0.01));
+    bind(film, "color", { view: "color" });
 
     const backdrop = pane.addFolder({ title: "Backdrop" });
     pick(backdrop, "backdrop", pickers.backdrop);
@@ -1259,7 +1262,12 @@ export function attachBubblePane(
     bind(view, "resolution", range(0.25, 2, 0.05));
     bind(view, "fxaa");
     bind(view, "debug", {
-        options: { off: "off", cost: "cost", layers: "layers" },
+        options: {
+            off: "off",
+            cost: "cost",
+            layers: "layers",
+            cells: "cells",
+        },
     });
 
     trackPane(pane);

@@ -150,12 +150,10 @@ export const effectDemos: EffectDemo[] = [
     },
     {
         name: "BubbleEffect",
-        text: "Soap bubbles filling the silhouette.",
+        text: "A foam of soap bubbles filling the silhouette.",
         media: "logo",
-        // A small pad keeps the tile cheap; packed bubbles fill thin
-        // strokes best.
-        create: () =>
-            new BubbleEffect({ pad: 40, zoom: 0.9, packing: "packed" }),
+        // A small pad keeps the tile cheap.
+        create: () => new BubbleEffect({ pad: 40, zoom: 0.9 }),
     },
     {
         name: "ChromaticEffect",
