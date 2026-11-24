@@ -47,6 +47,10 @@ import {
 } from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
     backdropKind,
     clampInt,
     GLSL_HEAT,
@@ -69,12 +73,6 @@ import {
     THIN_FILM_THICKNESS_MAX,
     thinFilmLut,
 } from "./_thin-film.js";
-import {
-    GLASS_PALETTES,
-    type GlassImageSource,
-    type GlassPaletteName,
-    type GlassPatternName,
-} from "./glass.js";
 
 /**
  * A {@link BubbleParams.debug} view: texture lookups per pixel
@@ -234,7 +232,7 @@ export type BubbleParams = OrbitCameraParams & {
      * `backdropVisible`, it is drawn behind the foam; otherwise the page
      * shows through it.
      */
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     /** Draw the backdrop behind and around the foam. */
     backdropVisible: boolean;
     /**
@@ -250,7 +248,7 @@ export type BubbleParams = OrbitCameraParams & {
     /** Speed of the pattern, in pattern periods per second. */
     backdropSpeed: number;
     /** The palette of a pattern, as `GlassParams.backdropColors`. */
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     /** Share of the second colour of a two-colour palette, 0 to 1. */
     backdropRatio: number;
     /** Softness of the edges between the palette's colours, 0 to 1. */
@@ -1609,7 +1607,7 @@ export class BubbleEffect implements Effect {
     #foamToken = 0;
     // Bumped by each new shape, so its foam is placed again.
     #shapeVersion = 0;
-    readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES);
 
     #time = 0;
     // The drift and the swirl so far: a change of speed only changes

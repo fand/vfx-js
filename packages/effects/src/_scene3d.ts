@@ -9,13 +9,45 @@ import type {
 } from "@vfx-js/core";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
-import type {
-    GlassImageSource,
-    GlassPaletteName,
-    GlassPatternName,
-} from "./glass.js";
 
-export const PATTERN_MODES: Record<GlassPatternName, number> = {
+/**
+ * A procedural `backdrop` of `GlassEffect` and `BubbleEffect`,
+ * coloured through the `backdropColors` palette. `"none"` is black.
+ * `"marble"` is the contour bands of a slow noise field, like zebra
+ * marble. `"flow"` runs through the palette diagonally, bent by a slow
+ * noise field into wavering ribbons.
+ */
+export type BackdropPatternName =
+    | "none"
+    | "stripes"
+    | "grid"
+    | "marble"
+    | "flow";
+
+/** A preset for `backdropColors`, see {@link BACKDROP_PALETTES}. */
+export type BackdropPaletteName = "mono" | "pastel" | "redblue";
+
+/** The colours of each {@link BackdropPaletteName}, `#rrggbb`, in order. */
+export const BACKDROP_PALETTES: Readonly<
+    Record<BackdropPaletteName, readonly string[]>
+> = {
+    mono: ["#000000", "#ffffff"],
+    pastel: ["#ff9f9f", "#dfdf80", "#9fff9f", "#80dfdf", "#9f9fff", "#df80df"],
+    redblue: ["#e8102a", "#1a3fe0"],
+};
+
+/**
+ * An image for `backdrop`. Strings other than a
+ * {@link BackdropPatternName} are treated as URLs.
+ */
+export type BackdropImageSource =
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | HTMLVideoElement
+    | ImageBitmap
+    | string;
+
+export const PATTERN_MODES: Record<BackdropPatternName, number> = {
     none: 0,
     stripes: 1,
     grid: 2,
@@ -382,8 +414,8 @@ export function clampInt(
 }
 
 export function isPattern(
-    v: GlassPatternName | GlassImageSource,
-): v is GlassPatternName {
+    v: BackdropPatternName | BackdropImageSource,
+): v is BackdropPatternName {
     return typeof v === "string" && v in PATTERN_MODES;
 }
 
@@ -393,11 +425,13 @@ export function isPattern(
  * loads and shows as none, so the shader does not change when it is
  * ready.
  */
-export function backdropKind(v: GlassPatternName | GlassImageSource): number {
+export function backdropKind(
+    v: BackdropPatternName | BackdropImageSource,
+): number {
     return isPattern(v) ? PATTERN_MODES[v] : IMAGE_MODE;
 }
 
-type BackdropElement = Exclude<GlassImageSource, string>;
+type BackdropElement = Exclude<BackdropImageSource, string>;
 
 // Native size of a backdrop element; 0 while a video has no frame.
 function sourceSize(el: BackdropElement): [number, number] {
@@ -419,12 +453,12 @@ function sourceSize(el: BackdropElement): [number, number] {
 // The colours of a `backdropColors` value, at least two: one colour is a
 // flat fill. Unknown names fall back to "mono".
 function resolvePalette(
-    v: GlassPaletteName | readonly string[],
-    presets: Readonly<Record<GlassPaletteName, readonly string[]>>,
+    v: BackdropPaletteName | readonly string[],
+    presets: Readonly<Record<BackdropPaletteName, readonly string[]>>,
 ): string[] {
     const list =
         typeof v === "string"
-            ? (presets[v as GlassPaletteName] ?? presets.mono)
+            ? (presets[v as BackdropPaletteName] ?? presets.mono)
             : v;
     const colors = list.length > 0 ? [...list] : [...presets.mono];
     return colors.length === 1 ? [colors[0], colors[0]] : colors;
@@ -493,12 +527,12 @@ function bakePalette(colors: readonly string[], ratio: number): Float32Array[] {
 
 /** The params of the backdrop and the lights, as in GlassParams. */
 export type SceneParams = {
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     backdropVisible: boolean;
     backdropScale: number;
     backdropDistance: number;
     backdropSpeed: number;
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     backdropRatio: number;
     backdropSoftness: number;
     lightIntensity: number;
@@ -511,7 +545,7 @@ export type SceneParams = {
  * `uniforms`.
  */
 export class SceneBackdrop {
-    readonly #presets: Readonly<Record<GlassPaletteName, readonly string[]>>;
+    readonly #presets: Readonly<Record<BackdropPaletteName, readonly string[]>>;
     // The palette twice: repeating, and clamped for the grid.
     #paletteRaw: WebGLTexture[] = [];
     #paletteTex: EffectTexture | null = null;
@@ -534,7 +568,7 @@ export class SceneBackdrop {
     #disposed = false;
 
     constructor(
-        presets: Readonly<Record<GlassPaletteName, readonly string[]>>,
+        presets: Readonly<Record<BackdropPaletteName, readonly string[]>>,
     ) {
         this.#presets = presets;
     }

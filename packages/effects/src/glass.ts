@@ -29,6 +29,10 @@ import {
 } from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
     backdropKind,
     clampInt,
     GLSL_HEAT,
@@ -50,38 +54,6 @@ import {
     type SourceChannel,
     sourceChannelOf,
 } from "./_source.js";
-
-/**
- * A procedural {@link GlassParams.backdrop}, coloured through the
- * {@link GlassParams.backdropColors} palette. `"none"` is black.
- * `"marble"` is the contour bands of a slow noise field, like zebra
- * marble. `"flow"` runs through the palette diagonally, bent by a slow
- * noise field into wavering ribbons.
- */
-export type GlassPatternName = "none" | "stripes" | "grid" | "marble" | "flow";
-
-/** A preset for {@link GlassParams.backdropColors}, see {@link GLASS_PALETTES}. */
-export type GlassPaletteName = "mono" | "pastel" | "redblue";
-
-/** The colours of each {@link GlassPaletteName}, `#rrggbb`, in order. */
-export const GLASS_PALETTES: Readonly<
-    Record<GlassPaletteName, readonly string[]>
-> = {
-    mono: ["#000000", "#ffffff"],
-    pastel: ["#ff9f9f", "#dfdf80", "#9fff9f", "#80dfdf", "#9f9fff", "#df80df"],
-    redblue: ["#e8102a", "#1a3fe0"],
-};
-
-/**
- * An image for {@link GlassParams.backdrop}. Strings other than a
- * {@link GlassPatternName} are treated as URLs.
- */
-export type GlassImageSource =
-    | HTMLImageElement
-    | HTMLCanvasElement
-    | HTMLVideoElement
-    | ImageBitmap
-    | string;
 
 /**
  * A {@link GlassParams.debug} view: the SDF lookups spent per pixel on
@@ -199,7 +171,7 @@ export type GlassParams = OrbitCameraParams & {
      * What is seen through the glass: a pattern name, or an image (an
      * element, an `ImageBitmap` or a URL).
      */
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     /** Draw the backdrop around the glass too, not only through it. */
     backdropVisible: boolean;
     /**
@@ -215,13 +187,13 @@ export type GlassParams = OrbitCameraParams & {
      */
     backdropSpeed: number;
     /**
-     * The palette of a procedural pattern: a {@link GlassPaletteName} or
+     * The palette of a procedural pattern: a {@link BackdropPaletteName} or
      * two or more `#rrggbb` colours in order, each with an equal share of
      * the area. One colour is a flat fill. Stripes, marble bands and
      * the flow go round the colours, the last running into the first;
      * the grid nests them as concentric squares.
      */
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     /**
      * Share of the area that the second colour covers when the palette
      * has two colours, 0 to 1: the width of the stripes and marble bands,
@@ -986,7 +958,7 @@ export class GlassEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
-    readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES);
 
     #time = 0;
     // Drags, the "tilt", and the window listeners while `drag` is on or

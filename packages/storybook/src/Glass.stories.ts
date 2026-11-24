@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import {
-    GLASS_PALETTES,
+    BACKDROP_PALETTES,
     GlassEffect,
-    type GlassPaletteName,
+    type BackdropPaletteName,
     type GlassParams,
-    type GlassPatternName,
+    type BackdropPatternName,
 } from "@vfx-js/effects";
 import Amagi from "../../docs/public/amagi.png";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -41,7 +41,7 @@ const SOURCES = {
 type SourceKey = keyof typeof SOURCES;
 
 // What is seen through the glass: the patterns, then a few images.
-const PATTERNS: readonly GlassPatternName[] = [
+const PATTERNS: readonly BackdropPatternName[] = [
     "stripes",
     "grid",
     "marble",
@@ -50,7 +50,7 @@ const PATTERNS: readonly GlassPatternName[] = [
 ];
 // The palette presets, then "custom": the two colour pickers, or the
 // story's own colours until they are edited.
-const PALETTE_KEYS = [...Object.keys(GLASS_PALETTES), "custom"];
+const PALETTE_KEYS = [...Object.keys(BACKDROP_PALETTES), "custom"];
 const IMAGES: Record<string, string> = {
     "image: jellyfish": Jellyfish,
     "image: pigeon": Pigeon,
@@ -60,7 +60,7 @@ const IMAGES: Record<string, string> = {
 const BACKDROP_KEYS = [...PATTERNS, ...Object.keys(IMAGES)];
 
 function resolveBackdrop(key: string): GlassParams["backdrop"] {
-    return IMAGES[key] ?? (key as GlassPatternName);
+    return IMAGES[key] ?? (key as BackdropPatternName);
 }
 
 type Args = {
@@ -121,13 +121,13 @@ export default {
         const storyColors =
             typeof backdropColors === "string" ? null : backdropColors;
         const initial =
-            storyColors ?? GLASS_PALETTES[backdropColors as GlassPaletteName];
+            storyColors ?? BACKDROP_PALETTES[backdropColors as BackdropPaletteName];
         const colors = { a: initial[0], b: initial[initial.length - 1] };
         let paletteKey =
             typeof backdropColors === "string" ? backdropColors : "custom";
         const palette = (): GlassParams["backdropColors"] => {
             if (paletteKey !== "custom") {
-                return paletteKey as GlassPaletteName;
+                return paletteKey as BackdropPaletteName;
             }
             const untouched =
                 storyColors &&
