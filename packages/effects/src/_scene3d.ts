@@ -450,6 +450,24 @@ function sourceSize(el: BackdropElement): [number, number] {
     return [el.width, el.height];
 }
 
+// Whether the element has pixels to draw: an image that has loaded, a
+// video with its first frame.
+function sourceReady(el: BackdropElement): boolean {
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        el instanceof HTMLImageElement
+    ) {
+        return el.complete && el.naturalWidth > 0;
+    }
+    if (
+        typeof HTMLVideoElement !== "undefined" &&
+        el instanceof HTMLVideoElement
+    ) {
+        return el.readyState >= 2;
+    }
+    return el.width > 0 && el.height > 0;
+}
+
 // The colours of a `backdropColors` value, at least two: one colour is a
 // flat fill. Unknown names fall back to "mono".
 function resolvePalette(
@@ -565,6 +583,10 @@ export class SceneBackdrop {
     // the footprint of a pixel on it.
     #backdropMip: EffectRenderTarget | null = null;
     #backdropDirty = false;
+    // The image was wrapped before it had loaded: upload it again once it has.
+    #imageWaiting = false;
+    // Counts loads, so a stale URL load does not wrap its image.
+    #loadId = 0;
     #disposed = false;
 
     constructor(
@@ -720,16 +742,17 @@ export class SceneBackdrop {
         this.#imageEl = null;
         this.#backdropMip?.dispose();
         this.#backdropMip = null;
+        const loadId = ++this.#loadId;
         if (isPattern(src)) {
             return;
         }
         const wrap = (el: BackdropElement) => {
-            if (this.#disposed || this.#imageKey !== src) {
+            if (this.#disposed || loadId !== this.#loadId) {
                 return;
             }
-            const [w, h] = sourceSize(el);
-            this.#imageAspect = w > 0 && h > 0 ? w / h : 1;
+            this.#image?.dispose();
             this.#imageEl = el;
+            this.#imageWaiting = false;
             this.#imageLive =
                 (typeof HTMLCanvasElement !== "undefined" &&
                     el instanceof HTMLCanvasElement) ||
@@ -750,7 +773,13 @@ export class SceneBackdrop {
         img.src = src;
         img.decode().then(
             () => wrap(img),
-            () => {},
+            () => {
+                if (!this.#disposed && loadId === this.#loadId) {
+                    console.warn(
+                        `[VFX-JS] Could not load the backdrop image: ${src}`,
+                    );
+                }
+            },
         );
     }
 
@@ -762,7 +791,18 @@ export class SceneBackdrop {
         if (!image || !el || !(this.#backdropDirty || this.#imageLive)) {
             return;
         }
+        if (!sourceReady(el)) {
+            // Not loaded yet: try again next frame.
+            this.#imageWaiting = true;
+            this.#backdropDirty = true;
+            return;
+        }
+        if (this.#imageWaiting) {
+            this.#imageWaiting = false;
+            image.update();
+        }
         const [iw, ih] = sourceSize(el);
+        this.#imageAspect = iw / ih;
         const fit = Math.min(1, BACKDROP_MIP_LONG / Math.max(iw, ih, 1));
         const w = Math.max(1, Math.round(iw * fit));
         const h = Math.max(1, Math.round(ih * fit));
@@ -799,6 +839,8 @@ export class SceneBackdrop {
         this.#image = null;
         this.#imageEl = null;
         this.#imageKey = null;
+        this.#imageWaiting = false;
+        this.#loadId++;
         this.#backdropMip?.dispose();
         this.#backdropMip = null;
     }
