@@ -217,7 +217,7 @@ export const contained: StoryObj<Args> = {
 export const borders: StoryObj<Args> = {
     args: {
         source: "VFX-JS logo",
-        params: { containment: 1, borderStrength: 1 },
+        params: { containment: 1, borderHighlight: 1 },
     },
 };
 
@@ -300,7 +300,7 @@ export const closeUpBorders: StoryObj<Args> = {
         params: {
             ...closeUp.args?.params,
             containment: 1,
-            borderStrength: 0.6,
+            borderHighlight: 0.6,
         },
     },
 };

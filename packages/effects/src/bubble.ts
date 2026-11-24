@@ -217,7 +217,7 @@ export type BubbleParams = OrbitCameraParams & {
      * as a share of `cellSize`, 0 (off) to 0.5: the water gathered there.
      * The film thickens over this width, by 100 nm per 0.01 at the
      * border, so wider borders show more bands of colour. The white line
-     * (see `borderStrength`) is a sharp core about half as wide in all.
+     * (see `borderHighlight`) is a sharp core about half as wide in all.
      * Walls inside the foam get no border.
      */
     borderWidth: number;
@@ -225,7 +225,7 @@ export type BubbleParams = OrbitCameraParams & {
      * Brightness of the white line along the borders: the light the water
      * gathered there scatters, 0 (off) to 2.
      */
-    borderStrength: number;
+    borderHighlight: number;
 
     /**
      * The backdrop: a pattern name, or an image (an element, an
@@ -329,7 +329,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     opacity: 0,
     color: "#2f7fe0",
     borderWidth: 0.06,
-    borderStrength: 0.35,
+    borderHighlight: 0.35,
     backdrop: "none",
     backdropVisible: false,
     backdropAround: false,
@@ -460,7 +460,7 @@ uniform vec3 bodyColor;
 // The borders on the foam's outside: their width in world units (0: off,
 // none of their work is done), the white line, the film's thickening.
 uniform float borderWidth;
-uniform float borderStrength;
+uniform float borderHighlight;
 uniform float borderThickness;
 uniform int debugView;
 
@@ -613,7 +613,7 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
         float fp = pixCone * length(p - ro) / max(cosI, 0.25);
         float f = 1.0 - edge / borderWidth;
         th = min(th + borderThickness * f * f, THICKNESS_MAX);
-        white = borderStrength * borderLine(edge, fp);
+        white = borderHighlight * borderLine(edge, fp);
     }
     float cosR = max(cosI, rimCos);
     vec3 R = mix(
@@ -1649,11 +1649,11 @@ export class BubbleEffect implements Effect {
     #borderUniforms(cellSize: number) {
         const p = this.params;
         const d = DEFAULT_PARAMS;
-        const strength = clamp(p.borderStrength, 0, 2, d.borderStrength);
+        const highlight = clamp(p.borderHighlight, 0, 2, d.borderHighlight);
         const share = clamp(p.borderWidth, 0, 0.5, d.borderWidth);
         return {
             borderWidth: share * cellSize,
-            borderStrength: strength,
+            borderHighlight: highlight,
             // More water: a wider border and a thicker film at it.
             borderThickness: share * BORDER_NM_PER_WIDTH,
         };
