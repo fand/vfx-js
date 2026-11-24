@@ -479,6 +479,9 @@ const float TAU = 6.2831853;
 const float LIGHT_GAIN = 8.0;
 const float RIM_MAX = 0.2;
 const float WALL_DIM = 0.35;
+// A wall inside the foam fades out when seen within this cosine of edge
+// on (about 6 degrees).
+const float WALL_EDGE_ON = 0.1;
 // Half the white line's core, as a share of the border's width.
 const float BORDER_LINE = 0.22;
 const float NO_EDGE = 1e30;
@@ -661,6 +664,12 @@ void shadeFilm(Film film) {
     float th = filmThickness(film.l, film.id);
     vec3 nf = dot(n, rd) > 0.0 ? -n : n;
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
+    if (film.outer < 0.5) {
+        // A wall seen nearly edge on covers only a sliver of the pixel,
+        // but a whole pixel would show its strong grazing reflection as a
+        // bright line: fade it out.
+        cover *= smoothstep(0.0, WALL_EDGE_ON, cosI);
+    }
     // White light scattered by the water along the borders.
     float white = 0.0;
     if (edge < borderWidth) {
