@@ -825,6 +825,24 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropImageSource/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropImageSource
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropPaletteName/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropPaletteName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropPatternName/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/BadJpegEffectOptions/">
                                                             <span class="DocSidebarLabel">
                                                                 BadJpegEffectOptions
@@ -933,27 +951,9 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassImageSource/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassImageSource
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassPaletteName/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassPaletteName
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/GlassParams/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassParams
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassPatternName/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassPatternName
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1373,9 +1373,9 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
-                                                        <a href="/vfx-js/docs/effects/GLASS_PALETTES/">
+                                                        <a href="/vfx-js/docs/effects/BACKDROP_PALETTES/">
                                                             <span class="DocSidebarLabel">
-                                                                GLASS_PALETTES
+                                                                BACKDROP_PALETTES
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1977,6 +1977,21 @@
                                     </a>
                                     <span>Name of a built-in <a href="/vfx-js/docs/effects/ASCII_PRESETS/"><code>ASCII_PRESETS</code></a> ramp.</span>
                                 </li><li>
+                                    <a href="/vfx-js/docs/effects/BackdropImageSource/">
+                                        <code>BackdropImageSource</code>
+                                    </a>
+                                    <span>An image for <code>backdrop</code>. Strings other than a <a href="/vfx-js/docs/effects/BackdropPatternName/"><code>BackdropPatternName</code></a> are treated as URLs.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BackdropPaletteName/">
+                                        <code>BackdropPaletteName</code>
+                                    </a>
+                                    <span>A preset for <code>backdropColors</code>, see <a href="/vfx-js/docs/effects/BACKDROP_PALETTES/"><code>BACKDROP_PALETTES</code></a>.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BackdropPatternName/">
+                                        <code>BackdropPatternName</code>
+                                    </a>
+                                    <span>A procedural <code>backdrop</code> of <code>GlassEffect</code> and <code>BubbleEffect</code>, coloured through the <code>backdropColors</code> palette. <code>&quot;none&quot;</code> is black. <code>&quot;marble&quot;</code> is the contour bands of a slow noise field, like zebra marble. <code>&quot;flow&quot;</code> runs through the palette diagonally, bent by a slow noise field into wavering ribbons.</span>
+                                </li><li>
                                     <a href="/vfx-js/docs/effects/BadJpegEffectOptions/">
                                         <code>BadJpegEffectOptions</code>
                                     </a>
@@ -2000,7 +2015,7 @@
                                     <a href="/vfx-js/docs/effects/BubbleParams/">
                                         <code>BubbleParams</code>
                                     </a>
-                                    <span>Params of <a href="/vfx-js/docs/effects/BubbleEffect/"><code>BubbleEffect</code></a>: the foam's own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>). All are read every frame. The placement params (<code>depth</code>, <code>bevel</code>, <code>cellSize</code>, <code>cellSizeRandomness</code>, <code>roundness</code>, <code>seed</code>, <code>minSize</code>) place the bubbles again on the CPU when they change, which takes a few to a few tens of milliseconds.</span>
+                                    <span>Params of <a href="/vfx-js/docs/effects/BubbleEffect/"><code>BubbleEffect</code></a>: the foam's own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>). All are read every frame. The placement params (<code>depth</code>, <code>bevel</code>, <code>cellSize</code>, <code>cellSizeRandomness</code>, <code>roundness</code>, <code>seed</code>, <code>minSize</code>) place the bubbles again on the CPU, in a worker, when they change: about 30 ms at the defaults on a desktop, and up to seconds for a deep shape (<code>depth</code> 1 or more) or a small <code>minSize</code>. <code>wobble</code> and <code>containment</code> rebuild the grid over them, which is quicker. The last foam is drawn until the new one is ready. Without workers (e.g. a CSP that blocks <code>blob:</code> URLs) the page stalls for that long.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/BubblePointer/">
                                         <code>BubblePointer</code>
@@ -2067,25 +2082,10 @@
                                     </a>
                                     <span></span>
                                 </li><li>
-                                    <a href="/vfx-js/docs/effects/GlassImageSource/">
-                                        <code>GlassImageSource</code>
-                                    </a>
-                                    <span>An image for <code>GlassParams.backdrop</code>. Strings other than a <a href="/vfx-js/docs/effects/GlassPatternName/"><code>GlassPatternName</code></a> are treated as URLs.</span>
-                                </li><li>
-                                    <a href="/vfx-js/docs/effects/GlassPaletteName/">
-                                        <code>GlassPaletteName</code>
-                                    </a>
-                                    <span>A preset for <code>GlassParams.backdropColors</code>, see <a href="/vfx-js/docs/effects/GLASS_PALETTES/"><code>GLASS_PALETTES</code></a>.</span>
-                                </li><li>
                                     <a href="/vfx-js/docs/effects/GlassParams/">
                                         <code>GlassParams</code>
                                     </a>
                                     <span>The params of <a href="/vfx-js/docs/effects/GlassEffect/"><code>GlassEffect</code></a>: the glass's own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>).</span>
-                                </li><li>
-                                    <a href="/vfx-js/docs/effects/GlassPatternName/">
-                                        <code>GlassPatternName</code>
-                                    </a>
-                                    <span>A procedural <code>GlassParams.backdrop</code>, coloured through the <code>GlassParams.backdropColors</code> palette. <code>&quot;none&quot;</code> is black. <code>&quot;marble&quot;</code> is the contour bands of a slow noise field, like zebra marble. <code>&quot;flow&quot;</code> runs through the palette diagonally, bent by a slow noise field into wavering ribbons.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/GlassPointer/">
                                         <code>GlassPointer</code>
@@ -2432,10 +2432,10 @@
                                     </a>
                                     <span>Built-in character ramps, ordered dark → light. Suited for light-on-dark output (more &quot;ink&quot; = brighter); flip with <code>invert: true</code> for dark-on-light.</span>
                                 </li><li>
-                                    <a href="/vfx-js/docs/effects/GLASS_PALETTES/">
-                                        <code>GLASS_PALETTES</code>
+                                    <a href="/vfx-js/docs/effects/BACKDROP_PALETTES/">
+                                        <code>BACKDROP_PALETTES</code>
                                     </a>
-                                    <span>The colours of each <a href="/vfx-js/docs/effects/GlassPaletteName/"><code>GlassPaletteName</code></a>, <code>#rrggbb</code>, in order.</span>
+                                    <span>The colours of each <a href="/vfx-js/docs/effects/BackdropPaletteName/"><code>BackdropPaletteName</code></a>, <code>#rrggbb</code>, in order.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/MATRIX_GLYPHS/">
                                         <code>MATRIX_GLYPHS</code>

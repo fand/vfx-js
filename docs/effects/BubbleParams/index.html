@@ -10,14 +10,14 @@
         <title>BubbleParams - API Reference - VFX-JS</title>
 
         <meta name="theme-color" content="#000000">
-        <meta name="description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU when they change, which takes a few to a few tens of milliseconds.">
+        <meta name="description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU, in a worker, when they change: about 30 ms at the defaults on a desktop, and up to seconds for a deep shape (depth 1 or more) or a small minSize. wobble and containment rebuild the grid over them, which is quicker. The last foam is drawn until the new one is ready. Without workers (e.g. a CSP that blocks blob: URLs) the page stalls for that long.">
         <link rel="canonical" href="https://amagi.dev/vfx-js/docs/effects/BubbleParams/">
 
         <meta property="og:url" content="https://amagi.dev/vfx-js/docs/effects/BubbleParams/">
         <meta property="og:type" content="website">
         <meta property="og:title" content="BubbleParams - API Reference - VFX-JS">
         <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
-        <meta property="og:description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU when they change, which takes a few to a few tens of milliseconds.">
+        <meta property="og:description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU, in a worker, when they change: about 30 ms at the defaults on a desktop, and up to seconds for a deep shape (depth 1 or more) or a small minSize. wobble and containment rebuild the grid over them, which is quicker. The last foam is drawn until the new one is ready. Without workers (e.g. a CSP that blocks blob: URLs) the page stalls for that long.">
         <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
         <meta property="og:locale" content="en_US">
 
@@ -26,7 +26,7 @@
         <meta name="twitter:creator" content="@amagitakayosi">
         <meta name="twitter:url" content="https://amagi.dev/vfx-js/docs/effects/BubbleParams/">
         <meta name="twitter:title" content="BubbleParams - API Reference - VFX-JS">
-        <meta name="twitter:description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU when they change, which takes a few to a few tens of milliseconds.">
+        <meta name="twitter:description" content="Params of BubbleEffect: the foam's own, and the camera's (OrbitCameraParams). All are read every frame. The placement params (depth, bevel, cellSize, cellSizeRandomness, roundness, seed, minSize) place the bubbles again on the CPU, in a worker, when they change: about 30 ms at the defaults on a desktop, and up to seconds for a deep shape (depth 1 or more) or a small minSize. wobble and containment rebuild the grid over them, which is quicker. The last foam is drawn until the new one is ready. Without workers (e.g. a CSP that blocks blob: URLs) the page stalls for that long.">
         <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
 
         <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
@@ -825,6 +825,24 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropImageSource/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropImageSource
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropPaletteName/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropPaletteName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BackdropPatternName/">
+                                                            <span class="DocSidebarLabel">
+                                                                BackdropPatternName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/BadJpegEffectOptions/">
                                                             <span class="DocSidebarLabel">
                                                                 BadJpegEffectOptions
@@ -933,27 +951,9 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassImageSource/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassImageSource
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassPaletteName/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassPaletteName
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
                                                         <a href="/vfx-js/docs/effects/GlassParams/">
                                                             <span class="DocSidebarLabel">
                                                                 GlassParams
-                                                            </span>
-                                                        </a>
-                                                    </li><li>
-                                                        <a href="/vfx-js/docs/effects/GlassPatternName/">
-                                                            <span class="DocSidebarLabel">
-                                                                GlassPatternName
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1373,9 +1373,9 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
-                                                        <a href="/vfx-js/docs/effects/GLASS_PALETTES/">
+                                                        <a href="/vfx-js/docs/effects/BACKDROP_PALETTES/">
                                                             <span class="DocSidebarLabel">
-                                                                GLASS_PALETTES
+                                                                BACKDROP_PALETTES
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1422,8 +1422,8 @@
         <h1>
             BubbleParams
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/2e95bdb030ec32656d5d569dd20cdbc1d32b6db1/packages/effects/src/bubble.ts#L97" target="_blank" rel="noreferrer">
-                    effects/src/bubble.ts:97 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/ca95252aeab8fa9f91adc49aaab0082ebba2eced/packages/effects/src/bubble.ts#L101" target="_blank" rel="noreferrer">
+                    effects/src/bubble.ts:101 &#8599;
                 </a>
     </header>
 
@@ -1431,17 +1431,21 @@
 <div class="ApiText"><p>Params of <a href="/vfx-js/docs/effects/BubbleEffect/"><code>BubbleEffect</code></a>: the foam's own, and the camera's
 (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>). All are read every frame. The placement
 params (<code>depth</code>, <code>bevel</code>, <code>cellSize</code>, <code>cellSizeRandomness</code>,
-<code>roundness</code>, <code>seed</code>, <code>minSize</code>) place the bubbles
-again on the CPU when they change, which takes a few to a few tens of
-milliseconds.</p>
+<code>roundness</code>, <code>seed</code>, <code>minSize</code>) place the bubbles again on the CPU, in
+a worker, when they change: about 30 ms at the defaults on a desktop,
+and up to seconds for a deep shape (<code>depth</code> 1 or more) or a small
+<code>minSize</code>. <code>wobble</code> and <code>containment</code> rebuild the grid over them,
+which is quicker. The last foam is drawn until the new one is ready.
+Without workers (e.g. a CSP that blocks <code>blob:</code> URLs) the page stalls
+for that long.</p>
 </div>
 
 
     <pre class="ApiCode"><code><span class="tk">type </span><span class="tr">BubbleParams</span><span class="tp"> =</span> <a class="tr" href="/vfx-js/docs/effects/OrbitCameraParams/">OrbitCameraParams</a><span class="tp"> &amp; </span><span class="tp">{</span>
     <span class="tm">antialias</span><span class="tp">: </span><span class="tk">boolean</span><span class="tp">;</span>
-    <span class="tm">backdrop</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPatternName/">GlassPatternName</a><span class="tp"> | </span><a class="tr" href="/vfx-js/docs/effects/GlassImageSource/">GlassImageSource</a><span class="tp">;</span>
+    <span class="tm">backdrop</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/BackdropPatternName/">BackdropPatternName</a><span class="tp"> | </span><a class="tr" href="/vfx-js/docs/effects/BackdropImageSource/">BackdropImageSource</a><span class="tp">;</span>
     <span class="tm">backdropAround</span><span class="tp">: </span><span class="tk">boolean</span><span class="tp">;</span>
-    <span class="tm">backdropColors</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassPaletteName/">GlassPaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <span class="tk">string</span><span class="tp">[]</span><span class="tp">;</span>
+    <span class="tm">backdropColors</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/BackdropPaletteName/">BackdropPaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <span class="tk">string</span><span class="tp">[]</span><span class="tp">;</span>
     <span class="tm">backdropDistance</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
     <span class="tm">backdropRatio</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
     <span class="tm">backdropScale</span><span class="tp">: </span><span class="tk">number</span><span class="tp">;</span>
