@@ -1,5 +1,6 @@
 // BubbleEffect's "spheres" foam along one ray, in TypeScript: the same
-// algorithm as the shader, so its maths can be tested. Pure module.
+// algorithm as the shader, so its maths can be tested. Pure module, for
+// the tests only: tsconfig leaves it out of lib/.
 //
 // The foam is a power diagram of spheres: a point belongs to the sphere i
 // with the least power |p - c_i|^2 - r_i^2, and is inside the foam when
