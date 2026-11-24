@@ -191,6 +191,12 @@ export type BubbleParams = OrbitCameraParams & {
     /** Strength of the reflected light, without changing transparency. */
     reflection: number;
     /**
+     * The bright white rim of a bubble, 0 to 1. A film seen at a grazing
+     * angle reflects much more, in white. 1 is the real film; 0 keeps the
+     * interference colours all the way to the edge.
+     */
+    rim: number;
+    /**
      * Colour the soapy water gives the light it scatters (a CSS hex
      * colour). Films seen at a grazing angle, and stacks of them, take it
      * on: the depth cue of a foam.
@@ -330,6 +336,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     swirlScale: 1.2,
     swirlSpeed: 0.12,
     reflection: 1.4,
+    rim: 1,
     tint: "#6d8ee8",
     tintStrength: 0.3,
     opacity: 0,
@@ -377,6 +384,8 @@ const MAX_LAYERS = 16;
 // cell size.
 const FILL_DEPTH = 0.5;
 const WOBBLE_MAX = 0.15;
+// The cosine the films' angle is held at with `rim` 0.
+const RIM_COS = 0.6;
 // Long side of the silhouette read back from the element, in px, and
 // the smoothing of its field. The field only places the bubbles, so it
 // can be coarser than GlassEffect's.
@@ -456,6 +465,8 @@ uniform float drain;
 uniform float swirlScale;
 uniform float swirlOffset;
 uniform float reflection;
+// The films reflect as if seen no more grazing than this cosine.
+uniform float rimCos;
 uniform vec3 tint;
 uniform float tintStrength;
 uniform float opacity;
@@ -711,9 +722,10 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
             cosI = clamp(-dot(rd, nf), 0.0, 1.0);
         }
     }
+    float cosR = max(cosI, rimCos);
     vec3 R = mix(
-        vec3(plainFilm(cosI)),
-        textureLod(filmLut, vec2(th / THICKNESS_MAX, cosI), 0.0).rgb,
+        vec3(plainFilm(cosR)),
+        textureLod(filmLut, vec2(th / THICKNESS_MAX, cosR), 0.0).rgb,
         iridescence
     );
     // Grazing films reflect most, but a foam is mostly grazing films:
@@ -2086,6 +2098,7 @@ export class BubbleEffect implements Effect {
                 swirlScale: Math.max(finite(p.swirlScale, d.swirlScale), 0),
                 swirlOffset: this.#swirlOffset,
                 reflection: Math.max(finite(p.reflection, d.reflection), 0),
+                rimCos: RIM_COS * (1 - clamp(p.rim, 0, 1, d.rim)),
                 tint: colorOf(p.tint, d.tint),
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),
                 opacity: clamp(p.opacity, 0, 1, d.opacity),

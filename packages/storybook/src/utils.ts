@@ -1259,6 +1259,7 @@ export function attachBubblePane(
     bind(film, "swirlScale", range(0, 6, 0.05));
     bind(film, "swirlSpeed", range(-1, 1, 0.01));
     bind(film, "reflection", range(0, 4, 0.05));
+    bind(film, "rim", range(0, 1, 0.01));
     bind(film, "tint", { view: "color" });
     bind(film, "tintStrength", range(0, 1, 0.01));
     bind(film, "opacity", range(0, 1, 0.01));
