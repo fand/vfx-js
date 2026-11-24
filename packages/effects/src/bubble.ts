@@ -767,11 +767,19 @@ vec2 candBK[MAX_CAND];
 int nCand = 0;
 
 // The fill along the current stretch inside the shape: the outline's
-// field there is fillA + fillB t (taken as straight).
+// field and gradient there, sampled at even steps of fillDt from fillT0
+// and taken as straight between them.
+#define FILL_STEPS 8
 bool fillOn = false;
-float fillA;
-float fillB;
-vec2 fillGrad;
+float fillT0;
+float fillDt;
+vec3 fillKnot[FILL_STEPS + 1];
+
+vec3 fillOutline(float t) {
+    float u = clamp((t - fillT0) / fillDt, 0.0, float(FILL_STEPS));
+    int i = min(int(u), FILL_STEPS - 1);
+    return mix(fillKnot[i], fillKnot[i + 1], u - float(i));
+}
 
 ivec2 texel(int i) {
     return ivec2(i % TEX_W, i / TEX_W);
@@ -900,15 +908,15 @@ bool sphereInside = false;
 float fillField(float t, out vec3 grad) {
     float zt = ro.z + rd.z * t;
     float dz = abs(zt) - halfDepth;
-    float d2 = fillA + fillB * t;
-    grad = d2 > dz ? vec3(fillGrad, 0.0) : vec3(0.0, 0.0, zt >= 0.0 ? 1.0 : -1.0);
-    return max(d2, dz);
+    vec3 o = fillOutline(t);
+    grad = o.x > dz ? vec3(o.yz, 0.0) : vec3(0.0, 0.0, zt >= 0.0 ? 1.0 : -1.0);
+    return max(o.x, dz);
 }
 
 // What the fill adds to r² at t.
 float fillAt(float t) {
     vec3 grad;
-    return fillG * clamp(-fillField(t, grad) / fillDepth, 0.0, 1.0);
+    return fillG * smoothstep(0.0, 1.0, -fillField(t, grad) / fillDepth);
 }
 // The cell that owns the end of the last segment (an index into cand).
 int segOwn = 0;
@@ -941,7 +949,8 @@ void sphereFilm(int i, float t, bool entering, float cover) {
         vec3 grad;
         float sf = fillField(t, grad);
         if (sf < 0.0 && sf > -fillDepth) {
-            n = normalize(p - cand[i].xyz + 0.5 * fillG / fillDepth * grad);
+            float q = -sf / fillDepth;
+            n = normalize(p - cand[i].xyz + 3.0 * q * (1.0 - q) * fillG / fillDepth * grad);
         }
     }
     float edge = NO_EDGE;
@@ -957,7 +966,7 @@ void sphereFilm(int i, float t, bool entering, float cover) {
 // envelope of the power lines, as in \`_sphere-foam.ts\`.
 // \`first\`: t0 is where the ray enters the container, so a cell that
 // holds that point starts with a film on the container's wall.
-void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
+void segmentFilms(float t0, float t1, float cone, int layers, bool first) {
     int n = nCand;
     if (n == 0) {
         sphereInside = false;
@@ -976,7 +985,7 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
         }
     }
     segOwn = own;
-    // The fill over the segment, as a line g0 + gB (t - t0).
+    // The fill over the segment, a line there: g0 + gB (t - t0).
     float g0 = 0.0;
     float gB = 0.0;
     if (fillOn) {
@@ -1044,6 +1053,41 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
         own = next;
         segOwn = own;
         ta = ts;
+    }
+}
+
+float fillCut(float num, float den) {
+    return abs(den) > 1e-7 ? num / den : 1e30;
+}
+
+// The films on [t0, t1]. With the fill, the stretch is split where the
+// fill bends along the ray, so it is close to a line on each part.
+void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
+    if (!fillOn || nCand == 0) {
+        segmentFilms(t0, t1, cone, layers, first);
+        return;
+    }
+    // The middle plane, and where the fill is full along z.
+    float zFull = halfDepth - fillDepth;
+    vec3 cut = vec3(
+        fillCut(-ro.z, rd.z),
+        fillCut(zFull - ro.z, rd.z),
+        fillCut(-zFull - ro.z, rd.z)
+    );
+    float ta = t0;
+    for (int k = 0; k < FILL_STEPS + 4; k++) {
+        // The next sample of the outline's field.
+        float tn = min(t1, fillT0 + fillDt * (floor((ta - fillT0) / fillDt + 1e-3) + 1.0));
+        for (int c = 0; c < 3; c++) {
+            if (cut[c] > ta + 1e-5 && cut[c] < tn) {
+                tn = cut[c];
+            }
+        }
+        segmentFilms(ta, tn, cone, layers, first && k == 0);
+        if (tn >= t1 || films >= layers) {
+            return;
+        }
+        ta = tn;
     }
 }
 
@@ -1281,13 +1325,15 @@ void traceContained(vec2 tb, float cone, int layers) {
                 }
             }
             // Inside the shape: the fill.
-            vec3 pm = ro + rd * (0.5 * (a + b));
-            vec3 s2 = sd2(pm.xy);
-            cost += 1.0;
-            fillGrad = s2.yz;
-            fillA = s2.x + dot(s2.yz, ro.xy - pm.xy);
-            fillB = dot(s2.yz, rd.xy);
             fillOn = fillG > 0.0;
+            if (fillOn) {
+                fillT0 = a;
+                fillDt = max(b - a, 1e-5) / float(FILL_STEPS);
+                for (int i = 0; i <= FILL_STEPS; i++) {
+                    fillKnot[i] = sd2((ro + rd * (a + fillDt * float(i))).xy);
+                }
+                cost += float(FILL_STEPS + 1);
+            }
             walkGrid(a, b, cone, layers);
             fillOn = false;
             t = b + (WALL_ON ? 4.0 * eps : 1e-4);
