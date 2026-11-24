@@ -2221,6 +2221,12 @@ export class SwirlParticleEffect implements Effect {
             steps = clamp(Math.ceil(frameDt / SIM_STEP), 1, MAX_SUBSTEPS);
             dt = frameDt / steps;
         }
+        if (this.#needsReset && this.#still) {
+            // Each still starts from the same clock, so it shows the same
+            // view and flow. The orbit camera follows the clock back.
+            this.#simTime = 0;
+            this.#steps = 0;
+        }
         const base = this.#simUniforms(ctx);
         if (this.#needsReset) {
             ctx.draw({
