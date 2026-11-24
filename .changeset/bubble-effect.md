@@ -11,4 +11,5 @@ Add `BubbleEffect`: the element's silhouette, extruded into 3D, filled with a fo
 - Borders: on the foam's outside, where two bubbles meet, the water gathered there: over `borderWidth` (a share of `cellSize`) the film thickens towards it, more for a wider border, and a pale line (`borderHighlight`) runs along it. Walls inside the foam get none.
 - Films do not bend light, so the page shows through the foam. `backdrop`, `backdropColors` and the other backdrop and light params are those of `GlassEffect`; with `backdropVisible: true` the backdrop is drawn behind the foam, and with `backdropAround: true` the films reflect it in front too, in place of the even sky.
 - Camera and output as in `GlassEffect` (`OrbitCameraParams`, `pointer: "tilt"`, `antialias`, `resolution`, `pad`). `debug: "cost"`, `"layers"` or `"cells"` shows a debug view.
-- `GlassEffect`'s scene code (backdrop, lights, output passes) moves to a module shared with `BubbleEffect`; its output is unchanged.
+- `GlassEffect`'s scene code (backdrop, lights, output passes) moves to a module shared with `BubbleEffect`.
+- Both effects compile only the kind of backdrop in use (none, a pattern, or an image), so their shaders compile faster. A change of `backdrop` to another kind compiles a new shader on its first frame. `GlassEffect` renders as before, but for a few pixels along the edges of the glass.

@@ -29,6 +29,7 @@ import {
 } from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
+    backdropKind,
     clampInt,
     GLSL_HEAT,
     GLSL_SCENE,
@@ -361,7 +362,10 @@ const RELIEF_MAX_RADIUS = 256;
 // A sunk relief keeps at least this share of the glass's thickness.
 const RELIEF_MIN_THICKNESS = 0.2;
 
-const FRAG_GLASS = `#version 300 es
+// The shader compiles only the kind of backdrop in use (see GLSL_SCENE):
+// a change of kind compiles a new shader on its first frame.
+const fragGlass = (kind: number) => `#version 300 es
+#define BACKDROP_KIND ${kind}
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -820,6 +824,17 @@ void main() {
 }
 `;
 
+// The shaders made so far, by kind of backdrop.
+const FRAG_GLASS = new Map<number, string>();
+function fragGlassFor(kind: number): string {
+    let frag = FRAG_GLASS.get(kind);
+    if (!frag) {
+        frag = fragGlass(kind);
+        FRAG_GLASS.set(kind, frag);
+    }
+    return frag;
+}
+
 // The SDF, plus the relief's height map on the same grid.
 type GlassShape = ShapeData & {
     /** Luminance 0..1 before the blur, kept to rebuild the relief. */
@@ -1088,7 +1103,7 @@ export class GlassEffect implements Effect {
         const reliefSlope = Math.abs(relief) * shape.reliefMaxGrad;
 
         ctx.draw({
-            frag: FRAG_GLASS,
+            frag: fragGlassFor(backdropKind(this.params.backdrop)),
             uniforms: {
                 sdfTex,
                 sdfRect: shape.sdfRect,

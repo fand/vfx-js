@@ -43,8 +43,17 @@ export const FROST_LIGHT_SOFTNESS = "0.6";
  * The backdrop plane and the lights, in view space: `backdrop(p, fw)`,
  * `lights(d, soft)` and `radiance(p, d, rough)`, with their uniforms.
  * Needs `snoiseD` (GLSL_SIMPLEX3 + GLSL_SIMPLEX3_GRAD) before it.
+ *
+ * A shader that defines `BACKDROP_KIND` as a backdrop mode before it
+ * only compiles that mode: it must only run with that `backdropMode`,
+ * or with 0 (none). The patterns are large, so this compiles much
+ * faster. See `backdropKind`.
  */
 export const GLSL_SCENE = `
+// The one backdrop mode compiled in, or -1 for all of them.
+#ifndef BACKDROP_KIND
+#define BACKDROP_KIND -1
+#endif
 uniform int backdropMode;
 uniform sampler2D backdropTex;
 uniform float backdropAspect;
@@ -78,9 +87,13 @@ vec3 palette(float u, float w) {
 // The backdrop plane, at view-space xy. fw is the footprint of the pixel
 // on it, in the same units.
 vec3 backdrop(vec2 p, float fw) {
+#if BACKDROP_KIND == 0
+    return vec3(0.0);
+#else
     if (backdropMode == 0) {
         return vec3(0.0);
     }
+#if BACKDROP_KIND == -1 || BACKDROP_KIND == ${IMAGE_MODE}
     if (backdropMode == ${IMAGE_MODE}) {
         vec2 half_ = backdropScale * vec2(backdropAspect, 1.0)
             / max(backdropAspect, 1.0);
@@ -95,6 +108,10 @@ vec3 backdrop(vec2 p, float fw) {
         float lod = log2(max(texels, 1e-4)) - 0.5;
         return textureLod(backdropTex, q, lod).rgb;
     }
+#endif
+#if BACKDROP_KIND == ${IMAGE_MODE}
+    return vec3(0.0);
+#else
     vec2 q = p / max(backdropScale, 1e-3);
     fw = clamp(fw / max(backdropScale, 1e-3), 1e-4, 4.0);
     // Each pattern gives u, 0 at the middle of the palette's first colour
@@ -105,14 +122,18 @@ vec3 backdrop(vec2 p, float fw) {
     // softness: the bands keep it along u; the grid, whose u is not
     // proportional to distance, keeps it as a distance (k follows gu),
     // so all its edges are equally soft at any ratio.
-    float u;
-    float gu;
+    float u = 0.0;
+    float gu = 1.0;
     float k = 1.0;
+#if BACKDROP_KIND == -1 || BACKDROP_KIND == 1
     if (backdropMode == 1) {
         // Once round the palette per stripe period.
         u = fract((q.x - q.y) * 0.7071 + backdropOffset + paletteShift);
         gu = 1.0;
-    } else if (backdropMode == 2) {
+    }
+#endif
+#if BACKDROP_KIND == -1 || BACKDROP_KIND == 2
+    if (backdropMode == 2) {
         // Distance t from the lines' centre, 0..0.5. The area within t of
         // a line is 1 - (1 - 2t)^2.
         vec2 g = abs(fract(q + vec2(backdropOffset, 0.0)) - 0.5);
@@ -120,7 +141,10 @@ vec3 backdrop(vec2 p, float fw) {
         u = a * a;
         gu = 4.0 * a;
         k = gu;
-    } else if (backdropMode == 3) {
+    }
+#endif
+#if BACKDROP_KIND == -1 || BACKDROP_KIND == 3
+    if (backdropMode == 3) {
         // "marble": contour bands of a slow noise field: closed loops
         // round its peaks, bands crowding where it is steep. A weaker
         // second octave makes the widths irregular. u goes once round the
@@ -132,7 +156,10 @@ vec3 backdrop(vec2 p, float fw) {
         u = fract(s + paletteShift);
         vec2 g = (a.xy + 0.46 * b.xy) * ${MARBLE_FREQ};
         gu = ${MARBLE_BANDS} * length(g);
-    } else {
+    }
+#endif
+#if BACKDROP_KIND == -1 || BACKDROP_KIND == 4
+    if (backdropMode == 4) {
         // "flow": a diagonal run through the palette, bent by a noise
         // field. The bend stays weaker than the run, so the colours keep
         // going one way: no closed rings, and no points where they all
@@ -145,6 +172,7 @@ vec3 backdrop(vec2 p, float fw) {
         u = fract(h);
         gu = length(dir + (a.xy + 0.525 * b.xy) * 0.32 * ${FLOW_FREQ});
     }
+#endif
     // Softness and filtering are one blur along u: the pixel's footprint
     // in u, or the softness in shares of a colour. Low softness matches
     // the smoothstep edges the patterns had (3 shares per unit); it
@@ -153,6 +181,8 @@ vec3 backdrop(vec2 p, float fw) {
     float shares = 3.0 * sf / (1.0 + 2.0 * sf * sqrt(sf));
     float soft = k * shares / float(max(paletteSize, 2));
     return palette(u, max(fw * gu, soft));
+#endif
+#endif
 }
 
 // A rectangular light seen in direction d: centre c, half size in
@@ -355,6 +385,16 @@ export function isPattern(
     v: GlassPatternName | GlassImageSource,
 ): v is GlassPatternName {
     return typeof v === "string" && v in PATTERN_MODES;
+}
+
+/**
+ * The `BACKDROP_KIND` a shader for `backdrop` compiles (see GLSL_SCENE):
+ * the pattern's mode, or the image's. An image keeps its kind while it
+ * loads and shows as none, so the shader does not change when it is
+ * ready.
+ */
+export function backdropKind(v: GlassPatternName | GlassImageSource): number {
+    return isPattern(v) ? PATTERN_MODES[v] : IMAGE_MODE;
 }
 
 type BackdropElement = Exclude<GlassImageSource, string>;

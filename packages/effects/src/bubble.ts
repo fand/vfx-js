@@ -47,6 +47,7 @@ import {
 } from "./_orbit-camera.js";
 import { padOutputRect } from "./_pad.js";
 import {
+    backdropKind,
     clampInt,
     GLSL_HEAT,
     GLSL_SCENE,
@@ -380,8 +381,11 @@ const SMOOTH_PASSES = 2;
 // The shader per containment mode: 0 none, 1 the shape cuts the foam
 // flat, 2 the foam out of the shape is squashed. Each mode compiles only
 // its own path, which keeps the others light on registers.
-const fragBubble = (mode: 0 | 1 | 2) => `#version 300 es
+// It also compiles only the kind of backdrop in use (see GLSL_SCENE): a
+// change of either compiles a new shader on its first frame.
+const fragBubble = (mode: 0 | 1 | 2, kind: number) => `#version 300 es
 #define CONTAIN ${mode}
+#define BACKDROP_KIND ${kind}
 precision highp float;
 precision highp int;
 precision highp sampler2D;
@@ -1446,7 +1450,17 @@ void main() {
     }
 }
 `;
-const FRAG_BUBBLES = [fragBubble(0), fragBubble(1), fragBubble(2)] as const;
+// The shaders made so far, by containment mode and kind of backdrop.
+const FRAG_BUBBLES = new Map<string, string>();
+function fragBubbleFor(mode: 0 | 1 | 2, kind: number): string {
+    const key = `${mode}:${kind}`;
+    let frag = FRAG_BUBBLES.get(key);
+    if (!frag) {
+        frag = fragBubble(mode, kind);
+        FRAG_BUBBLES.set(key, frag);
+    }
+    return frag;
+}
 
 function finite(v: number, fallback: number): number {
     return Number.isFinite(v) ? v : fallback;
@@ -1998,9 +2012,15 @@ export class BubbleEffect implements Effect {
         this.#move(ctx, foam);
         const containment = r.containment;
         const mode = containment <= 0 ? 0 : containment >= 0.995 ? 1 : 2;
+        const backdrop = this.#backdrop.uniforms(
+            p,
+            t,
+            r.halfDepth + reach,
+            sdfTex,
+        );
 
         ctx.draw({
-            frag: FRAG_BUBBLES[mode],
+            frag: fragBubbleFor(mode, backdropKind(p.backdrop)),
             uniforms: {
                 sdfTex,
                 sdfRect: shape.sdfRect,
@@ -2054,7 +2074,7 @@ export class BubbleEffect implements Effect {
                 opacity: clamp(p.opacity, 0, 1, d.opacity),
                 bodyColor: colorOf(p.color, d.color),
                 ...this.#borderUniforms(cellSize),
-                ...this.#backdrop.uniforms(p, t, r.halfDepth + reach, sdfTex),
+                ...backdrop,
                 debugView: this.#debugView(),
             },
             target: scene,
