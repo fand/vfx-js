@@ -1606,6 +1606,9 @@ export class BubbleEffect implements Effect {
     // frame.
     #foamFailed: string | null = null;
     #foamToken = 0;
+    // The shape and fill the kernel placed bubbles for last: it keeps that
+    // placement, so the next job with the same pair need not send the SDF.
+    #placedKey: string | null = null;
     // Bumped by each new shape, so its foam is placed again.
     #shapeVersion = 0;
     readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
@@ -1774,7 +1777,8 @@ export class BubbleEffect implements Effect {
         }
         const r = this.#resolved();
         const version = this.#shapeVersion;
-        const key = `${version}|${JSON.stringify(r.fill)}|${r.wobble}|${r.containment}`;
+        const placeKey = `${version}|${JSON.stringify(r.fill)}`;
+        const key = `${placeKey}|${r.wobble}|${r.containment}`;
         if (
             !this.#foamBusy &&
             this.#foamData?.key !== key &&
@@ -1786,14 +1790,17 @@ export class BubbleEffect implements Effect {
                 bubbleKernel as never,
                 BUBBLE_KERNEL_SOURCE,
             );
+            const sendShape = placeKey !== this.#placedKey;
             this.#kernel
                 .run<FoamData>("buildFoam", {
-                    shape: {
-                        sdf: shape.sdf,
-                        sdfW: shape.sdfW,
-                        sdfH: shape.sdfH,
-                        sdfRect: shape.sdfRect,
-                    },
+                    shape: sendShape
+                        ? {
+                              sdf: shape.sdf,
+                              sdfW: shape.sdfW,
+                              sdfH: shape.sdfH,
+                              sdfRect: shape.sdfRect,
+                          }
+                        : undefined,
                     shapeKey: version,
                     fill: r.fill,
                     wobble: r.wobble,
@@ -1803,12 +1810,19 @@ export class BubbleEffect implements Effect {
                     (data) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
+                            this.#placedKey = placeKey;
                             this.#foamReady = { key, version, data, params: r };
                         }
                     },
                     (e) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
+                            this.#placedKey = null;
+                            if (!sendShape) {
+                                // The kernel lost its placement (its worker
+                                // died): send the shape next frame.
+                                return;
+                            }
                             this.#foamFailed = key;
                             console.warn(
                                 "[VFX-JS] BubbleEffect could not place its bubbles:",
@@ -2166,6 +2180,7 @@ export class BubbleEffect implements Effect {
         this.#kernel = null;
         this.#foamToken++;
         this.#foamBusy = false;
+        this.#placedKey = null;
         this.#foamReady = null;
         this.#foamFailed = null;
         this.#backdrop.dispose(this.#gl);
