@@ -259,6 +259,12 @@ export type BubbleParams = OrbitCameraParams & {
     backdrop: GlassPatternName | GlassImageSource;
     /** Draw the backdrop behind and around the foam. */
     backdropVisible: boolean;
+    /**
+     * Reflect the backdrop all around, not only behind: the films facing
+     * the viewer reflect it too, in place of the even sky. The lights
+     * still add their highlights.
+     */
+    backdropAround: boolean;
     /** Size of the pattern's features, or of the image. */
     backdropScale: number;
     /** Distance of the backdrop plane behind the shape's centre. */
@@ -349,6 +355,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     frothWidth: 0.15,
     backdrop: "none",
     backdropVisible: false,
+    backdropAround: false,
     backdropScale: 0.25,
     backdropDistance: 0.6,
     backdropSpeed: 0.15,
@@ -467,6 +474,8 @@ uniform float swirlOffset;
 uniform float reflection;
 // The films reflect as if seen no more grazing than this cosine.
 uniform float rimCos;
+// The backdrop is reflected all around (1), or only behind (0).
+uniform float backdropAround;
 uniform vec3 tint;
 uniform float tintStrength;
 uniform float opacity;
@@ -579,6 +588,15 @@ float plainFilm(float c) {
 // highlight at the few percent a film reflects head on; past that, a
 // grazing film reflects them no more, so rims stay soft.
 vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
+    if (backdropAround > 0.5 && backdropMode != 0 && dV.z >= -1e-4) {
+        // The backdrop again, on a plane as far in front: towards the
+        // side both planes blur to its mean.
+        float t = (backdropDistance - pV.z) / max(dV.z, 1e-4);
+        vec2 q = pV.xy + dV.xy * t;
+        vec3 env = backdrop(q, length(fwidth(q)));
+        vec3 lit = lights(dV, lightSoftness);
+        return R * env + min(R, vec3(0.05)) * LIGHT_GAIN * lit;
+    }
     vec3 L = radiance(pV, dV, 0.0);
     bool lit = backdropMode == 0 || dV.z >= -1e-4;
     float sky = lightIntensity * 0.35 * (0.3 + 0.7 * smoothstep(-0.7, 0.9, dV.y));
@@ -2098,6 +2116,7 @@ export class BubbleEffect implements Effect {
                 swirlScale: Math.max(finite(p.swirlScale, d.swirlScale), 0),
                 swirlOffset: this.#swirlOffset,
                 reflection: Math.max(finite(p.reflection, d.reflection), 0),
+                backdropAround: p.backdropAround ? 1 : 0,
                 rimCos: RIM_COS * (1 - clamp(p.rim, 0, 1, d.rim)),
                 tint: colorOf(p.tint, d.tint),
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),

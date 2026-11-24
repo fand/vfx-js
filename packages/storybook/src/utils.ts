@@ -1277,6 +1277,7 @@ export function attachBubblePane(
     pick(backdrop, "backdrop", pickers.backdrop);
     pick(backdrop, "palette", pickers.palette);
     bind(backdrop, "backdropVisible");
+    bind(backdrop, "backdropAround");
     bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
     bind(backdrop, "backdropDistance", range(0, 3, 0.01));
     bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
