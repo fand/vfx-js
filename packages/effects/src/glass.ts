@@ -809,7 +809,8 @@ function fragGlassFor(kind: number): string {
     return frag;
 }
 
-// The SDF, plus the relief's height map on the same grid.
+// The SDF, plus the relief's height map on the same grid. The arrays
+// are emptied once uploaded (see dropArrays); the sizes stay.
 type GlassShape = ShapeData & {
     /** Luminance 0..1 before the blur, kept to rebuild the relief. */
     reliefLum: Float32Array;
@@ -820,6 +821,17 @@ type GlassShape = ShapeData & {
     /** Largest length of the relief's gradient, in world units. */
     reliefMaxGrad: number;
 };
+
+const EMPTY = new Float32Array(0);
+
+// Free the big arrays once they are on the GPU. A restored context reads
+// the element back again instead. The luminance stays, to rebuild the
+// relief when `reliefBlur` changes.
+function dropArrays(shape: GlassShape): void {
+    shape.sdf = EMPTY;
+    shape.spawn = EMPTY;
+    shape.relief = EMPTY;
+}
 
 /**
  * Luminance of the captured RGBA pixels (bottom-up rows, premultiplied),
@@ -983,9 +995,13 @@ export class GlassEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // The raw SDF texture is gone; upload it again. A readback in
-            // flight was rejected; start it over.
+            // The raw SDF texture is gone, and its array was freed: read
+            // the element back again. A readback in flight was rejected;
+            // start it over. The glass shows again once it is read.
             this.#source.contextRestored();
+            if (!this.#pending) {
+                this.#source.refresh();
+            }
             this.#gl = ctx.gl;
             this.#sdfTex?.dispose();
             this.#reliefTex?.dispose();
@@ -994,7 +1010,7 @@ export class GlassEffect implements Effect {
             this.#reliefRaw = null;
             this.#reliefTex = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#pending ?? this.#shape;
+            this.#shape = null;
         });
     }
 
@@ -1014,6 +1030,7 @@ export class GlassEffect implements Effect {
         // A new shape replaces the current one once it has been read back.
         if (this.#pending) {
             this.#upload(ctx, this.#pending);
+            dropArrays(this.#pending);
             this.#shape = this.#pending;
             this.#pending = null;
         }
@@ -1228,6 +1245,7 @@ export class GlassEffect implements Effect {
         Object.assign(shape, buildRelief(shape.reliefLum, shape, radius));
         shape.reliefRadius = radius;
         this.#uploadRelief(ctx, shape);
+        shape.relief = EMPTY;
     }
 
     #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
