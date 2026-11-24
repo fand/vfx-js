@@ -994,7 +994,14 @@ export class HoloEffect implements Effect {
 
     #readyWaiters: (() => void)[] = [];
     #drawnOnce = false;
+    #disposed = false;
     #readyNow(): boolean {
+        if (this.#disposed) {
+            return true;
+        }
+        if (this.#defFailed === this.#p.material && !this.#renderDef) {
+            return true; // nothing to draw: the first material failed to load
+        }
         return (
             this.#drawnOnce &&
             !this.#dirty &&
@@ -1135,6 +1142,7 @@ export class HoloEffect implements Effect {
 
     async init(ctx: EffectContext): Promise<void> {
         const life = ++this.#life;
+        this.#disposed = false;
         this.#sync();
         // the material's code, before the first frame
         await this.#requestDef(this.#p.material);
@@ -1284,6 +1292,7 @@ export class HoloEffect implements Effect {
                     this.#defPending = null;
                 }
                 this.#dirty = true; // resolve again: with the new material, or settle on the failure
+                this.#settleReady();
             });
         this.#defPending = { m, p };
         return p;
@@ -2039,6 +2048,7 @@ export class HoloEffect implements Effect {
         this.#release();
         // a pending ready resolves: nothing more is drawn until the next init
         this.#drawnOnce = false;
+        this.#disposed = true;
         const w = this.#readyWaiters;
         this.#readyWaiters = [];
         for (const f of w) {
