@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import {
     BACKDROP_PALETTES,
-    GlassEffect,
     type BackdropPaletteName,
-    type GlassParams,
     type BackdropPatternName,
+    GlassEffect,
+    type GlassParams,
 } from "@vfx-js/effects";
 import Amagi from "../../docs/public/amagi.png";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -121,7 +121,8 @@ export default {
         const storyColors =
             typeof backdropColors === "string" ? null : backdropColors;
         const initial =
-            storyColors ?? BACKDROP_PALETTES[backdropColors as BackdropPaletteName];
+            storyColors ??
+            BACKDROP_PALETTES[backdropColors as BackdropPaletteName];
         const colors = { a: initial[0], b: initial[initial.length - 1] };
         let paletteKey =
             typeof backdropColors === "string" ? backdropColors : "custom";

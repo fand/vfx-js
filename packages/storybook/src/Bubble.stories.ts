@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import {
-    BubbleEffect,
-    type BubbleParams,
     BACKDROP_PALETTES,
     type BackdropPaletteName,
     type BackdropPatternName,
+    BubbleEffect,
+    type BubbleParams,
 } from "@vfx-js/effects";
 import Amagi from "../../docs/public/amagi.png";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -105,7 +105,8 @@ export default {
         let colors: BubbleParams["backdropColors"] = backdropColors;
         const current = (): BubbleParams => ({
             ...params,
-            backdrop: IMAGES[backdropKey] ?? (backdropKey as BackdropPatternName),
+            backdrop:
+                IMAGES[backdropKey] ?? (backdropKey as BackdropPatternName),
             backdropColors: colors,
         });
 
