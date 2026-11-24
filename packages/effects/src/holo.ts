@@ -1514,6 +1514,8 @@ export class HoloEffect implements Effect {
                 );
             }
             this.#emboss.setPaper(embossDef.paperKey(r.values));
+        } else if (this.#emboss || this.#printTex || this.#capRt) {
+            this.#releaseEmboss(); // switched away from emboss
         }
         this.#eta = etaFrame(
             (this.#renderDef as MaterialDef).gratingSummary(r.values),
@@ -2084,21 +2086,13 @@ export class HoloEffect implements Effect {
             this.#env,
             this.#ltc1,
             this.#ltc2,
-            this.#capRt,
         ]) {
             rt?.dispose();
         }
         this.#bytesTex?.dispose();
         this.#ltcTex?.dispose();
         this.#glare.dispose();
-        this.#emboss?.dispose();
-        this.#emboss = null;
-        this.#logoRt?.dispose();
-        this.#logoRt = null;
-        this.#paperRt?.mom.dispose();
-        this.#paperRt?.aux.dispose();
-        this.#paperRt = null;
-        this.#logoUp = this.#paperUp = -1;
+        this.#releaseEmboss();
         this.#conv = this.#cum = this.#hdr = this.#black = this.#env = null;
         this.#base = null;
         this.#ltc1 = this.#ltc2 = null;
@@ -2107,7 +2101,19 @@ export class HoloEffect implements Effect {
         this.#ltcReady = false;
         this.#blackReady = false;
         this.#envDrawn = null;
-        // the element read back as the logo, and emboss.print: start over on the next init
+    }
+
+    /** Frees what only `emboss` uses: its workers, logo and paper maps, the element read back as the logo, and `emboss.print`. */
+    #releaseEmboss(): void {
+        this.#emboss?.dispose();
+        this.#emboss = null;
+        this.#logoRt?.dispose();
+        this.#logoRt = null;
+        this.#paperRt?.mom.dispose();
+        this.#paperRt?.aux.dispose();
+        this.#paperRt = null;
+        this.#logoUp = this.#paperUp = -1;
+        this.#capRt?.dispose();
         this.#capRt = null;
         this.#capKey = "";
         this.#capHash = "";
@@ -2121,6 +2127,7 @@ export class HoloEffect implements Effect {
         this.#printWant = "";
         this.#printToken++;
         this.#printBusy = false;
+        this.#printError = null;
     }
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {
