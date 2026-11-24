@@ -397,8 +397,16 @@ export function uploadFloatTexture(
     return tex;
 }
 
-export function hexToRgb(hex: string): [number, number, number] {
-    const [r, g, b] = parseHexColor(hex);
+const HEX_RE = /^#?(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/** RGB 0..1 of a `#rgb` / `#rrggbb` colour, or of `fallback` when it is not one. */
+export function hexToRgb(
+    hex: unknown,
+    fallback = "#000000",
+): [number, number, number] {
+    const [r, g, b] = parseHexColor(
+        typeof hex === "string" && HEX_RE.test(hex) ? hex : fallback,
+    );
     return [r, g, b];
 }
 
@@ -489,6 +497,12 @@ function resolvePalette(
             ? (presets[v as BackdropPaletteName] ?? presets.mono)
             : v;
     const colors = list.length > 0 ? [...list] : [...presets.mono];
+    // A colour that is not `#rrggbb` takes the default palette's in its place.
+    for (let i = 0; i < colors.length; i++) {
+        if (typeof colors[i] !== "string" || !HEX_RE.test(colors[i])) {
+            colors[i] = presets.mono[i % presets.mono.length];
+        }
+    }
     return colors.length === 1 ? [colors[0], colors[0]] : colors;
 }
 
@@ -503,7 +517,7 @@ function resolvePalette(
  */
 function bakePalette(colors: readonly string[], ratio: number): Float32Array[] {
     const n = colors.length;
-    const rgb = colors.map(hexToRgb);
+    const rgb = colors.map((c) => hexToRgb(c));
     const w =
         n * 2 ** Math.max(0, Math.ceil(Math.log2(PALETTE_MIN_TEXELS / n)));
     // Prefix sums per channel, to average any range of texels.

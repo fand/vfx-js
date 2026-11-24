@@ -1477,7 +1477,7 @@ function clamp(v: number, lo: number, hi: number, fallback: number): number {
 }
 
 function colorOf(hex: string, fallback: string): [number, number, number] {
-    return hexToRgb(typeof hex === "string" ? hex : fallback);
+    return hexToRgb(hex, fallback);
 }
 
 // A data texture read with texelFetch: RGBA32F, nearest.

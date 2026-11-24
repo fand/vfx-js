@@ -1079,7 +1079,7 @@ export class GlassEffect implements Effect {
                 samples: clampInt(p.samples, 1, MAX_SAMPLES, 8),
                 exits: clampInt(p.bounces, 0, MAX_BOUNCES, 2) + 1,
                 jitter: num(p.jitter, 0, 1, D.jitter),
-                tint: hexToRgb(p.tint),
+                tint: hexToRgb(p.tint, DEFAULT_PARAMS.tint),
                 absorption: num(p.absorption, 0, 1e3, D.absorption),
                 reflection: num(p.reflection, 0, 100, D.reflection),
                 bump: num(p.bump, 0, 1, D.bump),
