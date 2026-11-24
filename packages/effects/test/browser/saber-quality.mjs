@@ -291,12 +291,33 @@ export async function createSaberFixture({
         outputRect: (dims) => effect.outputRect?.(dims),
         dispose: () => effect.dispose?.(),
     };
-    const vfx = new VFX({
-        autoplay: false,
-        pixelRatio,
-        wrapper,
-        scrollPadding: false,
-    });
+    // VFX availability probes create detached contexts. Release those probes
+    // during large matrices, before Chrome evicts the live comparison context.
+    const createdContexts = new Set();
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    let vfx;
+    HTMLCanvasElement.prototype.getContext = function (...args) {
+        const result = getContext.apply(this, args);
+        if (result && (args[0] === "webgl" || args[0] === "webgl2")) {
+            createdContexts.add(result);
+        }
+        return result;
+    };
+    try {
+        vfx = new VFX({
+            autoplay: false,
+            pixelRatio,
+            wrapper,
+            scrollPadding: false,
+        });
+    } finally {
+        HTMLCanvasElement.prototype.getContext = getContext;
+        for (const context of createdContexts) {
+            if (!context.canvas.isConnected) {
+                context.getExtension("WEBGL_lose_context")?.loseContext();
+            }
+        }
+    }
     await vfx.add(input, { effect: adapter });
     await frame();
     const render = (time = 2) => {

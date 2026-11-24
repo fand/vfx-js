@@ -1038,12 +1038,12 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     const line = pane.addFolder({ title: "Core" });
     line.addBinding(p, "color", { view: "color" });
     line.addBinding(p, "intensity", range(0, 5, 0.01));
-    line.addBinding(p, "coreIntensity", range(0, 5, 0.01));
+    line.addBinding(p, "coreIntensity", range(0, 10, 0.01));
     line.addBinding(p, "coreWhiteness", range(0, 1, 0.01));
     line.addBinding(p, "coreSoftness", range(0, 12, 0.05));
     line.addBinding(p, "coreBlendOnTop");
     const halo = pane.addFolder({ title: "Halo" });
-    halo.addBinding(p, "haloIntensity", range(0, 5, 0.01));
+    halo.addBinding(p, "haloIntensity", range(0, 8, 0.01));
     halo.addBinding(p, "haloSize", range(0, 60, 0.1));
     line.addBinding(p, "thickness", range(0.5, 10, 0.1));
 
@@ -1103,12 +1103,13 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         distortion.addBinding(d, "windDirection", range(0, 360, 1));
         distortion.addBinding(d, "noiseSpeed", range(0, 3, 0.01));
         distortion.addBinding(d, "noiseScale", range(1, 300, 1));
-        distortion.addBinding(d, "noiseBias", range(0.1, 3, 0.01));
+        distortion.addBinding(d, "noiseBias", range(0.1, 4, 0.01));
         distortion.addBinding(d, "noiseComplexity", {
             ...range(1, 8, 1),
             label: "Noise octaves",
         });
         distortion.addBinding(d, "noiseDetail", range(0, 1, 0.01));
+        distortion.addBinding(d, "noiseTurbulence", range(0, 1, 0.01));
         distortion.addBinding(d, "noiseAspectRatio", range(0.1, 5, 0.01));
         distortion.addBinding(d, "directionality", range(0, 1, 0.01));
         distortion.addBinding(d, "motionBlur", {
@@ -1137,8 +1138,14 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         p.pad = padState.fullscreen ? "fullscreen" : padState.pad;
     };
     const output = pane.addFolder({ title: "Output" });
-    output.addBinding(p, "toneMapping", {
-        options: { Exponential: "exponential", Linear: "linear" },
+    output.addBinding(p, "gamma", { label: "Gamma", ...range(0.1, 10, 0.01) });
+    output.addBinding(p, "brightness", {
+        label: "Brightness",
+        ...range(0, 5, 0.01),
+    });
+    output.addBinding(p, "saturation", {
+        label: "Saturation",
+        ...range(0, 2, 0.01),
     });
     output.addBinding(p, "source");
     output.addBinding(padState, "fullscreen").on("change", writePad);

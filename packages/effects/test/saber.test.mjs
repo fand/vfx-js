@@ -170,22 +170,67 @@ test("halo and original-core overlay remain independent of glow and cache static
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
-test("display curve and glow tint preserve cached shapes and reset with presets", () => {
+test("output grading and glow tint preserve cached shapes and reset with presets", () => {
     const effect = steadyEffect({ preset: "laser" });
     const f = fixture();
     effect.init(f.ctx);
     const before = f.render(effect);
-    effect.setParams({ toneMapping: "linear", glowWhiteness: 0.8 });
+    effect.setParams({
+        gamma: 0.7,
+        brightness: 0.4,
+        saturation: 0,
+        glowWhiteness: 0.8,
+    });
     const after = f.render(effect);
     assert.equal(f.draws.length, 1);
     assert.equal(after.uniforms.core, before.uniforms.core);
     assert.equal(after.uniforms.layer0, before.uniforms.layer0);
     assert.equal(after.uniforms.coreWhiteness, before.uniforms.coreWhiteness);
-    assert.equal(after.uniforms.linearLight, 1);
+    assert.equal(after.uniforms.outputGamma, 0.7);
+    assert.equal(after.uniforms.outputBrightness, 0.4);
+    assert.equal(after.uniforms.outputSaturation, 0);
     assert.equal(after.uniforms.whiteMix, 0.8);
     effect.setParams({ preset: "laser" });
-    assert.equal(effect.params.toneMapping, "exponential");
+    for (const key of ["gamma", "brightness", "saturation"]) {
+        assert.equal(effect.params[key], SABER_PRESETS.laser[key]);
+    }
     assert.equal(effect.params.glowWhiteness, 0.15);
+    effect.dispose();
+});
+
+test("output grading bounds also apply to live parameter mutations", () => {
+    const effect = steadyEffect();
+    const f = fixture();
+    effect.init(f.ctx);
+    for (const [input, expected] of [
+        [
+            [0, -2, -1],
+            [0.1, 0, 0],
+        ],
+        [
+            [20, 8, 3],
+            [10, 5, 2],
+        ],
+        [
+            [NaN, Infinity, -Infinity],
+            [1, 1, 1],
+        ],
+    ]) {
+        [
+            effect.params.gamma,
+            effect.params.brightness,
+            effect.params.saturation,
+        ] = input;
+        const { uniforms } = f.render(effect);
+        assert.deepEqual(
+            [
+                uniforms.outputGamma,
+                uniforms.outputBrightness,
+                uniforms.outputSaturation,
+            ],
+            expected,
+        );
+    }
     effect.dispose();
 });
 
@@ -261,6 +306,30 @@ test("fine noise changes invalidate static distortion without rebuilding the fie
     assert.ok(
         !f.draws.some((d) => isCore(d) || d.uniforms.payloadOn !== undefined),
     );
+    effect.dispose();
+});
+
+test("turbulent advection invalidates only the glow result and clamps its strength", () => {
+    const effect = steadyEffect({
+        glowDistortion: { amount: 32, windSpeed: 0, noiseSpeed: 0 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    for (const [strength, expected] of [
+        [0.7, 0.7],
+        [2, 1],
+        [-1, 0],
+    ]) {
+        effect.setParams({ glowDistortion: { noiseTurbulence: strength } });
+        f.render(effect);
+        const distortion = f.draws.filter((d) => d.uniforms.glowPass === 1);
+        assert.equal(distortion.length, 1);
+        assert.equal(distortion[0].uniforms.noiseTurbulence, expected);
+        assert.equal(f.draws.length, 2); // Distortion + composition, no new blur/field.
+        f.render(effect);
+        assert.equal(f.draws.length, 1);
+    }
     effect.dispose();
 });
 
@@ -862,6 +931,7 @@ test("default is Electric, with explicit constructor overrides applied last", ()
 
 test("removed and unknown options fail before any preset or parameter mutation", () => {
     const removed = [
+        "toneMapping",
         "amplitude",
         "mainAmplitude",
         "scale",

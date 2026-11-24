@@ -89,8 +89,25 @@ the same core-distortion pipeline; there is no separate multi-line generator.
 Unknown top-level constructor or `setParams` options throw before changing state.
 Nested values are copied per instance; the shared recipes are frozen.
 These approximate AE's appearance and motion, not its proprietary shaders or
-numeric parameter units. Fire uses Fluid core + Energy/multiply glow; Burning
-uses Fluid core + Fluid/multiply glow and retains the original outline.
+numeric parameter units. The ten AE-inspired looks other than Fire are tuned
+against original preset exports, not the older Core Size 2 / Glow Intensity 20
+comparison override. Fire retains its broad, weak glow and core, with
+scale-dependent upward noise transport.
+Fog preserves a dim cyan contour; Burning/Embers and Tractor Beam restore the
+stronger luminous body of their AE references. Fire uses Fluid core +
+Energy/multiply glow; Burning uses Fluid core + Smoke/multiply glow and retains
+the original outline.
+Burning has billowing density noise; Fog uses soft Energy glow and Torch uses
+Fluid displacement. Kryptonite uses evolving Smoke; Wormhole adds gently
+warped turbulent Smoke. Arc Reactor has upward-moving smoke density.
+Windy uses four glow octaves; lower core gain/whiteness limit bright knots
+while retaining its deformation, halo, glow color and layer radii.
+Tractor Beam has a cooler blue tint. Wormhole uses the user-selected recipe:
+exponential output, glow 4, bias 0.7, layer sizes `[60, 8, 24, 60]`,
+intensities `[0.21, 0.06, 0.3, 0.11]`, core distortion amount 30 and Smoke
+glow distortion amount 80 with seed 0. Its matching demo input is
+`{ edge: "alpha", edgeThreshold: 1, source: false, pad: 320 }`; these input
+options remain separate from appearance presets.
 Fire/Torch rise, Tractor Beam stretches vertically, and Windy's core and glow
 travel in opposite directions. None of the eleven uses global brightness
 flicker or emits independent particles.
@@ -105,9 +122,9 @@ both as **Noise octaves** under Core Distortion / Glow Distortion.
 disabled. It supplies the beam's appearance, not a moving beam simulation;
 animate `start`/`end` separately to reveal it.
 
-`coreIntensity` (Electric default 1.33) scales visible core brightness independently of
-glow. `coreWhiteness` (0..1, Electric default 0.467) mixes its tint toward white.
-`coreSoftness` (CSS px Gaussian sigma, Electric default 1) softens only the visible core
+`coreIntensity` (Electric default 1.66) scales visible core brightness independently of
+glow. `coreWhiteness` (0..1, Electric default 0.7) mixes its tint toward white.
+`coreSoftness` (CSS px Gaussian sigma, Electric default 2) softens only the visible core
 after core distortion; glow continues to use the sharp distorted core. Zero
 bypasses the blur. Nonzero softness adds cached blur work and render targets;
 an animated core must update that blur each frame.
@@ -116,10 +133,22 @@ core, retaining a clean outline; both respect `coreSoftness`. The original
 outline's blur is cached separately from animated distortion. Overlay does not
 alter the light feeding glow/halo.
 `glowWhiteness` (0..1, default 0.15) controls glow tint independently of core and
-halo. `toneMapping` selects `"exponential"` highlight rolloff (default) or
-`"linear"` light clipped to the display range. Both only affect composition,
-preserving cached shapes. AE-inspired recipes use either curve as appropriate.
-`haloIntensity` (Electric default 2) and `haloSize` (CSS px Gaussian radius, Electric default 5.6)
+halo. Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
+`saturation` (0..2). Each is neutral at 1; named recipes may override them.
+The order is saturation about the RGB mean, brightness multiplication, then
+`pow(rgb, gamma)` and display clipping. Gamma below 1 lifts midtones; above 1
+darkens them. Saturation 0 makes grayscale; brightness 0 hides the effect.
+These directions, ranges and ordering were checked against installed AE Saber.
+Grading affects core/glow/halo together, before source composition, and leaves
+cached shapes and source pixels unchanged. It adds no render pass.
+The old `toneMapping` option is removed (passing it throws). Recipes formerly
+using linear clipping have neutral grades; other recipes use fitted grades to
+approximate their established appearance. The power curve cannot exactly
+reproduce the old exponential shoulder, so some highlights differ. These
+recipe values preserve VFX-JS looks, not AE preset parameter compatibility.
+Fog uses neutral grading with the user-selected cyan `#20c0ff`, glow 0.02,
+halo 0.5, and first glow layer 100/2.
+`haloIntensity` (Electric default 1.71) and `haloSize` (CSS px Gaussian radius, Electric default 2.8)
 add a separately controlled halo tinted with `color`, without the glow's white
 mix. It uses the distorted core before display softness, independently of glow
 size, bias and distortion. Zero intensity or size bypasses its blur. Static
@@ -141,6 +170,7 @@ brightness, reaching full modulation at amount 32), and `invert`. Each group has
 independent `windSpeed` (CSS px/s), `windDirection` (degrees, 0 right / 90 up),
 `noiseSpeed` (cycles/s), `noiseScale` (CSS px), `noiseBias` (positive contrast
 control), `noiseComplexity` (1..8), `noiseDetail` (0..1; Electric core 0.5 / glow 0.15),
+`noiseTurbulence` (0..1, default 0; scale-dependent transport),
 `noiseAspectRatio` (horizontal stretch),
 `directionality` (0..1, default 0; constrain displacement to the wind axis),
 and deterministic `seed`. Noise is anchored to the element. These clocks use VFX
@@ -149,10 +179,19 @@ group to freeze it. Core distortion changes the contour and its glow source; glo
 distortion changes only the generated glow. With nonzero detail,
 a fully revealed core uses distance-field coverage after warping
 to keep steep thin streaks continuous; animated reveals retain the raster path.
-Fluid/smoke glow uses broad wind-aligned flow at `noiseDetail: 0`; nonzero
+Fluid/smoke glow uses broad wind-aligned flow when both detail and turbulence
+are zero; otherwise it uses fractal noise. Nonzero
 detail uses a Fluid fBm / billowing Smoke fractal displacement field. Fluid core
 retains domain warping; above `noiseBias: 1`, its detailed turbulence concentrates
 in moving pockets, leaving calm regions between them.
+`noiseTurbulence` separates the wind speeds of the noise octaves. At 1,
+the first four octaves move at 0.6/0.9/1.2/1.5 times `windSpeed` (later ones
+cap at 1.8); at 0 every octave uses the same wind. This is independent of
+the four blurred `glowLayers`. Fluid/Smoke glow also gains a gentle evolving
+domain warp. Fire uses 1, Arc Reactor 0.65, Wormhole 0.5; other recipes default to 0.
+It adds no render passes; the Fluid/Smoke warp adds two coarse noise samples.
+Both wind and evolution still freeze when their speeds are zero. `glowFlow`
+continues to control the light envelope's reach, not octave speeds.
 `noiseDetail` raises octave frequency spacing from 2.03 to 2.7, fine-band gain
 from 0.5 to 0.58, and multiply contrast. Density glow keeps gain 0.5. For Energy/multiply
 Glow it blends ridges toward signed fBm density, with fine octaves kept weaker
@@ -172,7 +211,7 @@ The deformable share fades from full at radius `noiseScale / 4` to zero at
 radius `noiseScale`, using effective radii rather than layer order.
 `glowDistortAllLayers: true` includes every layer, used by the AE-inspired recipes
 so broad glow also moves. It leaves the independent `haloIntensity` halo unchanged.
-Electric defaults to true; Tractor Beam keeps its broad background smooth.
+Electric and Tractor Beam default to true; Tractor Beam also transports its broad haze.
 These are procedural approximations, not a reproduction of VideoCopilot's noise algorithm.
 
 `glowFlow` (CSS px, Electric default 5.1) extends the deformable glow envelope along
@@ -185,7 +224,7 @@ comes from `windSpeed`, evolution from `noiseSpeed`. It also works with
 Glow always uses exactly four `SaberGlowLayer` objects in `glowLayers`,
 each with `size` (approximate Gaussian sigma in CSS px) and `intensity` (brightness
 normalized for thin lines). Either value at zero disables that layer. Electric
-uses sizes `[2.8, 6, 18, 32]` and intensities `[0.469, 0.8, 0.1, 0.07]`.
+uses sizes `[2.8, 6, 18, 32]` and intensities `[0.75, 0.8, 0.113, 0.07]`.
 
 Effective radius is `size * glowSizeMultiplier`; the multiplier defaults to 1,
 and zero disables glow. `pad` only bounds the
@@ -210,8 +249,8 @@ keeping full-size glow/distortion outputs.
 
 `glowPreGamma` (positive, `pow(core, 1/gamma)` before blur) and
 `glowBias` (`pow(glow, 2^bias)` after glow distortion, -4..4) shape glow only.
-Electric defaults are 1 and -0.3. `glow` scales the resulting glow (Electric: 2.2);
-`intensity` scales core, halo and glow together (default 1). Nested defaults/options are copied per instance;
+Electric defaults are 1 and -0.0333. `glow` scales the resulting glow (Electric: 2.2);
+`intensity` scales core, halo and glow together (Electric default 2). Nested defaults/options are copied per instance;
 `setParams({ glowDistortion: { amount: 20 } })` preserves other group values.
 These are procedural WebGL approximations, not AE-compatible parameter units
 or a reproduction of Video Copilot's proprietary renderer.

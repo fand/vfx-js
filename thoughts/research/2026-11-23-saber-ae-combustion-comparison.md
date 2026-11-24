@@ -278,3 +278,342 @@ still `fire-light-comparison.png`.
 The comparison page's Fire Before clip now shows the immediately preceding
 glow adjustment. Other presets retain their original comparison baselines.
 The updated Fire clip has 72 frames/24 fps. 30 Node tests and Storybook build pass.
+
+
+## Original-preset appearance correction (2026-11-24)
+
+The preceding eleven-preset calibration used the structure-oriented display
+exports (Core Size 2 / Glow Intensity 20). That is a different target from the
+native presets: Fog was overexposed, while Burning and Tractor Beam were too
+weak. This revision uses the existing `*-raw` PNG sequences for ten AE-derived
+recipes. Fire keeps its separately approved appearance; Embers remains Burning.
+The seven original VFX-JS recipes and shared production shaders are unchanged.
+
+Changes are recipe-only: exposure/color, core softness and brightness, halo,
+layer radii/gain, and spatial distortion scale/amount/bias. Tractor Beam now
+moves its broad haze with `glowDistortAllLayers`. Transport clocks and octave
+counts remain unchanged. Storybook ranges accommodate the stronger presets.
+
+### Independent-time comparison
+
+Both renderers receive the same exported source alpha, 960×540/DPR 1, with
+160 px overscan and an identical viewport crop. Baseline is commit `6ee04908`.
+Tuning used AE times 1/2/3 s. The final evaluation uses six other times:
+1.25/1.75/2.25/2.75/3.25/3.75 s. Each frame is reduced to 8×8 RGB block means;
+relative RMS error compares temporal means, normalized by reference energy.
+Variance ratio compares temporal RGB variation energy (1 means equal energy).
+These are display-encoded image summaries, not perceptual match percentages
+or evidence of identical noise topology, phase or motion direction.
+
+| Preset | RGB error before → after | Temporal variance ratio before → after |
+| --- | ---: | ---: |
+| arc-reactor | 0.392 → 0.219 | 0.414 → 0.631 |
+| burning | 0.398 → 0.146 | 0.494 → 1.313 |
+| electric | 0.225 → 0.115 | 0.480 → 0.859 |
+| energy | 0.263 → 0.120 | 0.914 → 0.927 |
+| fog | 0.712 → 0.117 | 0.530 → 0.691 |
+| kryptonite | 0.418 → 0.194 | 0.504 → 0.868 |
+| torch | 0.331 → 0.123 | 0.170 → 0.936 |
+| tractor-beam | 0.584 → 0.118 | 0.473 → 0.721 |
+| windy | 0.576 → 0.154 | 1.123 → 1.141 |
+| wormhole | 0.380 → 0.157 | 0.499 → 0.818 |
+
+Fog loses its white clipping while retaining a cyan contour and haze.
+Burning/Embers, Kryptonite, Torch and Wormhole regain luminous body; Tractor
+Beam gains broad animated haze. The original AE Energy is itself heavily
+clipped. Fine noise topology and local brightness distribution still differ,
+especially in the tangled cores and broad Tractor Beam haze.
+
+### Verification and artifacts
+
+- Effects: 31 Node tests; ESM/CJS builds; changed-file Biome checks.
+- Focused Storybook TypeScript check; core TypeDoc and docs API/skill checks.
+- Browser: all 19 live preset switches, composition/flicker/source/softness/
+  disposal checks, and eleven-preset motion/seek/freeze checks pass.
+- Fire plus seven original recipes: 64 frame comparisons across four times
+  and DPR 1/2, byte-for-byte unchanged. No production core-library changes.
+- The fixture now releases detached WebGL capability-probe contexts after
+  VFX construction. Yielding for renderer teardown alone did not eliminate
+  Chrome context eviction in large matrices. All final matrices pass.
+
+Local artifacts (ignored): `packages/effects/node_modules/.cache/saber-raw/`.
+`compare.html` offers AE original / before / after playback, defaulting to Fog.
+Fire explicitly uses the older structure reference and identical before/after
+clips. Twenty-one new MP4s have 72 frames at 960×540/24 fps. `results/` contains
+PNG sequences, `final-0.png` / `final-1.png` contact sheets, calibration traces,
+`validation-six-times.json`, and `regression.json`. The `ae` symlink points to
+the existing `ae-saber-11` export directory above. Serve this directory over
+HTTP; the comparison uses no server-side processing.
+
+### Rendering cost
+
+Desktop Chrome, shared host/source, 640×400/DPR 1, 160 px overscan;
+90 samples after 30 warmup frames, three alternating repetitions. GPU median
+of run medians, milliseconds. Timing includes the complete effect. Batch 4
+measures throughput; batch 1 measures ordinary one-render-per-frame behavior.
+Every run reported GL error 0.
+
+| Preset | Before / after, batch 4 | Before / after, batch 1 |
+| --- | ---: | ---: |
+| arc-reactor | 1.96 / 2.07 | 2.92 / 3.04 |
+| burning | 1.88 / 2.65 | 2.08 / 3.63 |
+| electric | 2.57 / 3.06 | 3.89 / 4.63 |
+| energy | 2.68 / 2.75 | — |
+| fog | 2.88 / 3.02 | — |
+| kryptonite | 2.63 / 2.79 | — |
+| torch | 0.78 / 0.73 | — |
+| tractor-beam | 2.64 / 2.36 | 3.60 / 2.52 |
+| windy | 3.27 / 3.10 | — |
+| wormhole | 2.38 / 2.77 | — |
+| fire | 2.42 / 2.44 | 2.51 / 2.52 |
+
+Tiny core softness on Arc Reactor and Tractor Beam was removed after it added
+blur passes without improving held-out image error. Burning retains the more
+expensive softened core because it materially improves its luminous body.
+This is a quality/cost tradeoff, not a claim of unchanged performance for all
+presets. Fire is an unchanged control. These measurements are device-specific,
+with run-to-run variance; they do not establish mobile performance. Full
+samples: `results/performance.json` and `results/performance-frame.json`.
+
+
+## Glow texture and evolution follow-up (2026-11-24)
+
+User review requested smoke-like Burning, finer/broader Fog, evolving clouds
+for Kryptonite/Torch/Wormhole, a wider Torch, bluer Tractor Beam, and more
+complex Windy without changing its color/envelope. This follow-up tunes only
+those seven recipes (plus the Burning/Embers alias). All core distortion
+settings and shared shader code remain unchanged.
+
+- Burning: Smoke/multiply density, stronger local modulation, slower drift
+  and faster evolution. Its existing luminous core is retained.
+- Fog: Fluid/multiply over larger layers; lower independent halo avoids
+  masking the fine fractal field. A high-contrast Smoke trial was rejected
+  because it produced clipped granular spots.
+- Kryptonite/Wormhole: larger Smoke fields, wind reduced from 15 to 5 px/s,
+  evolution increased from 0.125 to 0.65/0.7. Torch uses the same evolving
+  cloud character, retains upward transport at 42 px/s, and has broader light.
+- Tractor Beam: blue tint `#5795ff`, less white in the glow.
+- Windy: four rather than two glow octaves, more fine detail/evolution;
+  its color, intensity, layer radii/gains, bias and halo settings are unchanged.
+
+### Observations and verification
+
+Same source/crop/time as above. At t=2, light outside the source bounding box
+expanded by 20 px grows from 3.6% to 9.8% for Fog and 6.4% to 24.6% for Torch.
+Windy's luminance-weighted vertical RMS radius changes from 100.7 to 100.0 px;
+its visible envelope remains approximately the same. These are descriptive
+single-frame measurements, not AE-equivalence or exact support guarantees.
+
+To distinguish shape evolution from scrolling, freeze core animation, remove
+visible core/halo, set glow wind to zero, and compare three 0.5 s intervals.
+Normalized RMS glow change (with zero wind):
+
+| Preset | Before | After |
+| --- | ---: | ---: |
+| burning | 0.025 | 0.405 |
+| fog | 0.037 | 0.642 |
+| kryptonite | 0.094 | 0.244 |
+| torch | 0.080 | 0.310 |
+| wormhole | 0.132 | 0.285 |
+
+Stopping evolution too gives byte-identical frames in all seven cases.
+The old presets already evolved, but their shape changes were weak relative
+to transport. The new settings strengthen billowing/evolution; they do not
+implement a fluid simulation or reproduce AE's proprietary noise.
+
+31 Node tests and ESM/CJS builds pass. Browser appearance, all 19 preset
+switches, motion/seek/freeze and disposal checks pass. Eleven untouched recipes,
+including Fire, match the preceding revision exactly across 88 comparisons
+(four times, DPR 1/2). Preset inspection confirms every core-distortion group
+and Windy's color/envelope parameters are unchanged.
+
+Artifacts remain under the ignored `saber-raw` directory above:
+`glow-compare.html` compares AE / immediately preceding appearance / new Glow;
+`results/glow-*.mp4` and PNG sequences contain 72 frames at 960×540/24 fps.
+The old comparison page and clips remain available. `baseline-glow/` freezes
+the preceding built renderer; `glow-options.json` records this follow-up's
+parameter overrides. `results/glow-metrics.json` and `glow-checks.json` contain
+measurements and full validation output.
+
+GPU check: same 640×400/DPR 1 fixture as above, batch 1, 80 samples after 25
+warmup frames, three alternating repetitions. No additional render passes;
+Windy evaluates two extra glow-noise octaves, while Fog's multiply branch
+needs only one scalar fractal field. Median of GPU medians, milliseconds:
+
+| Preset | Before | After |
+| --- | ---: | ---: |
+| burning | 3.53 | 3.54 |
+| fog | 2.95 | 2.67 |
+| kryptonite | 4.88 | 3.89 |
+| torch | 1.23 | 1.22 |
+| wormhole | 3.74 | 3.80 |
+| tractor-beam | 2.54 | 3.00 |
+| windy | 3.91 | 4.00 |
+| fire | 2.51 | 2.76 |
+
+All 48 runs report GL error 0. The unchanged Fire control varied by about 10%;
+treat these as device-specific samples, not general speedup guarantees.
+Tractor Beam changes only composition tint yet also varies, underscoring
+measurement noise. Full measurements: `results/glow-performance.json`.
+
+
+## Glow transport verification and correction (2026-11-24)
+
+Image-variance checks from the preceding tuning established animation, not
+matching motion. This revision inspects the exported AE Glow outside the core,
+including motion at different spatial scales. The lowest tracking patches can
+include a displaced core fringe; these are not semantic segmentations. Fire uses the structure/display
+reference (Core Size 2 / Glow Intensity 20, original motion settings); Arc
+Reactor and Wormhole use raw preset PNGs. The reference files are unchanged.
+
+### Motion evidence
+
+Use all 72 frames, downsample 2×, form Gaussian difference bands with sigma
+2/6/14 source pixels, and match 36×36 source-pixel patches above the text over
+four-frame intervals. Keep correlation ≥0.55 and reject search-boundary hits.
+Frame starts are 0/8/…/56; results have 12 px/s displacement quantization.
+Median vertical motion in px/s (negative means up), fine / medium / coarse:
+
+| Preset | AE | Before | After |
+| --- | --- | --- | --- |
+| Fire | -84 / -72 / -48 | -72 / -72 / -48 | -84 / -72 / -36 |
+| Arc Reactor | -60 / -48 / -24 | -36 / -24 / -12 | -60 / -48 / -48 |
+| Wormhole | -24 / -24 / -12 | -12 / -12 / -12 | -24 / -12 / -12 |
+
+These are local feature-tracking diagnostics, not exact noise velocities or
+proof that AE uses particular blur layers internally. Stationary light
+attenuation, deformation, occlusion and evolution affect the estimates; the
+sample sets differ between renderers. The full distributions remain in
+`results/motion-final-analysis.json`. Coarse-scale Arc Reactor motion still
+differs from AE. Pixel/noise topology parity is not claimed.
+
+The existing WebGL fBm applied the same wind translation to every octave.
+AE's Fire exhibits a broader range of upward motions, with finer features
+moving faster; Arc Reactor visibly has rising smoke rather than a largely
+smooth envelope. The first revised Fire was too fast at fine scales and was
+slowed after remeasuring the output, rather than only testing its clocks.
+
+### Implementation
+
+`noiseTurbulence` is an opt-in distortion-group control (0..1, default 0).
+It interpolates from uniform wind to octave multipliers 0.6/0.9/1.2/1.5,
+with later octaves capped at 1.8. These are noise octaves, not the four blurred
+Glow layers. Fire uses four octaves, strength 1, wind 64 px/s: nominal transport
+38.4/57.6/76.8/96 px/s. Its core and weak/broad glow recipe remain unchanged.
+
+Fluid/Smoke glow also receives a gentle coarse evolving domain warp, using
+two extra noise samples in the existing distortion pass. Arc Reactor uses
+rising Smoke/multiply density with a visible broad envelope; Wormhole retains
+Smoke's billowing appearance while gently bending its field. Both use strength
+0.65. A stronger domain warp was rejected because it produced long streaks.
+
+The feature compiles as a separate shader variant. Zero strength preserves
+legacy arithmetic and register usage; other looks do not inherit its changes.
+The new field participates in distortion caching, clamping and Storybook
+controls. No distortion render pass or temporal simulation was added.
+
+Fog and Torch are restored to the recipes immediately before the preceding
+Glow follow-up. Windy's geometry/noise, halo and broad glow are retained.
+Reducing its deformation merely moved its bright knots; instead its core gain
+is 0.22 (was 0.3), whiteness 0.12 (was 0.267). Across 144 frames over 12 seconds,
+the maximum count of pixels with mean RGB >200 falls from 1153 to 0, and the
+maximum mean RGB falls from 222.7 to 195.3. This suppresses bright white knots
+without changing the glow's color, layer radii or noise parameters.
+
+### Validation and review
+
+32 Node tests pass, including static glow-cache invalidation and strength
+clamping. ESM/CJS builds, changed-file Biome, focused Storybook TypeScript,
+TypeDoc and docs API/skill checks pass.
+
+Browser checks pass: all 19 live preset switches, appearance/disposal,
+transport/envelope, preset seek/freeze, and a new per-octave velocity probe.
+The probe isolates coarse/fine bands of the production fBm, uses frozen
+evolution and signed winds at DPR 1/2, and checks their distinct translated
+positions. It rejects non-finite samples rather than silently passing them.
+Thirteen untouched recipes match the preceding renderer byte-for-byte over
+104 frames; restored Fog/Torch match their previous reference over 16 frames.
+Fire core-only output matches in four sampled frames. Full results are in
+`results/motion-checks.json` and `motion-targeted.json`.
+
+The ignored artifact directory above contains `motion-compare.html`, with
+synchronized AE / before / after playback at normal or quarter speed. Its
+upper-Glow mode crops the same x=180,y=60,w=600,h=150 rectangle from every
+column and applies the same gamma 1.667 display aid. This deliberately reveals
+weak moving light; it is not the unmodified brightness comparison. Six complete
+clips and eighteen crop clips use 72 frames/24 fps. `baseline-motion/` freezes
+the previous renderer, and `analyze-motion.py` preserves the diagnostic script.
+
+GPU timings for this follow-up use 640×400/DPR 1, the same exported alpha,
+160 px overscan, batch 1, 80 samples after 25 warmup frames, and three
+alternating repetitions. Median of run medians (ms):
+
+| Preset | Before | After |
+| --- | ---: | ---: |
+| fire | 4.53 | 4.44 |
+| arc-reactor | 2.90 | 3.24 |
+| wormhole | 5.62 | 3.76 |
+| windy | 3.34 | 3.10 |
+| electric | 4.84 | 3.84 |
+
+All 30 runs reported GL error 0. The unchanged Electric control varies
+substantially; no general speedup is claimed. Arc Reactor adds about 0.34 ms
+in this run set. Full samples: `results/motion-performance.json`.
+
+A stricter upper-Glow audit excludes the lowest patch row (all retained patches
+end at y=170) and rejects patches with more than 1% of pixels above max-channel
+0.7. This reduces displaced-core contamination. Fine/medium/coarse median
+vertical speeds in px/s are:
+
+| Preset | AE | After |
+| --- | --- | --- |
+| Fire | -72 / -84 / -60 | -84 / -84 / -60 |
+| Arc Reactor | -60 / -60 / -36 | -60 / -48 / -48 |
+| Wormhole | -24 / -30 / -12 | -24 / -24 / -12 |
+
+The remaining differences are within one 12 px/s tracking bin in this audit,
+except that it still cannot establish matching cloud topology or all motion
+statistics. See `results/motion-upper-audit.json` and `analyze-upper-motion.py`.
+
+
+## Output grading migration (2026-11-24)
+
+Removed the public `toneMapping` switch and both its shader branches. New
+`gamma` / `brightness` / `saturation` controls share one output path; no hidden
+preset-dependent curve remains. Geometry, noise, glow and halo generation are
+unchanged in this migration.
+
+An installed AE Saber probe used a temporary 400×300 Fog beam at t=1. Its
+properties report Gamma 0.1–10, Brightness 0–5 and Saturation 0–2. Neutral is 1.
+The rendered perturbations support saturation about the RGB arithmetic mean,
+then brightness gain, then a direct gamma exponent. Gamma below 1 brightens;
+it is not the reciprocal-gamma convention used by our Glow Pre Gamma.
+Against 19,772 dim/midtone pixels, gamma=2 agrees with squared baseline output
+at mean absolute error 0.00106 (normalized RGB); grayscale agrees with the
+RGB mean at 0.00102. Combined gamma/brightness and gamma/saturation probes
+support the stated ordering. This establishes these controls locally, not
+bit-exact compatibility of the proprietary renderer, HDR/color-management
+pipeline, or preset units. Probe images/logs are in the ignored comparison
+cache's `results/ae-output-probe/`.
+
+Preserving existing VFX-JS presets is a separate migration concern. Five former
+linear recipes use neutral grades. Fourteen former exponential recipes use
+fitted grades from pre-clip energy at t=1/2/3 with the shared 960×540 source.
+The fit balances channel error and visible low-light falloff; it does not
+reproduce an exponential shoulder exactly. A highlight-weighted alternative
+reduced peak error but increased total image brightness and expanded visible
+Glow; retained the lower mean-error fit. Values are VFX-JS appearance
+compensation, not exported AE preset values.
+
+Validation at t=1.37/2/2.73 (19 presets, 57 pairs): former linear recipes differ
+by at most 1/255 per channel; other recipes have visible-region RGB MAE
+1.96–5.85/255 averaged across times, with localized peak differences up to
+58/255. Mean total RGB energy changes by about 0.3–2.9% for those recipes.
+No WebGL errors. All controls reuse cached shapes; no render pass was added.
+Production shader checks cover gamma/gain direction, grayscale, zero-light
+alpha and ungraded source composition. Node tests: 33 passed. ESM/CJS builds,
+focused Storybook type check, Biome and docs public-API checks passed.
+
+Review: `http://127.0.0.1:6040/grading-compare.html`; cache files
+`results/grading-report.json`, `results/grading-controls.json`,
+`results/grading-fit.json`, `results/grading/*-{before,after}.png`.

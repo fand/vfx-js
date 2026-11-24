@@ -25,8 +25,10 @@ function translatedError(a, b, dx, dy) {
         n = 0;
     const w = a.width,
         h = a.height;
-    for (let y = 32; y < h - 32; y++) {
-        for (let x = 32; x < w - 32; x++) {
+    const marginX = Math.max(32, Math.abs(dx) + 1);
+    const marginY = Math.max(32, Math.abs(dy) + 1);
+    for (let y = marginY; y < h - marginY; y++) {
+        for (let x = marginX; x < w - marginX; x++) {
             sum += Math.abs(
                 a.pixels[(y * w + x) * 4] -
                     b.pixels[((y + dy) * w + x + dx) * 4],
@@ -163,6 +165,93 @@ export async function runMotionChecks() {
         }
     }
     return result;
+}
+
+// Isolate coarse/fine bands from the production fBm. A pure uniform scroll
+// would incorrectly align both bands at the same velocity.
+export async function turbulenceChecks() {
+    const rows = [];
+    for (const pixelRatio of [1, 2]) {
+        for (const windSpeed of [50, -50]) {
+            for (const octave of [0, 3]) {
+                const f = await createSaberFixture({
+                    width: 320,
+                    height: 240,
+                    sourceWidth: 200,
+                    sourceHeight: 120,
+                    pixelRatio,
+                    options: {
+                        ...STEADY_OPTIONS,
+                        pad: 0,
+                        glowDistortion: {
+                            amount: 32,
+                            type: "energy",
+                            composite: "multiply",
+                            noiseDetail: 1,
+                            noiseTurbulence: 1,
+                            noiseComplexity: 4,
+                            noiseScale: 120,
+                            windSpeed,
+                            windDirection: 90,
+                            noiseSpeed: 0,
+                        },
+                    },
+                    transformDraw: (d) =>
+                        d.uniforms?.glowPass === 1
+                            ? {
+                                  ...d,
+                                  frag: d.frag
+                                      .replace(
+                                          "sum += snoise(samplePosition) * weight * band;",
+                                          `if (i == ${octave}) sum += snoise(samplePosition) * weight * band;`,
+                                      )
+                                      .replace(
+                                          "    float light = shadeNoise(n);",
+                                          "    outColor=vec4(vec3(0.5+0.5*n.x),1.0); return;\n    float light = shadeNoise(n);",
+                                      ),
+                              }
+                            : d,
+                });
+                try {
+                    const a = await f.capture("glow-distortion", 1);
+                    const b = await f.capture("glow-distortion", 1.2);
+                    const speed = octave === 0 ? 0.6 : 1.5;
+                    const shift = Math.round(
+                        windSpeed * 0.2 * speed * pixelRatio,
+                    );
+                    const aligned = translatedError(a, b, 0, shift);
+                    const rigid = translatedError(
+                        a,
+                        b,
+                        0,
+                        Math.round(windSpeed * 0.2 * pixelRatio),
+                    );
+                    rows.push({
+                        pixelRatio,
+                        windSpeed,
+                        octave,
+                        aligned,
+                        rigid,
+                        glError: f.gl.getError(),
+                    });
+                } finally {
+                    f.destroy();
+                }
+            }
+        }
+    }
+    return {
+        rows,
+        failures: rows.filter(
+            (r) =>
+                !Number.isFinite(r.aligned) ||
+                !Number.isFinite(r.rigid) ||
+                r.aligned > 0.001 ||
+                r.rigid < r.aligned * 10 ||
+                r.rigid < 0.001 ||
+                r.glError,
+        ),
+    };
 }
 
 // Compare thin directional warps against a 4x raster reference. This catches

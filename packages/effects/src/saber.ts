@@ -363,7 +363,9 @@ uniform float glowBias;
 uniform int source;
 uniform float edgeFade;
 uniform float whiteMix;
-uniform int linearLight;
+uniform float outputGamma;
+uniform float outputBrightness;
+uniform float outputSaturation;
 #ifdef LAYERED_GLOW
 ${GLSL_SABER_LAYERS}
 #elif defined(HALO)
@@ -408,7 +410,11 @@ void main() {
     // Halo is independent of glow tint/bias/distortion and visible-core softness.
     energy += layerAt(haloTex, haloScale, haloOutputSize) * haloGain * color;
 #endif
-    vec3 rgb = linearLight == 1 ? clamp(energy, 0.0, 1.0) : 1.0 - exp(-energy);
+    // AE-style output grading: saturation about the RGB mean, gain, then
+    // direct gamma (values below 1 lift midtones). Keep HDR until final clipping.
+    float gray = (energy.r + energy.g + energy.b) / 3.0;
+    vec3 graded = max(mix(vec3(gray), energy, outputSaturation), 0.0);
+    vec3 rgb = clamp(pow(graded * outputBrightness, vec3(outputGamma)), 0.0, 1.0);
     // Cut the last 8-bit step of the tail, so it ends along the glow, not at the pad edge.
     rgb = max(rgb - 1.0 / 255.0, 0.0) * (255.0 / 254.0);
 
@@ -447,8 +453,12 @@ export type SaberParams = {
     color: string;
     /** Overall brightness of the lines and glow. */
     intensity: number;
-    /** Exponential highlight rolloff (default), or linear light clipped to display range. */
-    toneMapping: "exponential" | "linear";
+    /** Output exponent, 0.1..10. 1 is neutral; below 1 lifts midtones, above 1 darkens them. */
+    gamma: number;
+    /** Output light multiplier before gamma, 0..5. 1 is neutral; 0 hides the light. */
+    brightness: number;
+    /** Output saturation about the RGB mean, 0..2. 0 is grayscale; 1 is neutral. */
+    saturation: number;
     /** Visible core brightness only. 1 is neutral gain; 0 hides the core. */
     coreIntensity: number;
     /** Mix the visible core's tint toward white, 0..1. */
@@ -555,7 +565,9 @@ const WHITE_MIX = 0.15;
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
     intensity: 1,
-    toneMapping: "exponential",
+    gamma: 1,
+    brightness: 1,
+    saturation: 1,
     coreIntensity: 1,
     coreWhiteness: WHITE_MIX,
     coreSoftness: 0,
@@ -1018,7 +1030,7 @@ export class SaberEffect implements Effect {
             Math.max(0, this.params.glowWhiteness),
         );
         const customTint = coreWhiteness !== glowWhiteness;
-        const brightness = saberFlickerGain(
+        const flickerGain = saberFlickerGain(
             ctx.time,
             this.params.flickerIntensity,
             this.params.flickerSpeed,
@@ -1043,22 +1055,24 @@ export class SaberEffect implements Effect {
                     Math.max(0, this.params.haloIntensity) *
                     this.#haloWeight *
                     intensity *
-                    brightness,
+                    flickerGain,
                 glowTex,
                 color: [r, g, b],
                 coreGain:
                     CORE_GAIN *
                     intensity *
                     Math.max(0, this.params.coreIntensity) *
-                    brightness,
+                    flickerGain,
                 coreWhiteness,
                 glowGain: glowEnabled
-                    ? GLOW_GAIN * glow * intensity * brightness
+                    ? GLOW_GAIN * glow * intensity * flickerGain
                     : 0,
                 glowBias: Math.min(4, Math.max(-4, this.params.glowBias)),
                 source: source ? 1 : 0,
                 whiteMix: glowWhiteness,
-                linearLight: this.params.toneMapping === "linear" ? 1 : 0,
+                outputGamma: outputParam(this.params.gamma, 0.1, 10),
+                outputBrightness: outputParam(this.params.brightness, 0, 5),
+                outputSaturation: outputParam(this.params.saturation, 0, 2),
                 edgeFade: this.params.pad === "fullscreen" ? 0 : 2 * pixelRatio,
             },
             target: ctx.target,
@@ -1441,6 +1455,7 @@ function distortionKey(p: SaberDistortionParams, time: number): CacheKey {
         p.noiseBias,
         p.noiseComplexity,
         p.noiseDetail,
+        p.noiseTurbulence,
         p.noiseAspectRatio,
         p.directionality,
         p.motionBlur,
@@ -1492,13 +1507,20 @@ function splatGeometry({
     };
 }
 
+function outputParam(value: number, min: number, max: number): number {
+    return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : 1;
+}
+
 function validateOptions(options: SaberOptions): void {
     const unknown = Reflect.ownKeys(options).filter(
         (key) => key !== "preset" && !Object.hasOwn(DEFAULT_PARAMS, key),
     );
     if (unknown.length > 0) {
+        const migration = unknown.includes("toneMapping")
+            ? "toneMapping has been removed; use gamma, brightness and saturation."
+            : "Legacy line and pyramid glow options have been removed; use coreDistortion, glowDistortion and glowLayers.";
         throw new TypeError(
-            `Unknown Saber option${unknown.length === 1 ? "" : "s"}: ${unknown.map(String).join(", ")}. Legacy line and pyramid glow options have been removed; use coreDistortion, glowDistortion and glowLayers.`,
+            `Unknown Saber option${unknown.length === 1 ? "" : "s"}: ${unknown.map(String).join(", ")}. ${migration}`,
         );
     }
 }

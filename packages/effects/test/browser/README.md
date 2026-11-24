@@ -29,6 +29,21 @@ Open `http://127.0.0.1:6023/`. The manifest records SHA-256 hashes of the main
 renderer and host files. Do not regenerate this folder during a measurement.
 Both renderers intentionally use the same host; this isolates effect costs.
 
+For AE appearance comparisons, use the original `*-raw` preset exports.
+The older `*-display` exports override Core Size to 2 and Glow Intensity to 20;
+they expose structure but are not the native preset brightness reference.
+Fire is the intentional exception: preserve its separately approved look.
+Use the exported source alpha, identical times, and identical cropping. With a
+full-frame 960×540 source, `pad: 160` supplies overscan for distorted broad glow;
+crop the viewport readback to the source rectangle instead of resizing it.
+
+After changing output grading, run
+`await (await import('./saber-appearance-checks.mjs')).runOutputChecks()`.
+This checks Gamma/Brightness direction, grayscale at Saturation 0, transparent
+light at Brightness 0, and unchanged source pixels. Gamma is the direct exponent
+(below 1 lifts midtones), matching the installed AE Saber probe. Preset grades
+preserve the previous VFX-JS looks; they are not copied AE preset values.
+
 ## GPU comparison
 
 Keep other animation tabs closed, the viewport fixed, and the machine on the
@@ -52,9 +67,10 @@ Use the median of repeated medians, and inspect p95 and repeat variation before
 interpreting small differences. These timings are specific to the GPU, driver,
 viewport, source and preset. They do not establish mobile performance.
 Also repeat with `batch: 1` to measure one render per animation frame; batched
-throughput and ordinary frame costs can differ on tile-based GPUs. Fixture
-teardown releases each test context after normal resource disposal to avoid
-browser context eviction during a later run.
+throughput and ordinary frame costs can differ on tile-based GPUs. The fixture
+releases detached VFX capability-probe contexts after construction and its
+renderer context after normal teardown, avoiding browser context eviction
+during a later run.
 
 Generate a Markdown timing table from the exported result:
 
@@ -98,6 +114,8 @@ const appearanceChecks = await import('./saber-appearance-checks.mjs');
 const appearance = await appearanceChecks.runAppearanceChecks({
   Baseline: saberComparison.Baseline,
 });
+const motionChecks = await import('./saber-motion-checks.mjs');
+const turbulence = await motionChecks.turbulenceChecks();
 ```
 
 The checks cover impulse energy/variance across mip boundaries, even/odd source
@@ -118,6 +136,12 @@ default with the old default.
 pixels from an internal pass; `screen()` returns composited RGBA8 pixels.
 Always destroy fixtures. Resource tracking is opt-in and must remain disabled
 for performance measurements.
+
+The turbulence probe isolates coarse/fine production noise bands. With frozen
+evolution it checks distinct signed wind velocities, at DPR 1/2, rather than
+merely asserting that the image changes over time. AE animation analysis should
+also exclude the core and inspect multiple spatial scales. A change in total
+image variance alone does not establish matching transport or cloud dynamics.
 
 Visual review remains necessary: numeric improvements do not prove an
 attractive animated result. Storybook includes `thin-lines`,

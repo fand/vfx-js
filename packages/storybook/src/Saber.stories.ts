@@ -93,7 +93,7 @@ export default {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
         thickness: { control: { type: "range", min: 0.1, max: 8, step: 0.05 } },
         coreIntensity: {
-            control: { type: "range", min: 0, max: 5, step: 0.01 },
+            control: { type: "range", min: 0, max: 10, step: 0.01 },
         },
         coreWhiteness: {
             control: { type: "range", min: 0, max: 1, step: 0.01 },
@@ -399,7 +399,23 @@ export const presets: StoryObj<Args> = {
         });
         const pane = attachSaberPane("Saber · controls", effect);
         const select = (name: SaberPresetName) => {
-            effect.setParams({ preset: name });
+            effect.setParams({
+                preset: name,
+                // Input/reveal options belong to this demo, not appearance recipes.
+                ...(name === "wormhole" || name === "fog"
+                    ? {
+                          edge: "alpha" as const,
+                          edgeThreshold: name === "wormhole" ? 1 : 0.5,
+                          dynamic: false,
+                          source: false,
+                          pad: 320,
+                          start: 0,
+                          end: 1,
+                          segments: 3,
+                          fade: 100,
+                      }
+                    : {}),
+            });
             pane.refresh();
             for (const button of canvasElement.querySelectorAll<HTMLButtonElement>(
                 "[data-preset]",
@@ -416,7 +432,10 @@ export const presets: StoryObj<Args> = {
                 description.textContent = PRESET_DESCRIPTIONS[name];
             }
             if (code) {
-                code.textContent = `new SaberEffect({ preset: "${name}", source: false })`;
+                code.textContent =
+                    name === "wormhole"
+                        ? 'new SaberEffect({ preset: "wormhole", edgeThreshold: 1, source: false, pad: 320 })'
+                        : `new SaberEffect({ preset: "${name}", source: false })`;
             }
         };
         for (const button of canvasElement.querySelectorAll<HTMLButtonElement>(

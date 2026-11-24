@@ -17,6 +17,70 @@ function difference(a, b) {
     return { maximum, changed };
 }
 
+// Production-shader checks for the AE-style output controls, including the
+// source-compositing boundary. Dither may separate grayscale channels by 2 LSB.
+export async function runOutputChecks() {
+    const f = await createSaberFixture({
+        options: {
+            ...STEADY_OPTIONS,
+            color: "#4080c0",
+            intensity: 0.15,
+            coreWhiteness: 0,
+            glow: 0,
+            haloIntensity: 0,
+            gamma: 1,
+            brightness: 1,
+            saturation: 1,
+            source: false,
+        },
+    });
+    const sum = ({ pixels }) =>
+        pixels.reduce(
+            (total, value, i) => total + (i % 4 === 3 ? 0 : value),
+            0,
+        );
+    const result = { failures: [] };
+    try {
+        const neutral = sum(f.screen(2));
+        f.effect.params.gamma = 0.5;
+        const lifted = sum(f.screen(2));
+        f.effect.params.gamma = 2;
+        const darkened = sum(f.screen(2));
+        if (!(lifted > neutral && neutral > darkened && darkened > 0)) {
+            result.failures.push("Gamma direction");
+        }
+        f.effect.setParams({ gamma: 1, brightness: 2 });
+        if (sum(f.screen(2)) <= neutral) {
+            result.failures.push("Brightness direction");
+        }
+        f.effect.setParams({ brightness: 1, saturation: 0 });
+        const gray = f.screen(2);
+        for (let i = 0; i < gray.pixels.length; i += 4) {
+            const channels = gray.pixels.subarray(i, i + 3);
+            if (Math.max(...channels) - Math.min(...channels) > 2) {
+                result.failures.push("Saturation zero is not grayscale");
+                break;
+            }
+        }
+        f.effect.params.brightness = 0;
+        if (f.screen(2).pixels.some((value) => value !== 0)) {
+            result.failures.push("Zero brightness leaves light or alpha");
+        }
+        f.effect.params.source = true;
+        const source = f.screen(2);
+        f.effect.setParams({ gamma: 0.1, saturation: 2 });
+        if (!sum(source) || difference(source, f.screen(2)).maximum) {
+            result.failures.push("Output grading changes source pixels");
+        }
+        if (f.gl.getError()) {
+            result.failures.push("Output grading WebGL error");
+        }
+        return result;
+    } finally {
+        f.destroy();
+    }
+}
+
 export async function runAppearanceChecks({ Baseline } = {}) {
     const result = {
         compatibility: [],

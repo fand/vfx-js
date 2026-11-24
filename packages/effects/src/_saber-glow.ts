@@ -31,6 +31,8 @@ export type SaberDistortionParams = {
     noiseComplexity: number;
     /** Fine turbulence and octave spacing, 0..1. Energy/multiply glow blends ridges toward cloud-like density. 0 preserves the original look. */
     noiseDetail: number;
+    /** Turbulent transport, 0..1. Separates octave wind speeds; Fluid/Smoke glow also warps its noise domain. 0 preserves uniform transport. */
+    noiseTurbulence: number;
     /** Horizontal wavelength multiplier, positive. */
     noiseAspectRatio: number;
     /** Constrain displacement to the wind axis: 0 = free, 1 = along wind only. */
@@ -61,6 +63,7 @@ export const DEFAULT_DISTORTION: SaberDistortionParams = {
     noiseBias: 1,
     noiseComplexity: 3,
     noiseDetail: 0,
+    noiseTurbulence: 0,
     noiseAspectRatio: 1,
     directionality: 0,
     motionBlur: 0,
@@ -88,6 +91,9 @@ uniform float amount;
 uniform float noiseScale;
 uniform float noiseBias;
 uniform float noiseDetail;
+#ifdef TURBULENT_NOISE
+uniform float noiseTurbulence;
+#endif
 uniform float aspect;
 uniform float directionality;
 uniform float seed;
@@ -113,7 +119,11 @@ float noiseBand(float footprint) {
     return 1.0 - smoothstep(0.25, 1.0, footprint);
 }
 
-float fbm(vec3 p, float footprint) {
+float fbm(vec3 p, float footprint
+#ifdef TURBULENT_NOISE
+    , vec2 transport
+#endif
+) {
     float sum = 0.0;
     float weight = 0.5;
     // Density needs a strong coarse envelope with diminishing fine detail.
@@ -121,12 +131,29 @@ float fbm(vec3 p, float footprint) {
     bool density = glowPass == 1 && ((noiseType == 2 && composite == 1) || (noiseType != 2 && noiseDetail > 0.0));
     float persistence = mix(0.5, 0.58, density ? 0.0 : noiseDetail);
     float lacunarity = mix(2.03, 2.7, noiseDetail);
+#ifdef TURBULENT_NOISE
+    float frequency = 1.0;
+#endif
     for (int i = 0; i < 8; i++) {
         if (i >= complexity) break;
         float band = noiseBand(footprint);
         if (band <= 0.0) break;
+#ifdef TURBULENT_NOISE
+        vec3 samplePosition = p;
+        if (noiseTurbulence > 0.0) {
+            // Large clouds drift slowly; finer eddies overtake them. Applying
+            // one wind offset before fBm otherwise locks all octaves together.
+            float speed = min(0.6 + 0.3 * float(i), 1.8);
+            samplePosition.xy += transport * frequency * (1.0 - speed) * noiseTurbulence;
+        }
+        sum += snoise(samplePosition) * weight * band;
+#else
         sum += snoise(p) * weight * band;
+#endif
         p = p * lacunarity + vec3(17.1, 9.2, 13.7);
+#ifdef TURBULENT_NOISE
+        frequency *= lacunarity;
+#endif
         footprint *= lacunarity;
         weight *= persistence;
     }
@@ -186,10 +213,18 @@ float sampleLight(vec2 p) {
 vec2 distortionAt(float offset) {
     // Anchor noise to the element, so changing pad does not move it.
     float sampleClock = clock + noiseVelocity * offset;
+#ifdef TURBULENT_NOISE
+    vec2 transport = (wind + windVelocity * offset) / noiseScale;
+    transport.x /= aspect;
+#endif
     vec2 q = (uvContent * contentSize - wind - windVelocity * offset) / noiseScale;
     q.x /= aspect;
     vec2 n;
-    if (glowPass == 1 && noiseType != 2 && noiseDetail == 0.0) {
+    if (glowPass == 1 && noiseType != 2 && noiseDetail == 0.0
+#ifdef TURBULENT_NOISE
+        && noiseTurbulence == 0.0
+#endif
+    ) {
         // Broad, wind-aligned flow. Fine strands appear only in active pockets,
         // rather than folding every part of the halo into the same marbling.
         vec2 across = vec2(flowDirection.y, -flowDirection.x);
@@ -224,6 +259,9 @@ vec2 distortionAt(float offset) {
             vec2 across = vec2(flowDirection.y, -flowDirection.x);
             float stretch = composite == 1 ? 0.65 : 0.15;
             domain = mix(q, vec2(dot(q, across), dot(q, flowDirection) * stretch), noiseDetail);
+#ifdef TURBULENT_NOISE
+            transport = mix(transport, vec2(dot(transport, across), dot(transport, flowDirection) * stretch), noiseDetail);
+#endif
         }
         vec3 p = vec3(domain, sampleClock) + vec3(seed * 0.123, seed * 0.719, seed * 0.317);
         float baseFootprint = noiseFootprint(p.xy);
@@ -231,10 +269,28 @@ vec2 distortionAt(float offset) {
             // The warp itself must disappear when its wavelength is unresolved.
             p.xy += 0.65 * noiseBand(baseFootprint) * vec2(snoise(p + 3.1), snoise(p + 19.7));
         }
+#ifdef TURBULENT_NOISE
+        if (noiseType != 2 && glowPass == 1 && noiseTurbulence > 0.0) {
+            // Coarse evolving flow bends the finer density field into curls.
+            // Opt-in keeps existing recipes and their cached look intact.
+            vec3 flow = vec3(domain * 0.7, sampleClock * 0.45)
+                + vec3(seed * 0.123, seed * 0.719, seed * 0.317);
+            p.xy += 0.2 * noiseTurbulence * noiseBand(baseFootprint)
+                * vec2(snoise(flow + 3.1), snoise(flow + 19.7));
+        }
+#endif
         float footprint = max(baseFootprint, noiseFootprint(p.xy));
-        n.x = shape(fbm(p, footprint));
+        n.x = shape(fbm(p, footprint
+#ifdef TURBULENT_NOISE
+            , transport
+#endif
+        ));
         // Multiply consumes one scalar; avoid evaluating a second fractal field.
-        n.y = composite == 1 ? 0.0 : shape(fbm(p + vec3(43.7, 17.3, 9.1), footprint));
+        n.y = composite == 1 ? 0.0 : shape(fbm(p + vec3(43.7, 17.3, 9.1), footprint
+#ifdef TURBULENT_NOISE
+            , transport
+#endif
+        ));
         n *= polarity * noiseBand(footprint);
     }
     if (glowPass == 0 && noiseType == 0 && noiseDetail > 0.0 && noiseBias > 1.0) {
@@ -317,6 +373,18 @@ const FRAG_DISTORT_CONTOUR = FRAG_DISTORT_BOUNDED.replace(
     "#version 300 es",
     "#version 300 es\n#define ANALYTIC_CORE",
 );
+
+// Compile the opt-in path separately: zero turbulence retains the original
+// arithmetic, register usage and displayed pixels of existing recipes.
+function turbulentFragment(fragment: string): string {
+    return fragment.replace(
+        "#version 300 es",
+        "#version 300 es\n#define TURBULENT_NOISE",
+    );
+}
+const FRAG_DISTORT_TURBULENT = turbulentFragment(FRAG_DISTORT);
+const FRAG_DISTORT_BOUNDED_TURBULENT = turbulentFragment(FRAG_DISTORT_BOUNDED);
+const FRAG_DISTORT_CONTOUR_TURBULENT = turbulentFragment(FRAG_DISTORT_CONTOUR);
 
 const FRAG_PRE_GAMMA = `#version 300 es
 precision highp float;
@@ -473,10 +541,16 @@ export class SaberGlowPasses {
         ctx.draw({
             frag:
                 bounds?.lineWidth && params.composite === "distort"
-                    ? FRAG_DISTORT_CONTOUR
+                    ? params.noiseTurbulence > 0
+                        ? FRAG_DISTORT_CONTOUR_TURBULENT
+                        : FRAG_DISTORT_CONTOUR
                     : bounds
-                      ? FRAG_DISTORT_BOUNDED
-                      : FRAG_DISTORT,
+                      ? params.noiseTurbulence > 0
+                          ? FRAG_DISTORT_BOUNDED_TURBULENT
+                          : FRAG_DISTORT_BOUNDED
+                      : params.noiseTurbulence > 0
+                        ? FRAG_DISTORT_TURBULENT
+                        : FRAG_DISTORT,
             uniforms: {
                 ...(bounds
                     ? {
@@ -525,6 +599,10 @@ export class SaberGlowPasses {
                 noiseScale: Math.max(params.noiseScale, 0.1),
                 noiseBias: Math.max(params.noiseBias, 0.05),
                 noiseDetail: Math.min(1, Math.max(0, params.noiseDetail)),
+                noiseTurbulence: Math.min(
+                    1,
+                    Math.max(0, params.noiseTurbulence),
+                ),
                 aspect: Math.max(params.noiseAspectRatio, 0.05),
                 directionality: Math.max(0, Math.min(1, params.directionality)),
                 seed: params.seed,
