@@ -122,24 +122,20 @@ export function sphereFilms(
  * of that cell, and the sphere across it (-1: none). Walls lie on
  * radical planes, so the distance to the wall shared with sphere j is
  * exact: (pow_j(q) - pow_own(q)) / (2 |c_j - c_own|). It is >= 0 inside
- * the cell and 0 on the line where two bubbles' surfaces meet.
- * `normal` is that wall's unit normal, from the owner towards the sphere
- * across: moving q by v changes the distance by -v . normal (the froth
- * uses it). As the shader's `borderDist`; the owner itself (same centre)
- * is skipped.
+ * the cell and 0 on the line where two bubbles' surfaces meet. As the
+ * shader's `borderDist`; the owner itself (same centre) is skipped.
  */
 export function borderDist(
     q: readonly [number, number, number],
     own: number,
     spheres: readonly FoamSphere[],
-): { e: number; across: number; normal: [number, number, number] } {
+): { e: number; across: number } {
     const pow = ([x, y, z, r]: FoamSphere) =>
         (q[0] - x) ** 2 + (q[1] - y) ** 2 + (q[2] - z) ** 2 - r * r;
     const o = spheres[own];
     const powI = pow(o);
     let e = Infinity;
     let across = -1;
-    let normal: [number, number, number] = [0, 0, 0];
     spheres.forEach((s, j) => {
         const d2 = (s[0] - o[0]) ** 2 + (s[1] - o[1]) ** 2 + (s[2] - o[2]) ** 2;
         if (d2 < 1e-12) {
@@ -149,9 +145,7 @@ export function borderDist(
         if (ej < e) {
             e = ej;
             across = j;
-            const k = 1 / Math.sqrt(d2);
-            normal = [(s[0] - o[0]) * k, (s[1] - o[1]) * k, (s[2] - o[2]) * k];
         }
     });
-    return { e: Math.max(e, 0), across, normal };
+    return { e: Math.max(e, 0), across };
 }

@@ -214,10 +214,11 @@ export type BubbleParams = OrbitCameraParams & {
 
     /**
      * Width of the borders on the foam's outside, where two bubbles meet,
-     * as a share of `cellSize`, 0 to 0.5: the film thickens over this
-     * width (see `borderThickness`), and the white line (see
-     * `borderStrength`) is a sharp core about half as wide in all. Walls
-     * inside the foam get no border.
+     * as a share of `cellSize`, 0 (off) to 0.5: the water gathered there.
+     * The film thickens over this width, by 100 nm per 0.01 at the
+     * border, so wider borders show more bands of colour. The white line
+     * (see `borderStrength`) is a sharp core about half as wide in all.
+     * Walls inside the foam get no border.
      */
     borderWidth: number;
     /**
@@ -225,30 +226,6 @@ export type BubbleParams = OrbitCameraParams & {
      * gathered there scatters, 0 (off) to 2.
      */
     borderStrength: number;
-    /**
-     * How much thicker the film gets towards a border, in nm, 0 (off) to
-     * 1500: the interference colours run in bands along it.
-     */
-    borderThickness: number;
-    /**
-     * Froth along the borders on the foam's outside, 0 (off) to 1: very
-     * fine bubbles, densest at the border and thinning out over
-     * `frothWidth`. Each catches the light on its rim and shimmers in
-     * its own colours; smaller than a couple of pixels, they blend into
-     * a soft brightening.
-     */
-    froth: number;
-    /**
-     * Size of the froth's bubbles, as a share of `cellSize`, 0.01 to
-     * 0.3: the spacing they sit at; their diameters are 0.35 to 0.9 of
-     * it.
-     */
-    frothSize: number;
-    /**
-     * Width of the froth's band along the borders, as a share of
-     * `cellSize`, 0 to 0.5: it thins out from the border to there.
-     */
-    frothWidth: number;
 
     /**
      * The backdrop: a pattern name, or an image (an element, an
@@ -322,6 +299,10 @@ export type BubbleEffectOptions = {
     still?: boolean;
 };
 
+// How much thicker the film gets at a border, in nm per unit of
+// borderWidth.
+const BORDER_NM_PER_WIDTH = 10000;
+
 const DEFAULT_PARAMS: BubbleParams = {
     sourceChannel: "alpha",
     depth: 0.1,
@@ -349,10 +330,6 @@ const DEFAULT_PARAMS: BubbleParams = {
     color: "#2f7fe0",
     borderWidth: 0.06,
     borderStrength: 0.35,
-    borderThickness: 600,
-    froth: 0.6,
-    frothSize: 0.08,
-    frothWidth: 0.15,
     backdrop: "none",
     backdropVisible: false,
     backdropAround: false,
@@ -485,13 +462,6 @@ uniform vec3 bodyColor;
 uniform float borderWidth;
 uniform float borderStrength;
 uniform float borderThickness;
-// The froth along the borders: its amount, the size of its cells and the
-// width of its band (world units; 0: off). edgeReach is the farthest
-// either reaches from a border (0: the distance is not needed).
-uniform float froth;
-uniform float frothSize;
-uniform float frothWidth;
-uniform float edgeReach;
 uniform int debugView;
 
 // Spheres a grid cell lists, at most: the ray passes through some of them.
@@ -508,12 +478,6 @@ const float WALL_DIM = 0.35;
 // Half the white line's core, as a share of the border's width.
 const float BORDER_LINE = 0.22;
 const float NO_EDGE = 1e30;
-// The froth: how far a tiny bubble wanders from its noise cell's centre,
-// its radius range, and the brightness of its rim; all per cell size.
-const float FROTH_JITTER = 0.5;
-const float FROTH_RMIN = 0.18;
-const float FROTH_RMAX = 0.45;
-const float FROTH_RIM = 0.9;
 
 ${GLSL_SIMPLEX3}
 ${GLSL_SIMPLEX3_GRAD}
@@ -553,15 +517,6 @@ float sphereId(int i) {
 
 vec3 col = vec3(0.0);
 vec3 remain = vec3(1.0);
-// The point an outer film shows (on the squashed shell, pushed out from
-// the ray) and the surface's normal there: the froth sits on it. Set
-// with the border distance.
-vec3 filmQ;
-vec3 filmQN;
-// The nearest border found with it: the unit normal of its plane, from
-// the owner towards the sphere across it. The distance falls by dot(v,
-// edgeN) when the point moves by v.
-vec3 edgeN = vec3(0.0);
 int films = 0;
 float firstId = -1.0;
 
@@ -614,80 +569,6 @@ float borderLine(float e, float fp) {
     return c / w * (1.0 - smoothstep(w - s, w + s, e));
 }
 
-// How much froth there is at distance e from a border (none past
-// frothWidth).
-float frothBand(float e) {
-    return froth * (1.0 - smoothstep(0.0, frothWidth, e));
-}
-
-// The froth at q, a point of an outer film with normal nq there, at
-// distance e from the nearest border (edgeN): tiny bubbles from a 3D
-// cellular noise in object space, one per noise cell at most, kept more
-// often near the border. Their circles are measured along the surface.
-// The one covering q bends the shading normal nf like a hemisphere and
-// shifts the thickness th; returns the white its rim scatters. Smaller
-// than about 1.5 px, they fade into an even brightening.
-float frothAt(vec3 q, vec3 nq, inout vec3 nf, float e, float fp, inout float th) {
-    float fs = frothSize;
-    float avg = frothBand(e) * 0.12 * FROTH_RIM;
-    if (FROTH_RMAX * fs < 1.5 * fp) {
-        // All under 1.5 px: only their average shows.
-        return avg;
-    }
-    vec3 g = q / fs - 0.5;
-    ivec3 base = ivec3(floor(g));
-    float best = 2.0;
-    vec3 bt = vec3(0.0);
-    float br = 1.0;
-    float bth = 0.0;
-    for (int k = 0; k < 8; k++) {
-        ivec3 c = base + ivec3(k & 1, (k >> 1) & 1, k >> 2);
-        vec4 h = hash4(uvec3(c) ^ uvec3(0x51a3u, 0x2f9bu, 0x7c15u));
-        // The centre stays within a quarter cell of the cell's centre and
-        // the radius under 0.45 cell, so a cell outside these eight can
-        // not cover q (|offset| >= 0.75 cell, and only those within half
-        // a cell of the surface count).
-        vec3 o = (vec3(c) + 0.5 + (h.xyz - 0.5) * FROTH_JITTER) * fs - q;
-        float on = dot(o, nq);
-        if (abs(on) > 0.5 * fs) {
-            continue;
-        }
-        vec3 t = o - nq * on;
-        float r = fs * mix(FROTH_RMIN, FROTH_RMAX, h.w);
-        float d = length(t) / r;
-        if (d >= 1.0 + fp / r || d >= best) {
-            continue;
-        }
-        // Kept by the band at its own centre, on either side of the
-        // border, so both films agree on it.
-        vec4 h2 = hash4(uvec3(c) ^ uvec3(0x93c1u, 0x0e6du, 0x4b27u));
-        if (h2.x >= frothBand(abs(e - dot(t, edgeN)))) {
-            continue;
-        }
-        best = d;
-        bt = t;
-        br = r;
-        bth = h2.y;
-    }
-    // Drawn from a radius of 1.5 px, fully from 3 px.
-    // Where they are too small to draw, their average stands in.
-    avg *= 1.0 - smoothstep(1.5, 3.0, 0.5 * (FROTH_RMIN + FROTH_RMAX) * fs / fp);
-    if (best >= 2.0) {
-        return avg;
-    }
-    float detail = smoothstep(1.5, 3.0, br / fp);
-    float d = min(best, 1.0);
-    // How much of the pixel the tiny bubble covers.
-    float cov = clamp((1.0 - best) * br / fp + 0.5, 0.0, 1.0) * detail;
-    vec3 nb = normalize(nf * sqrt(1.0 - d * d) - (bt - nf * dot(bt, nf)) / br);
-    nf = normalize(mix(nf, nb, cov));
-    // Its own film, thinner or thicker: it shimmers in other colours.
-    th = mix(th, clamp(th + (bth - 0.5) * 700.0, 60.0, THICKNESS_MAX), cov);
-    float rimW = max(0.2, 1.5 * fp / br);
-    float rim = smoothstep(1.0 - 2.0 * rimW, 1.0, d);
-    return cov * rim * FROTH_RIM + avg;
-}
-
 // The shell's warp along a piece of the ray, where it is linear: with
 // warpOn, ro and rd are the piece in the unsquashed foam (t scaled by
 // warpL), roReal and rdReal the ray seen. The push is along warpG (out of
@@ -725,20 +606,14 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
     // White light scattered by the water along the borders.
     float white = 0.0;
-    if (edge < edgeReach) {
-        // The pixel's footprint on the film, longer at a grazing angle.
+    if (edge < borderWidth) {
+        // The border: the water gathered where two bubbles meet. The
+        // film thickens towards it, and a narrow line of it scatters.
+        // The pixel's footprint on the film is longer at a grazing angle.
         float fp = pixCone * length(p - ro) / max(cosI, 0.25);
-        if (edge < borderWidth) {
-            // The border: the water gathered where two bubbles meet. The
-            // film thickens towards it, and a narrow line of it scatters.
-            float f = 1.0 - edge / borderWidth;
-            th = min(th + borderThickness * f * f, THICKNESS_MAX);
-            white = borderStrength * borderLine(edge, fp);
-        }
-        if (edge < frothWidth) {
-            white += frothAt(filmQ, filmQN, nf, edge, fp, th);
-            cosI = clamp(-dot(rd, nf), 0.0, 1.0);
-        }
+        float f = 1.0 - edge / borderWidth;
+        th = min(th + borderThickness * f * f, THICKNESS_MAX);
+        white = borderStrength * borderLine(edge, fp);
     }
     float cosR = max(cosI, rimCos);
     vec3 R = mix(
@@ -876,8 +751,8 @@ void loadCell(ivec3 C, float t0, float t1, bool all) {
 
 // The distance from q, in the cell of sphere \`own\` (whose power at q is
 // powI), to the wall it shares with sphere s: walls lie on radical
-// planes, so it is exact. Keeps the nearer of it and e (and edgeN); the
-// owner itself is skipped.
+// planes, so it is exact. Keeps the nearer of it and e; the owner itself
+// is skipped.
 void nearWall(inout float e, vec3 q, vec4 own, float powI, vec4 s) {
     vec3 dc = s.xyz - own.xyz;
     float d2 = dot(dc, dc);
@@ -886,11 +761,7 @@ void nearWall(inout float e, vec3 q, vec4 own, float powI, vec4 s) {
     }
     vec3 m = q - s.xyz;
     float ri = inversesqrt(d2);
-    float ej = (dot(m, m) - s.w * s.w - powI) * 0.5 * ri;
-    if (ej < e) {
-        e = ej;
-        edgeN = dc * ri;
-    }
+    e = min(e, (dot(m, m) - s.w * s.w - powI) * 0.5 * ri);
 }
 
 // The distance from q to the nearest wall of its owner's cell, over
@@ -961,10 +832,8 @@ void wallFilm(int i, float t, bool entering) {
     vec4 s = sdf3(p);
     cost += 1.0;
     float edge = NO_EDGE;
-    if (edgeReach > 0.0) {
+    if (borderWidth > 0.0) {
         edge = borderDist(p, cand[i]);
-        filmQ = p;
-        filmQN = s.yzw;
     }
     shadeFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0, edge);
 }
@@ -984,10 +853,8 @@ void sphereFilm(int i, float t, bool entering, float cover) {
         }
     }
     float edge = NO_EDGE;
-    if (edgeReach > 0.0) {
+    if (borderWidth > 0.0) {
         edge = borderDist(p, cand[i]);
-        filmQ = p;
-        filmQN = n;
     }
     shadeFilm(p, n, cand[i].xyz, candId[i], 1.0, entering, cover, edge);
 }
@@ -1778,27 +1645,17 @@ export class BubbleEffect implements Effect {
         };
     }
 
-    // The borders and the froth, in world units; a width of 0 skips them
-    // in the shader.
+    // The borders, in world units; a width of 0 skips them in the shader.
     #borderUniforms(cellSize: number) {
         const p = this.params;
         const d = DEFAULT_PARAMS;
         const strength = clamp(p.borderStrength, 0, 2, d.borderStrength);
-        const thickness = clamp(p.borderThickness, 0, 1500, d.borderThickness);
-        const width = clamp(p.borderWidth, 0, 0.5, d.borderWidth) * cellSize;
-        const on = width > 0 && (strength > 0 || thickness > 0);
-        const froth = clamp(p.froth, 0, 1, d.froth);
-        const frothSize = clamp(p.frothSize, 0.01, 0.3, d.frothSize) * cellSize;
-        const frothWidth = clamp(p.frothWidth, 0, 0.5, d.frothWidth) * cellSize;
-        const frothOn = froth > 0 && frothWidth > 0;
+        const share = clamp(p.borderWidth, 0, 0.5, d.borderWidth);
         return {
-            borderWidth: on ? width : 0,
+            borderWidth: share * cellSize,
             borderStrength: strength,
-            borderThickness: thickness,
-            froth,
-            frothSize,
-            frothWidth: frothOn ? frothWidth : 0,
-            edgeReach: Math.max(on ? width : 0, frothOn ? frothWidth : 0),
+            // More water: a wider border and a thicker film at it.
+            borderThickness: share * BORDER_NM_PER_WIDTH,
         };
     }
 

@@ -202,26 +202,6 @@ describe("borderDist", () => {
         expect(borderDist([0, 0, 0], 0, [[0, 0, 0, 1]])).toEqual({
             e: Infinity,
             across: -1,
-            normal: [0, 0, 0],
         });
-    });
-
-    test("the normal gives how the distance changes (the froth's band)", () => {
-        const s: FoamSphere[] = [
-            [0.1, -0.2, 0.3, 1.1],
-            [1.2, 0.5, -0.4, 0.9],
-            [-0.3, 1.4, 0.2, 1],
-        ];
-        const q = [0.3, 0.2, 0.1] as const;
-        const a = borderDist(q, 0, s);
-        const v = [0.02, -0.03, 0.01] as const;
-        const b = borderDist([q[0] + v[0], q[1] + v[1], q[2] + v[2]], 0, s);
-        expect(b.across).toBe(a.across);
-        const n = a.normal;
-        expect(Math.hypot(...n)).toBeCloseTo(1);
-        expect(b.e).toBeCloseTo(
-            a.e - (v[0] * n[0] + v[1] * n[1] + v[2] * n[2]),
-            10,
-        );
     });
 });
