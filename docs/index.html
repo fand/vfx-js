@@ -561,7 +561,7 @@
                                     <details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Classes</span>
-                                                <span class="DocSidebarCount">36</span>
+                                                <span class="DocSidebarCount">37</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -580,6 +580,12 @@
                                                         <a href="/vfx-js/docs/effects/BloomEffect/">
                                                             <span class="DocSidebarLabel">
                                                                 BloomEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BubbleEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                BubbleEffect
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -785,7 +791,7 @@
                                         </details><details>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">90</span>
+                                                <span class="DocSidebarCount">94</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -828,6 +834,30 @@
                                                         <a href="/vfx-js/docs/effects/BloomParams/">
                                                             <span class="DocSidebarLabel">
                                                                 BloomParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BubbleDebugView/">
+                                                            <span class="DocSidebarLabel">
+                                                                BubbleDebugView
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BubbleEffectOptions/">
+                                                            <span class="DocSidebarLabel">
+                                                                BubbleEffectOptions
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BubbleParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                BubbleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BubblePointer/">
+                                                            <span class="DocSidebarLabel">
+                                                                BubblePointer
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1747,6 +1777,11 @@
                                     </a>
                                     <span>COD:AW-style bloom. Mutate <code>params</code> directly or via <code>setParams</code> — uniforms and <code>outputRect</code> read live each frame, so a reactive UI (e.g. Tweakpane) can bind directly to <code>effect.params</code>.</span>
                                 </li><li>
+                                    <a href="/vfx-js/docs/effects/BubbleEffect/">
+                                        <code>BubbleEffect</code>
+                                    </a>
+                                    <span>Fills the element's silhouette, extruded into 3D, with a foam of transparent soap bubbles in thin-film colours.</span>
+                                </li><li>
                                     <a href="/vfx-js/docs/effects/ChromaticEffect/">
                                         <code>ChromaticEffect</code>
                                     </a>
@@ -1951,6 +1986,26 @@
                                         <code>BloomParams</code>
                                     </a>
                                     <span></span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BubbleDebugView/">
+                                        <code>BubbleDebugView</code>
+                                    </a>
+                                    <span>A <code>BubbleParams.debug</code> view: texture lookups per pixel (<code>&quot;cost&quot;</code>), films shaded (<code>&quot;layers&quot;</code>), or each bubble in a flat colour where the ray first meets it (<code>&quot;cells&quot;</code>).</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BubbleEffectOptions/">
+                                        <code>BubbleEffectOptions</code>
+                                    </a>
+                                    <span></span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BubbleParams/">
+                                        <code>BubbleParams</code>
+                                    </a>
+                                    <span>Params of <a href="/vfx-js/docs/effects/BubbleEffect/"><code>BubbleEffect</code></a>: the foam's own, and the camera's (<a href="/vfx-js/docs/effects/OrbitCameraParams/"><code>OrbitCameraParams</code></a>). All are read every frame. The placement params (<code>depth</code>, <code>bevel</code>, <code>cellSize</code>, <code>cellSizeRandomness</code>, <code>roundness</code>, <code>seed</code>, <code>minSize</code>) place the bubbles again on the CPU when they change, which takes a few to a few tens of milliseconds.</span>
+                                </li><li>
+                                    <a href="/vfx-js/docs/effects/BubblePointer/">
+                                        <code>BubblePointer</code>
+                                    </a>
+                                    <span>What the pointer does to a <a href="/vfx-js/docs/effects/BubbleEffect/"><code>BubbleEffect</code></a>.</span>
                                 </li><li>
                                     <a href="/vfx-js/docs/effects/ChromaticParams/">
                                         <code>ChromaticParams</code>
