@@ -44,7 +44,11 @@ export function loadMaterial(m: HoloMaterialId): Promise<MaterialDef> {
     }
     let p = loading.get(m);
     if (!p) {
-        p = loaders[m]().then(
+        const load = Object.hasOwn(loaders, m) ? loaders[m] : undefined;
+        if (!load) {
+            return Promise.reject(new Error(`unknown material "${m}"`));
+        }
+        p = load().then(
             (d) => {
                 loaded.set(m, d);
                 loading.delete(m);

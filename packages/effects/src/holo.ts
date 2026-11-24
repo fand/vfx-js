@@ -507,7 +507,11 @@ function applyInput(st: Composed, input: HoloSettingsInput): void {
         Object.assign(writes, sceneWrites(rest));
         for (const [k, v] of Object.entries(rest)) {
             if (COMPOSED_KEYS.has(k)) {
-                if (v !== undefined) {
+                if (k === "material" && v !== undefined && !isMaterialName(v)) {
+                    warnOnce(
+                        `HoloEffect: unknown material "${String(v)}" (one of ${MATERIAL_NAMES.join(", ")}); keeping "${st.material}".`,
+                    );
+                } else if (v !== undefined) {
                     (st as Record<string, unknown>)[k] = v;
                 }
             } else if (!SCENE_KEYS.has(k)) {
