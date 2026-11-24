@@ -47,6 +47,7 @@ await vfx.add(img, {
 | `BubbleEffect`           | Foam of thin-film soap bubbles filling the 3D silhouette        |
 | `FluidEffect`            | Stable-Fluids advection driven by pointer events                |
 | `GlassEffect`            | Dispersive glass in the shape of the extruded 3D silhouette     |
+| `HoloEffect`             | Holographic foils of holo.spot, tilting with the pointer        |
 | `HalftoneEffect`         | RGB / CMYK halftone screen with configurable ink presets        |
 | `JPEGGlitchEffect`       | Real codec-level JPEG glitch — corrupts the encoded byte stream  |
 | `MatrixEffect`           | Matrix-movie digital rain — random glyphs over the source grayscale |
