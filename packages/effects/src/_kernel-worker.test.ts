@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { KernelWorker } from "./kernel-worker.js";
+import { KernelWorker } from "./_kernel-worker.js";
 
 afterEach(() => {
     vi.unstubAllGlobals();

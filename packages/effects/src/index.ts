@@ -13,6 +13,13 @@ export {
 } from "./ascii.js";
 export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg.js";
 export { BloomEffect, type BloomParams } from "./bloom.js";
+export {
+    type BubbleDebugView,
+    BubbleEffect,
+    type BubbleEffectOptions,
+    type BubbleParams,
+    type BubblePointer,
+} from "./bubble.js";
 export { ChromaticEffect, type ChromaticParams } from "./chromatic.js";
 export {
     ColoredEdgesEffect,

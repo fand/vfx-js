@@ -1,5 +1,5 @@
 // Ported from holospot engine/scene/kernelWorker.ts (https://github.com/dmitrykurash/holospot), MIT © 2026 Dmitry Kurash.
-// A tiny inline-worker runner for self-contained CPU kernels (addendum A6: the logo SDF and the paper maps; the same
+// A tiny inline-worker runner for self-contained CPU kernels (HoloEffect's logo SDF and paper maps, BubbleEffect's foam; the same
 // pattern as scene/bumpMaps.ts). The kernel factory's source text becomes a Blob worker:
 //   const K = (<factory source>)();  self.onmessage = (e) => reply(K[e.data.fn](e.data.arg))
 // so the factory must be self-contained (no reference outside its own body). vfx-js port: the source text is
