@@ -543,20 +543,31 @@ float plainFilm(float c) {
 // highlight at the few percent a film reflects head on; past that, a
 // grazing film reflects them no more, so rims stay soft.
 vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
-    if (backdropAround > 0.5 && backdropMode != 0 && dV.z >= -1e-4) {
-        // The backdrop again, on a plane as far in front: towards the
-        // side both planes blur to its mean.
-        float t = (backdropDistance - pV.z) / max(dV.z, 1e-4);
-        vec2 q = pV.xy + dV.xy * t;
-        vec3 env = backdrop(q, length(fwidth(q)));
-        vec3 lit = lights(dV, lightSoftness);
-        return R * env + min(R, vec3(0.05)) * LIGHT_GAIN * lit;
+    // The backdrop is behind, and with backdropAround on a plane as far
+    // in front too: towards the side both planes blur to its mean.
+    // It is sampled in one place: each call site is compiled apart, and
+    // the patterns are the largest part of the shader.
+    bool behind = backdropMode != 0 && dV.z < -1e-4;
+    bool front = backdropAround > 0.5 && backdropMode != 0 && !behind;
+    float t = behind
+        ? (-backdropDistance - pV.z) / dV.z
+        : (backdropDistance - pV.z) / max(dV.z, 1e-4);
+    vec2 q = pV.xy + dV.xy * t;
+    bool hit = front || (behind && t > 0.0);
+    vec3 env = vec3(0.0);
+    if (hit) {
+        env = backdrop(q, length(fwidth(q)));
     }
-    vec3 L = radiance(pV, dV, 0.0);
-    bool lit = backdropMode == 0 || dV.z >= -1e-4;
+    vec3 lit = lights(dV, lightSoftness);
+    vec3 glint = min(R, vec3(0.05)) * LIGHT_GAIN * lit;
+    if (front) {
+        return R * env + glint;
+    }
     float sky = lightIntensity * 0.35 * (0.3 + 0.7 * smoothstep(-0.7, 0.9, dV.y));
-    vec3 r = lit ? min(R, vec3(0.05)) * LIGHT_GAIN * L : R * L;
-    return r + R * sky;
+    if (behind) {
+        return R * (hit ? env : lit) + R * sky;
+    }
+    return glint + R * sky;
 }
 
 // The white line across a border, at distance e from it: a flat core
