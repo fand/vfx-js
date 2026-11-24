@@ -413,6 +413,16 @@ export function clampInt(
         : fallback;
 }
 
+/** `v` clamped to [lo, hi], or `fallback` when it is not a finite number. */
+export function num(
+    v: number,
+    lo: number,
+    hi: number,
+    fallback: number,
+): number {
+    return Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : fallback;
+}
+
 export function isPattern(
     v: BackdropPatternName | BackdropImageSource,
 ): v is BackdropPatternName {
@@ -564,6 +574,8 @@ export type SceneParams = {
  */
 export class SceneBackdrop {
     readonly #presets: Readonly<Record<BackdropPaletteName, readonly string[]>>;
+    // Used in place of params that are not finite numbers.
+    readonly #defaults: SceneParams;
     // The palette twice: repeating, and clamped for the grid.
     #paletteRaw: WebGLTexture[] = [];
     #paletteTex: EffectTexture | null = null;
@@ -591,8 +603,10 @@ export class SceneBackdrop {
 
     constructor(
         presets: Readonly<Record<BackdropPaletteName, readonly string[]>>,
+        defaults: SceneParams,
     ) {
         this.#presets = presets;
+        this.#defaults = defaults;
     }
 
     /** The raw textures are gone with the context: rebuild them. */
@@ -630,14 +644,21 @@ export class SceneBackdrop {
             : image
               ? IMAGE_MODE
               : 0;
+        const d = this.#defaults;
         return {
             backdropMode: mode,
             backdropTex: image ?? fallback,
             backdropAspect: this.#imageAspect,
             backdropVisible: p.backdropVisible ? 1 : 0,
-            backdropScale: p.backdropScale,
-            backdropDistance: Math.max(p.backdropDistance, minDistance),
-            backdropOffset: time * p.backdropSpeed,
+            backdropScale: num(p.backdropScale, 1e-3, 1e3, d.backdropScale),
+            backdropDistance: num(
+                p.backdropDistance,
+                minDistance,
+                1e3,
+                Math.max(d.backdropDistance, minDistance),
+            ),
+            backdropOffset:
+                time * num(p.backdropSpeed, -1e3, 1e3, d.backdropSpeed),
             paletteTex:
                 (mode === PATTERN_MODES.grid
                     ? this.#paletteClampTex
@@ -645,11 +666,11 @@ export class SceneBackdrop {
             paletteSize: this.#paletteSize,
             paletteShift:
                 this.#paletteSize === 2
-                    ? 0.5 - Math.min(Math.max(p.backdropRatio, 0), 1) / 2
+                    ? 0.5 - num(p.backdropRatio, 0, 1, d.backdropRatio) / 2
                     : 0,
-            backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
-            lightIntensity: Math.max(p.lightIntensity, 0),
-            lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
+            backdropSoftness: num(p.backdropSoftness, 0, 1, d.backdropSoftness),
+            lightIntensity: num(p.lightIntensity, 0, 1e3, d.lightIntensity),
+            lightSoftness: num(p.lightSoftness, 0, 1, d.lightSoftness),
         };
     }
 

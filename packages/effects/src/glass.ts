@@ -27,7 +27,7 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
 } from "./_orbit-camera.js";
-import { padOutputRect } from "./_pad.js";
+import { padOf, padOutputRect } from "./_pad.js";
 import {
     BACKDROP_PALETTES,
     type BackdropImageSource,
@@ -38,6 +38,7 @@ import {
     GLSL_HEAT,
     GLSL_SCENE,
     hexToRgb,
+    num,
     SceneBackdrop,
     ScenePasses,
     uploadFloatTexture,
@@ -958,7 +959,7 @@ export class GlassEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
-    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES);
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
 
     #time = 0;
     // Drags, the "tilt", and the window listeners while `drag` is on or
@@ -997,7 +998,7 @@ export class GlassEffect implements Effect {
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(this.params.pad, dims);
+        return padOutputRect(padOf(this.params.pad, DEFAULT_PARAMS.pad), dims);
     }
 
     render(ctx: EffectContext): void {
@@ -1025,7 +1026,10 @@ export class GlassEffect implements Effect {
             time: this.#time,
             dt: this.#still ? 0 : ctx.deltaTime,
             dims: ctx.dims,
-            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            outputRect: padOutputRect(
+                padOf(this.params.pad, DEFAULT_PARAMS.pad),
+                ctx.dims,
+            ),
             mouse: ctx.mouse,
             mouseViewport: ctx.mouseViewport,
             pixelRatio: ctx.pixelRatio,
@@ -1034,7 +1038,7 @@ export class GlassEffect implements Effect {
         });
         const scene = this.#drawGlass(ctx, cam);
         this.#passes.output(ctx, scene, {
-            pad: this.params.pad,
+            pad: padOf(this.params.pad, DEFAULT_PARAMS.pad),
             antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
@@ -1054,15 +1058,23 @@ export class GlassEffect implements Effect {
             return null;
         }
         const p = this.params;
-        const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        const scene = this.#passes.scene(
+            ctx,
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            p.resolution,
+        );
+        const [, , ow, oh] = padOutputRect(
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            ctx.dims,
+        );
         if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }
         const t = this.#time;
-        const halfDepth = Math.max(p.depth / 2, 0.005);
-        const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
-        const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
+        const D = DEFAULT_PARAMS;
+        const halfDepth = num(p.depth, 0.01, 100, D.depth) / 2;
+        const bulge = num(p.bulge, 0, 100, 0);
+        const bulgeWidth = num(p.bulgeWidth, 1e-3, 100, D.bulgeWidth);
         const bulgeSlope = bulge > 0 ? (2 * bulge) / bulgeWidth : 0;
         // A sunk relief must keep the front cap above the back one. UI
         // sliders leave remainders like 5e-17; those count as 0, so the
@@ -1083,7 +1095,10 @@ export class GlassEffect implements Effect {
                 sdfRect: shape.sdfRect,
                 sdfSize: [shape.sdfW, shape.sdfH],
                 halfDepth,
-                rounding: Math.min(Math.max(p.bevel, 0), halfDepth),
+                rounding: Math.min(
+                    num(p.bevel, 0, halfDepth, D.bevel),
+                    halfDepth,
+                ),
                 bevelShape: BEVEL_SHAPES[p.bevelShape] ?? 0,
                 bulge,
                 bulgeWidth,
@@ -1101,22 +1116,18 @@ export class GlassEffect implements Effect {
                 principalPx: cam.principalPx,
                 bufferPx: [ow, oh],
                 pixelSize: ow / scene.width,
-                ior: Math.max(p.ior, 1.0001),
-                dispersion: p.dispersion,
+                ior: num(p.ior, 1.0001, 10, D.ior),
+                dispersion: num(p.dispersion, -10, 10, D.dispersion),
                 paths: clampInt(p.paths, 1, MAX_PATHS, 2),
                 samples: clampInt(p.samples, 1, MAX_SAMPLES, 8),
                 bounces: clampInt(p.bounces, 1, MAX_BOUNCES, 3),
-                jitter: Math.min(Math.max(p.jitter, 0), 1),
+                jitter: num(p.jitter, 0, 1, D.jitter),
                 tint: hexToRgb(p.tint),
-                absorption: Math.max(p.absorption, 0),
-                reflection: Math.max(p.reflection, 0),
-                bump: Number.isFinite(p.bump)
-                    ? Math.min(Math.max(p.bump, 0), 1)
-                    : 0,
-                bumpScale: Math.max(p.bumpScale, 1e-3),
-                frost: Number.isFinite(p.frost)
-                    ? Math.min(Math.max(p.frost, 0), 1)
-                    : 0,
+                absorption: num(p.absorption, 0, 1e3, D.absorption),
+                reflection: num(p.reflection, 0, 100, D.reflection),
+                bump: num(p.bump, 0, 1, D.bump),
+                bumpScale: num(p.bumpScale, 1e-3, 100, D.bumpScale),
+                frost: num(p.frost, 0, 1, D.frost),
                 ...this.#backdrop.uniforms(
                     p,
                     t,

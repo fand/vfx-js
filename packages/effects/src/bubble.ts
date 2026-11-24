@@ -45,7 +45,7 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
 } from "./_orbit-camera.js";
-import { padOutputRect } from "./_pad.js";
+import { padOf, padOutputRect } from "./_pad.js";
 import {
     BACKDROP_PALETTES,
     type BackdropImageSource,
@@ -1608,7 +1608,7 @@ export class BubbleEffect implements Effect {
     #foamToken = 0;
     // Bumped by each new shape, so its foam is placed again.
     #shapeVersion = 0;
-    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES);
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
 
     #time = 0;
     // The drift and the swirl so far: a change of speed only changes
@@ -1656,7 +1656,7 @@ export class BubbleEffect implements Effect {
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(this.params.pad, dims);
+        return padOutputRect(padOf(this.params.pad, DEFAULT_PARAMS.pad), dims);
     }
 
     render(ctx: EffectContext): void {
@@ -1687,7 +1687,10 @@ export class BubbleEffect implements Effect {
             time: this.#time,
             dt: this.#still ? 0 : ctx.deltaTime,
             dims: ctx.dims,
-            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            outputRect: padOutputRect(
+                padOf(this.params.pad, DEFAULT_PARAMS.pad),
+                ctx.dims,
+            ),
             mouse: ctx.mouse,
             mouseViewport: ctx.mouseViewport,
             pixelRatio: ctx.pixelRatio,
@@ -1696,7 +1699,7 @@ export class BubbleEffect implements Effect {
         });
         const scene = this.#draw(ctx, cam);
         this.#passes.output(ctx, scene, {
-            pad: this.params.pad,
+            pad: padOf(this.params.pad, DEFAULT_PARAMS.pad),
             antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
@@ -2003,8 +2006,15 @@ export class BubbleEffect implements Effect {
         }
         const p = this.params;
         const d = DEFAULT_PARAMS;
-        const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        const scene = this.#passes.scene(
+            ctx,
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            p.resolution,
+        );
+        const [, , ow, oh] = padOutputRect(
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            ctx.dims,
+        );
         if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }

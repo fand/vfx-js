@@ -40,7 +40,7 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
 } from "./_orbit-camera.js";
-import { padOutputRect } from "./_pad.js";
+import { padOf, padOutputRect } from "./_pad.js";
 import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
 import {
     buildShape,
@@ -1293,7 +1293,6 @@ const NUM_RANGE: Readonly<Record<NumKey, readonly [number, number]>> = {
     pointerRadius: [0, 10000],
 };
 const NUM_KEYS = Object.keys(NUM_RANGE) as NumKey[];
-const MAX_PAD = 10000;
 
 /** Params as the frame uses them: valid, clamped, colours parsed. */
 type Resolved = Record<NumKey, number> & {
@@ -1312,15 +1311,6 @@ type Resolved = Record<NumKey, number> & {
 
 function clamp(x: number, lo: number, hi: number): number {
     return Math.min(Math.max(x, lo), hi);
-}
-
-function padOf(pad: unknown): number | "fullscreen" {
-    if (pad === "fullscreen") {
-        return pad;
-    }
-    return typeof pad === "number" && Number.isFinite(pad)
-        ? clamp(pad, 0, MAX_PAD)
-        : (DEFAULT_PARAMS.pad as number);
 }
 
 const HEX_RE = /^#?(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -1370,7 +1360,7 @@ function resolveParams(p: SwirlParticleParams, out?: Resolved): Resolved {
                 : DEFAULT_PARAMS[k];
     }
     r.count = Math.floor(r.count);
-    r.pad = padOf(p.pad);
+    r.pad = padOf(p.pad, DEFAULT_PARAMS.pad);
     r.shadow = !!p.shadow;
     r.drag = !!p.drag;
     r.cameraOrigin = p.cameraOrigin === "viewport" ? "viewport" : "element";
@@ -1646,7 +1636,7 @@ export class SwirlParticleEffect implements Effect {
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(padOf(this.params.pad), dims);
+        return padOutputRect(padOf(this.params.pad, DEFAULT_PARAMS.pad), dims);
     }
 
     // The particle buffer: HDR colour + depth, multisampled with
