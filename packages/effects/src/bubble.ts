@@ -1642,9 +1642,10 @@ export class BubbleEffect implements Effect {
             // flight was rejected; start it over.
             this.#source.contextRestored();
             this.#gl = ctx.gl;
+            const foam = this.#foamData;
             this.#sdfTex?.dispose();
             this.#lutTex?.dispose();
-            for (const tex of this.#foamData?.textures ?? []) {
+            for (const tex of foam?.textures ?? []) {
                 tex.dispose();
             }
             this.#sdfRaw = null;
@@ -1654,7 +1655,22 @@ export class BubbleEffect implements Effect {
             this.#foamData = null;
             this.#foamFailed = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#pending ?? this.#next ?? this.#shape;
+            if (this.#next) {
+                // A placement is in flight; it uploads the new shape.
+                return;
+            }
+            if (foam && this.#shape) {
+                // Upload the last placement again, without placing anew.
+                this.#next = this.#shape;
+                this.#foamReady = {
+                    key: foam.key,
+                    version: this.#shapeVersion,
+                    data: foam,
+                    params: foam.params,
+                };
+                return;
+            }
+            this.#pending = this.#pending ?? this.#shape;
         });
     }
 
