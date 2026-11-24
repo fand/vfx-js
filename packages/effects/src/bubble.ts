@@ -88,9 +88,13 @@ export type BubblePointer = "none" | "tilt";
  * Params of {@link BubbleEffect}: the foam's own, and the camera's
  * ({@link OrbitCameraParams}). All are read every frame. The placement
  * params (`depth`, `bevel`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `seed`, `minSize`) place the bubbles
- * again on the CPU when they change, which takes a few to a few tens of
- * milliseconds.
+ * `roundness`, `seed`, `minSize`) place the bubbles again on the CPU, in
+ * a worker, when they change: about 30 ms at the defaults on a desktop,
+ * and up to seconds for a deep shape (`depth` 1 or more) or a small
+ * `minSize`. `wobble` and `containment` rebuild the grid over them,
+ * which is quicker. The last foam is drawn until the new one is ready.
+ * Without workers (e.g. a CSP that blocks `blob:` URLs) the page stalls
+ * for that long.
  */
 export type BubbleParams = OrbitCameraParams & {
     /**
