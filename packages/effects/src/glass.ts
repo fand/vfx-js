@@ -141,7 +141,7 @@ export type GlassParams = OrbitCameraParams & {
      * channels split into separate bands instead of a smooth rainbow.
      */
     samples: number;
-    /** Reflections inside the glass before the ray is forced out, 1 to 6. */
+    /** Reflections inside the glass before the ray is forced out, 0 to 5. */
     bounces: number;
     /**
      * Per-pixel offset of the wavelengths, 0 to 1. Trades the banding of
@@ -271,7 +271,7 @@ const DEFAULT_PARAMS: GlassParams = {
     dispersion: 0.12,
     paths: 2,
     samples: 8,
-    bounces: 3,
+    bounces: 2,
     jitter: 0,
     tint: "#ffffff",
     absorption: 0,
@@ -317,7 +317,7 @@ const BEVEL_SHAPES: Record<GlassBevelShape, number> = {
 };
 const MAX_PATHS = 4;
 const MAX_SAMPLES = 16;
-const MAX_BOUNCES = 6;
+const MAX_BOUNCES = 5;
 // Noise gradient to surface slope, before it saturates.
 const BUMP_SLOPE = "0.6";
 // Long side of the silhouette read back from the element, in px, and the
@@ -449,7 +449,7 @@ uniform float ior;
 uniform float dispersion;
 uniform int paths;
 uniform int samples;
-uniform int bounces;
+uniform int exits;
 uniform float jitter;
 uniform vec3 tint;
 uniform float absorption;
@@ -462,7 +462,8 @@ uniform int debugView;
 
 const int MAX_PATHS = ${MAX_PATHS};
 const int MAX_SAMPLES = ${MAX_SAMPLES};
-const int MAX_BOUNCES = ${MAX_BOUNCES};
+// Tries to leave the glass: one more than the reflections.
+const int MAX_EXITS = ${MAX_BOUNCES + 1};
 const int OUTER_STEPS = 72;
 const int INNER_STEPS = 40;
 const float HIT = 0.0012;
@@ -586,7 +587,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
     float exW[MAX_PATHS];
     int exN[MAX_PATHS];
     int nPaths = clamp(paths, 1, MAX_PATHS);
-    int nBounces = clamp(bounces, 1, MAX_BOUNCES);
+    int nExits = clamp(exits, 1, MAX_EXITS);
     for (int m = 0; m < MAX_PATHS; m++) {
         if (m >= nPaths) {
             break;
@@ -598,7 +599,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
         float w = 1.0 - fresnel(cos0, 1.0, n);
         float len = 0.0;
         int nb = 0;
-        for (int b = 0; b < MAX_BOUNCES; b++) {
+        for (int b = 0; b < MAX_EXITS; b++) {
             float ti = 0.0;
             vec4 si;
             for (int i = 0; i < INNER_STEPS; i++) {
@@ -618,7 +619,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
             vec3 ni = normalAt(p, d);
             float cosI = clamp(dot(d, ni), 0.0, 1.0);
             vec3 o = refract(d, -ni, n);
-            bool last = b >= nBounces - 1;
+            bool last = b >= nExits - 1;
             if (dot(o, o) > 0.0) {
                 w *= 1.0 - fresnel(cosI, n, 1.0);
                 d = o;
@@ -1120,7 +1121,7 @@ export class GlassEffect implements Effect {
                 dispersion: num(p.dispersion, -10, 10, D.dispersion),
                 paths: clampInt(p.paths, 1, MAX_PATHS, 2),
                 samples: clampInt(p.samples, 1, MAX_SAMPLES, 8),
-                bounces: clampInt(p.bounces, 1, MAX_BOUNCES, 3),
+                exits: clampInt(p.bounces, 0, MAX_BOUNCES, 2) + 1,
                 jitter: num(p.jitter, 0, 1, D.jitter),
                 tint: hexToRgb(p.tint),
                 absorption: num(p.absorption, 0, 1e3, D.absorption),
