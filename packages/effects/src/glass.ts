@@ -43,13 +43,8 @@ import {
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
-import { buildShapeAsync } from "./_shape-worker.js";
-import {
-    buildRelief,
-    GLSL_SD2,
-    reliefRadius,
-    type ShapeData,
-} from "./_silhouette.js";
+import { buildReliefAsync, buildShapeAsync } from "./_shape-worker.js";
+import { GLSL_SD2, reliefRadius, type ShapeData } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
     SourceCapture,
@@ -912,6 +907,15 @@ export class GlassEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
+    // A relief rebuilt in the worker for a new `reliefBlur`.
+    #reliefBusy = false;
+    #reliefToken = 0;
+    #reliefReady: {
+        shape: GlassShape;
+        radius: number;
+        map: Float32Array;
+        maxGrad: number;
+    } | null = null;
     readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
 
     #time = 0;
@@ -939,6 +943,7 @@ export class GlassEffect implements Effect {
             // the element back again. A readback in flight was rejected;
             // start it over. The glass shows again once it is read.
             this.#source.contextRestored();
+            this.#dropReliefJob();
             if (!this.#pending) {
                 this.#source.refresh();
             }
@@ -1204,25 +1209,61 @@ export class GlassEffect implements Effect {
             }
             return;
         }
+        // A relief built in the worker: take it if it is for this shape.
+        const ready = this.#reliefReady;
+        if (ready) {
+            this.#reliefReady = null;
+            if (ready.shape === shape) {
+                shape.relief = ready.map;
+                shape.reliefMaxGrad = ready.maxGrad;
+                shape.reliefRadius = ready.radius;
+                this.#uploadRelief(ctx, shape);
+                shape.relief = EMPTY;
+            }
+        }
         const radius = reliefRadius(
             this.params.reliefBlur,
             shape,
             RELIEF_MAX_RADIUS,
         );
-        if (radius === shape.reliefRadius) {
+        if (radius === shape.reliefRadius || this.#reliefBusy) {
             return;
         }
-        const { map, maxGrad } = buildRelief(
-            shape.reliefLum,
-            shape,
+        // One job at a time; the radius is checked again when it is back.
+        this.#reliefBusy = true;
+        const token = this.#reliefToken;
+        buildReliefAsync({
+            lum: shape.reliefLum,
+            sdfRect: shape.sdfRect,
+            sdfW: shape.sdfW,
+            sdfH: shape.sdfH,
             radius,
-            RELIEF_PASSES,
+            passes: RELIEF_PASSES,
+        }).then(
+            (r) => {
+                if (token === this.#reliefToken) {
+                    this.#reliefBusy = false;
+                    this.#reliefReady = { shape, radius, ...r };
+                }
+            },
+            (e) => {
+                if (token === this.#reliefToken) {
+                    this.#reliefBusy = false;
+                    shape.reliefRadius = radius; // not asked again
+                    console.warn(
+                        "[VFX-JS] GlassEffect could not build the relief:",
+                        e,
+                    );
+                }
+            },
         );
-        shape.relief = map;
-        shape.reliefMaxGrad = maxGrad;
-        shape.reliefRadius = radius;
-        this.#uploadRelief(ctx, shape);
-        shape.relief = EMPTY;
+    }
+
+    // Drop a relief job in flight (dispose, restore).
+    #dropReliefJob(): void {
+        this.#reliefToken++;
+        this.#reliefBusy = false;
+        this.#reliefReady = null;
     }
 
     #freeRelief(gl: WebGL2RenderingContext): void {
@@ -1281,6 +1322,7 @@ export class GlassEffect implements Effect {
         this.#pending = null;
         // Start over like a new instance if it is added again.
         this.#source.reset();
+        this.#dropReliefJob();
         this.#channel = null;
     }
 }

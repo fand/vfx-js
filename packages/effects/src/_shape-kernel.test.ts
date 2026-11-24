@@ -1,8 +1,13 @@
 import { expect, test } from "vitest";
 import { shapeKernelSource } from "../scripts/gen-shape-kernel.mjs";
 import { SHAPE_KERNEL_SOURCE } from "./_shape-kernel-source.js";
-import { buildShapeAsync } from "./_shape-worker.js";
-import { buildShapeJob, type ShapeJob, shapeKernel } from "./_silhouette.js";
+import { buildReliefAsync, buildShapeAsync } from "./_shape-worker.js";
+import {
+    buildRelief,
+    buildShapeJob,
+    type ShapeJob,
+    shapeKernel,
+} from "./_silhouette.js";
 
 test("_shape-kernel-source.ts is up to date (node scripts/gen-shape-kernel.mjs)", () => {
     expect(SHAPE_KERNEL_SOURCE).toBe(shapeKernelSource());
@@ -65,4 +70,23 @@ test("spawn points and the relief are built only when asked", () => {
 test("buildShapeAsync runs on the page without workers", async () => {
     const shape = await buildShapeAsync(job(false, false));
     expect(shape?.sdfW).toBe(buildShapeJob(job(false, false))?.sdfW);
+});
+
+test("buildReliefAsync rebuilds the relief as buildRelief does", async () => {
+    const shape = buildShapeJob(job(false, true));
+    if (!shape?.relief) {
+        throw new Error("no relief");
+    }
+    const lum = shape.relief.lum;
+    const got = await buildReliefAsync({
+        lum,
+        sdfRect: shape.sdfRect,
+        sdfW: shape.sdfW,
+        sdfH: shape.sdfH,
+        radius: 3,
+        passes: 2,
+    });
+    expect(got.map).toEqual(buildRelief(lum, shape, 3, 2).map);
+    // The luminance is kept for later rebuilds.
+    expect(lum.length).toBe(shape.sdfW * shape.sdfH);
 });

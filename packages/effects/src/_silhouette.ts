@@ -106,6 +106,13 @@ export type ReliefData = {
     maxGrad: number;
 };
 
+/** A relief to build again from its luminance, for {@link buildReliefJob}. */
+export type ReliefJob = Pick<ShapeData, "sdfRect" | "sdfW" | "sdfH"> & {
+    lum: Float32Array;
+    radius: number;
+    passes: number;
+};
+
 export type ShapeJobResult = (ShapeData & { relief: ReliefData | null }) | null;
 
 /**
@@ -525,6 +532,14 @@ export function shapeKernel() {
         return { map: out, maxGrad };
     }
 
+    /** {@link buildRelief} from one job. */
+    function buildReliefJob(a: ReliefJob): {
+        map: Float32Array;
+        maxGrad: number;
+    } {
+        return buildRelief(a.lum, a, a.radius, a.passes);
+    }
+
     /** {@link buildShape}, and the relief when asked, from one job. */
     function buildShapeJob(a: ShapeJob): ShapeJobResult {
         const shape = buildShape(
@@ -562,6 +577,7 @@ export function shapeKernel() {
         buildShape,
         buildShapeJob,
         buildRelief,
+        buildReliefJob,
         reliefRadius,
     };
 }
