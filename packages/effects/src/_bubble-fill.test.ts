@@ -215,8 +215,9 @@ describe("placeBubbles", () => {
     });
 
     test("the filling spheres cut into their neighbours: shared walls", () => {
-        // Every one overlaps a neighbour; most cut into one by a tenth of
-        // their radius or more (those limited by the outline less).
+        // Every one overlaps a neighbour, but the first in a part too thin
+        // for a big bubble may stand alone; most cut into one by a tenth
+        // of their radius or more (those limited by the outline less).
         let touch = 0;
         let cut = 0;
         for (let i = fill.latticeCount; i < fill.count; i++) {
@@ -233,7 +234,7 @@ describe("placeBubbles", () => {
             cut += deepest > 0.1 ? 1 : 0;
         }
         const n = fill.count - fill.latticeCount;
-        expect(touch).toBe(n);
+        expect(touch).toBeGreaterThanOrEqual(n - 1);
         expect(cut / n).toBeGreaterThan(0.7);
     });
 
@@ -401,6 +402,94 @@ describe("buildSphereGrid", () => {
             for (let k = 0; k < g.count; k++) {
                 expect(ls[id].includes(k)).toBe(touches(g, k, id, 1));
             }
+        }
+    });
+});
+
+describe("placeBubbles at its limits", () => {
+    test("cells too small for maxCount grow until the shape is covered", () => {
+        const f = placeBubbles(shape, { ...OPTS, cellSize: 0.02 });
+        expect(f.cellSize).toBeGreaterThan(0.02);
+        expect(f.latticeCount).toBeLessThan(BUBBLE_MAX_COUNT / 2);
+        // Big bubbles at both ends of the shape, not only round one seed.
+        let x0 = Infinity;
+        let x1 = -Infinity;
+        for (let i = 0; i < f.latticeCount; i++) {
+            x0 = Math.min(x0, f.spheres[i * 4]);
+            x1 = Math.max(x1, f.spheres[i * 4]);
+        }
+        expect(x0).toBeLessThan(-0.8);
+        expect(x1).toBeGreaterThan(0.8);
+    });
+
+    test("a part too thin for a big bubble still gets bubbles", () => {
+        // One thin horizontal stroke.
+        const mw = 512;
+        const mh = 128;
+        const px = new Uint8Array(mw * mh * 4);
+        for (let y = 61; y < 67; y++) {
+            for (let x = 40; x < mw - 40; x++) {
+                px[(y * mw + x) * 4 + 3] = 255;
+            }
+        }
+        const thin = buildShape(px, mw, mh, "alpha", 0.05, mw / mh, 2, 2);
+        if (!thin) {
+            throw new Error("empty shape");
+        }
+        const f = placeBubbles(thin, {
+            ...OPTS,
+            cellSize: 0.16,
+            minSize: 0.05,
+        });
+        expect(f.latticeCount).toBe(0);
+        expect(f.count).toBeGreaterThan(10);
+    });
+});
+
+describe("placeBubbles in a part thinner than minSize", () => {
+    // One thin horizontal stroke, 6 px of 512.
+    const mw = 512;
+    const mh = 128;
+    const px = new Uint8Array(mw * mh * 4);
+    for (let y = 61; y < 67; y++) {
+        for (let x = 40; x < mw - 40; x++) {
+            px[(y * mw + x) * 4 + 3] = 255;
+        }
+    }
+    const thin = buildShape(px, mw, mh, "alpha", 0.05, mw / mh, 2, 2);
+    if (!thin) {
+        throw new Error("empty shape");
+    }
+    const o = { ...OPTS, cellSize: 0.16 };
+    const f = placeBubbles(thin, o);
+
+    test("a row of spheres smaller than minSize runs along it", () => {
+        expect(f.latticeCount).toBe(0);
+        expect(f.count).toBeGreaterThan(30);
+        const xs: number[] = [];
+        for (let i = 0; i < f.count; i++) {
+            const [x, , z, r] = sphere(f, i);
+            expect(z).toBe(0);
+            expect(r).toBeLessThan(0.5 * o.minSize * o.cellSize);
+            xs.push(x);
+        }
+        xs.sort((a, b) => a - b);
+        expect(xs[0]).toBeLessThan(-0.75);
+        expect(xs[xs.length - 1]).toBeGreaterThan(0.75);
+        // No break in the row wider than a sphere.
+        let widest = 0;
+        for (let i = 1; i < xs.length; i++) {
+            widest = Math.max(widest, xs[i] - xs[i - 1]);
+        }
+        expect(widest).toBeLessThan(0.04);
+    });
+
+    test("the logo, thick enough everywhere, gets none of them", () => {
+        const logo = placeBubbles(shape, OPTS);
+        for (let i = logo.latticeCount; i < logo.count; i++) {
+            expect(sphere(logo, i)[3]).toBeGreaterThan(
+                0.5 * 0.5 * OPTS.minSize * OPTS.cellSize,
+            );
         }
     });
 });

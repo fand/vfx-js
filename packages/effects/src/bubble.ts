@@ -1,29 +1,29 @@
 // A foam of soap bubbles filling an extruded silhouette.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
-// 1. The silhouette is read back from the element (`ctx.src` alpha) and
-//    turned into a 2D signed distance field; the 3D volume is its
-//    extrusion (see `_silhouette.ts`).
-// 2. The bubbles are placed on the CPU (`_bubble-fill.ts`): spheres
-//    spread through the volume by Poisson disk sampling, sized by `cellSize`,
-//    `roundness` and `cellSizeRandomness`, then smaller spheres in the
-//    gaps left between them and along the outline, down to `minSize`.
-//    Where spheres overlap, they are cut by their radical plane and share
-//    one flat film there (a power diagram); where a sphere is exposed,
-//    its own round surface is the film.
-// 3. A soap film is thin, so it does not bend light: each camera ray is
-//    straight. Along it, the power of every sphere is t² + b t + k, and
-//    t² is the same for all of them, so the cell that owns a point is the
-//    lower envelope of the lines b t + k. The films are found exactly,
-//    with no marching inside the foam (see `_sphere-foam.ts`, which
-//    mirrors the solver in TypeScript, and `sphereSegment` below). The
-//    ray walks a uniform grid over the spheres; each grid cell lists
-//    every sphere that can reach into it.
-// 4. A film's colour is thin-film interference: a LUT of reflectance by
-//    thickness and angle, baked once from the CIE colour matching
-//    functions (`_thin-film.ts`). It reflects the same backdrop and box
-//    lights as GlassEffect, softened. The films are composited front to
-//    back.
+// - The silhouette is read back from the element (`ctx.src` alpha) and
+//   turned into a 2D signed distance field; the 3D volume is its
+//   extrusion (see `_silhouette.ts`).
+// - The bubbles are placed on the CPU (`_bubble-fill.ts`): spheres
+//   spread through the volume by Poisson disk sampling, sized by `cellSize`,
+//   `roundness` and `cellSizeRandomness`, then smaller spheres in the
+//   gaps left between them and along the outline, down to `minSize`.
+//   Where spheres overlap, they are cut by their radical plane and share
+//   one flat film there (a power diagram); where a sphere is exposed,
+//   its own round surface is the film.
+// - A soap film is thin, so it does not bend light: each camera ray is
+//   straight. Along it, the power of every sphere is t² + b t + k, and
+//   t² is the same for all of them, so the cell that owns a point is the
+//   lower envelope of the lines b t + k. The films are found exactly,
+//   with no marching inside the foam (see `_sphere-foam.ts`, which
+//   mirrors the solver in TypeScript, and `sphereSegment` below). The
+//   ray walks a uniform grid over the spheres; each grid cell lists
+//   every sphere that can reach into it.
+// - A film's colour is thin-film interference: a LUT of reflectance by
+//   thickness and angle, baked once from the CIE colour matching
+//   functions (`_thin-film.ts`). It reflects the same backdrop and box
+//   lights as GlassEffect, softened. The films are composited front to
+//   back.
 import type {
     Effect,
     EffectContext,
@@ -103,8 +103,8 @@ export type BubbleParams = OrbitCameraParams & {
      */
     sourceChannel: SourceChannel;
     /**
-     * Extrusion depth, relative to the long side of the element (= 2).
-     * Placement param.
+     * Extrusion depth, relative to the long side of the element (= 2),
+     * up to 2. Placement param.
      */
     depth: number;
     /**
@@ -1483,9 +1483,20 @@ type Foam = FoamData & {
     indexTex: EffectTexture;
     edgeCellTex: EffectTexture;
     edgeIndexTex: EffectTexture;
+    /** The params it was built for: it is drawn with these. */
+    params: FoamParams;
     /** The spheres as drifted for the frame, and when it was. */
     moved: Float32Array;
     movedKey: string;
+};
+
+// The params the foam depends on, clamped.
+type FoamParams = {
+    halfDepth: number;
+    cellSize: number;
+    fill: FillOptions;
+    wobble: number;
+    containment: number;
 };
 
 /**
@@ -1537,10 +1548,13 @@ export class BubbleEffect implements Effect {
     #channel: SourceChannel | null = null;
     #pending: ShapeData | null = null;
     #shape: ShapeData | null = null;
+    // The latest shape read. It takes over once its foam is placed.
+    #next: ShapeData | null = null;
     readonly #passes = new ScenePasses();
 
     #gl: WebGL2RenderingContext | null = null;
-    #raw: WebGLTexture[] = [];
+    #sdfRaw: WebGLTexture | null = null;
+    #lutRaw: WebGLTexture | null = null;
     #sdfTex: EffectTexture | null = null;
     #lutTex: EffectTexture | null = null;
     #foamData: Foam | null = null;
@@ -1552,8 +1566,14 @@ export class BubbleEffect implements Effect {
     // reply is drawn even if the params moved on (a step closer), unless
     // the shape changed under it. The token drops replies after dispose().
     #foamBusy = false;
-    #foamReady: { key: string; version: number; data: FoamData } | null = null;
-    // The key whose job failed, so it is not asked again every frame.
+    #foamReady: {
+        key: string;
+        version: number;
+        data: FoamData;
+        params: FoamParams;
+    } | null = null;
+    // The key whose job or upload failed, so it is not asked again every
+    // frame.
     #foamFailed: string | null = null;
     #foamToken = 0;
     // Bumped by each new shape, so its foam is placed again.
@@ -1561,6 +1581,10 @@ export class BubbleEffect implements Effect {
     readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
 
     #time = 0;
+    // The drift and the swirl so far: a change of speed only changes
+    // their rate from then on.
+    #driftTurns = 0;
+    #swirlOffset = 0;
     // Drags, the "tilt", and the window listeners while `drag` is on or
     // `pointer` is "tilt".
     readonly #camera = new OrbitCamera(DEFAULT_PARAMS);
@@ -1585,12 +1609,14 @@ export class BubbleEffect implements Effect {
             // flight was rejected; start it over.
             this.#source.contextRestored();
             this.#gl = ctx.gl;
-            this.#raw = [];
+            this.#sdfRaw = null;
+            this.#lutRaw = null;
             this.#sdfTex = null;
             this.#lutTex = null;
             this.#foamData = null;
+            this.#foamFailed = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#pending ?? this.#shape;
+            this.#pending = this.#pending ?? this.#next ?? this.#shape;
         });
     }
 
@@ -1607,15 +1633,20 @@ export class BubbleEffect implements Effect {
             this.#source.refresh();
         }
         this.#source.update(ctx);
-        // A new shape replaces the current one once it has been read back.
+        // A new shape waits for its foam, then replaces the current one.
         if (this.#pending) {
-            this.#upload(ctx, this.#pending);
-            this.#shape = this.#pending;
+            this.#next = this.#pending;
             this.#pending = null;
+            this.#shapeVersion++;
         }
         this.#backdrop.update(ctx, this.params);
         if (!this.#still) {
-            this.#time += Math.min(ctx.deltaTime, 0.1);
+            const dt = Math.min(ctx.deltaTime, 0.1);
+            const p = this.params;
+            const d = DEFAULT_PARAMS;
+            this.#time += dt;
+            this.#driftTurns += dt * Math.max(finite(p.speed, d.speed), 0);
+            this.#swirlOffset += dt * finite(p.swirlSpeed, d.swirlSpeed);
         }
         const cam = this.#camera.update(this.params, {
             time: this.#time,
@@ -1642,10 +1673,10 @@ export class BubbleEffect implements Effect {
 
     // The params, clamped to what the shader can take, and what follows
     // from them.
-    #resolved() {
+    #resolved(): FoamParams {
         const p = this.params;
         const d = DEFAULT_PARAMS;
-        const halfDepth = Math.max(finite(p.depth, d.depth) / 2, 0.005);
+        const halfDepth = clamp(p.depth / 2, 0.005, 1, d.depth / 2);
         const cellSize = Math.max(finite(p.cellSize, d.cellSize), 0.02);
         const fill: FillOptions = {
             halfDepth,
@@ -1698,13 +1729,20 @@ export class BubbleEffect implements Effect {
     // The bubbles for the params, placed by the kernel (in a worker where
     // it can) whenever the shape or a param it depends on changes. Until
     // the new foam comes back, the last one is drawn.
-    #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
+    #foam(ctx: EffectContext): Foam | null {
         const ready = this.#foamReady;
         if (ready) {
             this.#foamReady = null;
-            if (ready.version === this.#shapeVersion) {
-                this.#uploadFoam(ctx, ready.key, ready.data);
+            if (
+                ready.version === this.#shapeVersion &&
+                !this.#adopt(ctx, ready)
+            ) {
+                this.#foamFailed = ready.key;
             }
+        }
+        const shape = this.#next ?? this.#shape;
+        if (!shape) {
+            return null;
         }
         const r = this.#resolved();
         const version = this.#shapeVersion;
@@ -1728,6 +1766,7 @@ export class BubbleEffect implements Effect {
                         sdfH: shape.sdfH,
                         sdfRect: shape.sdfRect,
                     },
+                    shapeKey: version,
                     fill: r.fill,
                     wobble: r.wobble,
                     containment: r.containment,
@@ -1736,13 +1775,17 @@ export class BubbleEffect implements Effect {
                     (data) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
-                            this.#foamReady = { key, version, data };
+                            this.#foamReady = { key, version, data, params: r };
                         }
                     },
-                    () => {
+                    (e) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
                             this.#foamFailed = key;
+                            console.warn(
+                                "[VFX-JS] BubbleEffect could not place its bubbles:",
+                                e,
+                            );
                         }
                     },
                 );
@@ -1750,10 +1793,51 @@ export class BubbleEffect implements Effect {
         return this.#foamData;
     }
 
-    #uploadFoam(ctx: EffectContext, key: string, data: FoamData): void {
+    // Switch to a foam that came back, and to the shape it was placed in.
+    // False when a texture could not be made; the last foam stays.
+    #adopt(
+        ctx: EffectContext,
+        ready: { key: string; data: FoamData; params: FoamParams },
+    ): boolean {
+        const gl = ctx.gl;
+        const next = this.#next;
+        let sdf: WebGLTexture | null = null;
+        if (next) {
+            sdf = uploadFloatTexture(gl, next.sdfW, next.sdfH, next.sdf);
+            ctx.resetState();
+            if (!sdf) {
+                return false;
+            }
+        }
+        const foam = this.#uploadFoam(ctx, ready.key, ready.data, ready.params);
+        if (!foam) {
+            gl.deleteTexture(sdf);
+            return false;
+        }
+        this.#freeFoam();
+        this.#foamData = foam;
+        if (next && sdf) {
+            gl.deleteTexture(this.#sdfRaw);
+            this.#sdfRaw = sdf;
+            this.#sdfTex = ctx.wrapTexture(sdf, {
+                size: [next.sdfW, next.sdfH],
+                filter: "linear",
+                wrap: "clamp",
+            });
+            this.#shape = next;
+            this.#next = null;
+        }
+        return true;
+    }
+
+    #uploadFoam(
+        ctx: EffectContext,
+        key: string,
+        data: FoamData,
+        params: FoamParams,
+    ): Foam | null {
         const { grid } = data;
         const edgeGrid = data.edgeGrid ?? grid;
-        this.#freeFoam();
         const gl = ctx.gl;
         const raw: WebGLTexture[] = [];
         const textures: EffectTexture[] = [];
@@ -1787,9 +1871,9 @@ export class BubbleEffect implements Effect {
             for (const tex of raw) {
                 gl.deleteTexture(tex);
             }
-            return;
+            return null;
         }
-        this.#foamData = {
+        return {
             ...data,
             key,
             raw,
@@ -1798,19 +1882,17 @@ export class BubbleEffect implements Effect {
             indexTex: textures[2],
             edgeCellTex: textures[edgeGrid === grid ? 1 : 3],
             edgeIndexTex: textures[edgeGrid === grid ? 2 : 4],
+            params,
             moved: grid.sphereData.slice(),
             movedKey: "",
         };
     }
 
-    // Drift the spheres for time t and upload them: a slow wander of
-    // length <= wobble times the radius, from a random phase per sphere.
-    #move(ctx: EffectContext, foam: Foam, t: number, wobble: number): void {
-        const speed = Math.max(
-            finite(this.params.speed, DEFAULT_PARAMS.speed),
-            0,
-        );
-        const key = `${t}|${wobble}|${speed}`;
+    // Drift the spheres and upload them: a slow wander of length <= wobble
+    // times the radius, from a random phase per sphere.
+    #move(ctx: EffectContext, foam: Foam): void {
+        const wobble = foam.params.wobble;
+        const key = `${this.#driftTurns}`;
         if (foam.movedKey === key) {
             return;
         }
@@ -1818,7 +1900,7 @@ export class BubbleEffect implements Effect {
         const src = foam.grid.sphereData;
         const out = foam.moved;
         const f = foam.drift;
-        const w = speed * Math.PI * 2 * t;
+        const w = Math.PI * 2 * this.#driftTurns;
         for (let i = 0; i < foam.grid.count; i++) {
             const amp = wobble * src[i * 4 + 3] * 0.5774;
             for (let a = 0; a < 3; a++) {
@@ -1846,6 +1928,28 @@ export class BubbleEffect implements Effect {
         ctx.resetState();
     }
 
+    // The thin-film colours, uploaded when first needed.
+    #lut(ctx: EffectContext): EffectTexture | null {
+        if (!this.#lutTex) {
+            const lut = uploadFloatTexture(
+                ctx.gl,
+                THIN_FILM_LUT_W,
+                THIN_FILM_LUT_H,
+                thinFilmLut(),
+            );
+            ctx.resetState();
+            if (lut) {
+                this.#lutRaw = lut;
+                this.#lutTex = ctx.wrapTexture(lut, {
+                    size: [THIN_FILM_LUT_W, THIN_FILM_LUT_H],
+                    filter: "linear",
+                    wrap: "clamp",
+                });
+            }
+        }
+        return this.#lutTex;
+    }
+
     #freeFoam(): void {
         const f = this.#foamData;
         if (f && this.#gl) {
@@ -1857,14 +1961,11 @@ export class BubbleEffect implements Effect {
     }
 
     #draw(ctx: EffectContext, cam: OrbitCameraView): EffectRenderTarget | null {
+        const foam = this.#foam(ctx);
         const shape = this.#shape;
         const sdfTex = this.#sdfTex;
-        const lutTex = this.#lutTex;
-        if (!shape || !sdfTex || !lutTex) {
-            return null;
-        }
-        const foam = this.#foam(ctx, shape);
-        if (!foam) {
+        const lutTex = this.#lut(ctx);
+        if (!foam || !shape || !sdfTex || !lutTex) {
             return null;
         }
         const p = this.params;
@@ -1875,7 +1976,9 @@ export class BubbleEffect implements Effect {
             return null;
         }
         const t = this.#time;
-        const r = this.#resolved();
+        const r = foam.params;
+        // The cells may be larger than asked, to fit the shape.
+        const cellSize = foam.fill.cellSize;
         const grid = foam.grid;
         let maxR = 0;
         for (let i = 0; i < grid.count; i++) {
@@ -1884,8 +1987,8 @@ export class BubbleEffect implements Effect {
         // How far any sphere reaches out of the shape, drift included,
         // with a margin for the field's filtering.
         const reach =
-            foam.fill.reach + foam.grow + r.wobble * maxR + 0.02 * r.cellSize;
-        this.#move(ctx, foam, t, r.wobble);
+            foam.fill.reach + foam.grow + r.wobble * maxR + 0.02 * cellSize;
+        this.#move(ctx, foam);
         const containment = r.containment;
         const mode = containment <= 0 ? 0 : containment >= 0.995 ? 1 : 2;
 
@@ -1907,7 +2010,7 @@ export class BubbleEffect implements Effect {
                 pixelSize: ow / scene.width,
                 maxLayers: clampInt(p.maxLayers, 1, MAX_LAYERS, d.maxLayers),
                 seed: r.fill.seed,
-                cellSize: r.cellSize,
+                cellSize,
                 sphereTex: foam.sphereTex,
                 cellTex: foam.cellTex,
                 indexTex: foam.indexTex,
@@ -1923,7 +2026,7 @@ export class BubbleEffect implements Effect {
                 clipOff: (1 - containment) * reach,
                 warpK: containment / Math.max(1 - containment, 1e-3),
                 fillG: foam.fillG,
-                fillDepth: FILL_DEPTH * r.cellSize,
+                fillDepth: FILL_DEPTH * cellSize,
                 filmLut: lutTex,
                 iridescence: clamp(p.iridescence, 0, 1, d.iridescence),
                 thickness: Math.max(finite(p.thickness, d.thickness), 0),
@@ -1935,13 +2038,13 @@ export class BubbleEffect implements Effect {
                 ),
                 drain: clamp(p.drain, 0, 1, d.drain),
                 swirlScale: Math.max(finite(p.swirlScale, d.swirlScale), 0),
-                swirlOffset: t * finite(p.swirlSpeed, d.swirlSpeed),
+                swirlOffset: this.#swirlOffset,
                 reflection: Math.max(finite(p.reflection, d.reflection), 0),
                 tint: colorOf(p.tint, d.tint),
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),
                 opacity: clamp(p.opacity, 0, 1, d.opacity),
                 bodyColor: colorOf(p.color, d.color),
-                ...this.#borderUniforms(r.cellSize),
+                ...this.#borderUniforms(cellSize),
                 ...this.#backdrop.uniforms(p, t, r.halfDepth + reach, sdfTex),
                 debugView: this.#debugView(),
             },
@@ -1995,52 +2098,14 @@ export class BubbleEffect implements Effect {
         return true;
     }
 
-    #upload(ctx: EffectContext, shape: ShapeData): void {
-        const gl = ctx.gl;
-        for (const tex of this.#raw) {
-            gl.deleteTexture(tex);
-        }
-        this.#raw = [];
-        this.#sdfTex = null;
-        this.#lutTex = null;
-        this.#freeFoam();
-        this.#shapeVersion++;
-        const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
-        const lut = uploadFloatTexture(
-            gl,
-            THIN_FILM_LUT_W,
-            THIN_FILM_LUT_H,
-            thinFilmLut(),
-        );
-        ctx.resetState();
-        if (sdf) {
-            this.#raw.push(sdf);
-            this.#sdfTex = ctx.wrapTexture(sdf, {
-                size: [shape.sdfW, shape.sdfH],
-                filter: "linear",
-                wrap: "clamp",
-            });
-        }
-        if (lut) {
-            this.#raw.push(lut);
-            this.#lutTex = ctx.wrapTexture(lut, {
-                size: [THIN_FILM_LUT_W, THIN_FILM_LUT_H],
-                filter: "linear",
-                wrap: "clamp",
-            });
-        }
-    }
-
     dispose(): void {
         this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
-        if (this.#gl) {
-            for (const tex of this.#raw) {
-                this.#gl.deleteTexture(tex);
-            }
-        }
-        this.#raw = [];
+        this.#gl?.deleteTexture(this.#sdfRaw);
+        this.#gl?.deleteTexture(this.#lutRaw);
+        this.#sdfRaw = null;
+        this.#lutRaw = null;
         this.#sdfTex = null;
         this.#lutTex = null;
         this.#freeFoam();
@@ -2054,6 +2119,7 @@ export class BubbleEffect implements Effect {
         this.#gl = null;
         this.#passes.dispose();
         this.#shape = null;
+        this.#next = null;
         this.#pending = null;
         // Start over like a new instance if it is added again.
         this.#source.reset();

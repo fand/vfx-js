@@ -1,19 +1,19 @@
 // BubbleEffect's bubbles, placed on the CPU, and the grid the shader
 // walks to find them. Pure module: no GL, Node-testable.
 //
-// 1. Big bubbles: a Poisson disk sampling of the volume (no two centres
-//    closer than a spacing set by the cell size, so no lattice shows),
-//    kept a little inside the outline and from poking out of it too far.
-// 2. Fill: on a voxel grid over the volume, the clearance of a point is
-//    how far it is from every sphere placed so far and from the shape's
-//    allowed outside. The voxel with the most clearance gets the next
-//    sphere, a little larger than its clearance so that it cuts into its
-//    neighbours and shares walls with them, until no gap is wider than
-//    `minSize` of a cell.
-// 3. Grid: a uniform grid over the spheres, each cell listing every
-//    sphere that can reach into it (grown by its drift). The lists are
-//    complete: a cell that would list more than the shader can hold makes
-//    the grid finer.
+// - Big bubbles: a Poisson disk sampling of the volume (no two centres
+//   closer than a spacing set by the cell size, so no lattice shows),
+//   kept a little inside the outline and from poking out of it too far.
+// - Fill: on a voxel grid over the volume, the clearance of a point is
+//   how far it is from every sphere placed so far and from the shape's
+//   allowed outside. The voxel with the most clearance gets the next
+//   sphere, a little larger than its clearance so that it cuts into its
+//   neighbours and shares walls with them, until no gap is wider than
+//   `minSize` of a cell.
+// - Grid: a uniform grid over the spheres, each cell listing every
+//   sphere that can reach into it (grown by its drift). The lists are
+//   complete: a cell that would list more than the shader can hold makes
+//   the grid finer.
 //
 // No sphere's power cell is empty: each sphere owns its own centre (its
 // power there, -r², is below every other sphere's).
@@ -49,6 +49,11 @@ export type BubbleFill = {
     latticeCount: number;
     /** The count reached `maxCount`. */
     capped: boolean;
+    /**
+     * The cell size used: larger than asked when the big bubbles would
+     * not fit in `maxCount`.
+     */
+    cellSize: number;
     /**
      * How far any sphere reaches out of the shape (the extruded 2D field,
      * edges rounded by the bevel), world units.
@@ -97,6 +102,8 @@ type Shape2D = Pick<ShapeData, "sdf" | "sdfW" | "sdfH" | "sdfRect">;
 /** What {@link buildFoam} takes. */
 export type FoamInput = {
     shape: Shape2D;
+    /** Names the shape: with the same key and `fill`, the last placement is reused. */
+    shapeKey?: number;
     fill: FillOptions;
     /** Drift per radius, grows the grid's lists. */
     wobble: number;
@@ -382,14 +389,47 @@ export function bubbleKernel() {
 
     // ---- placement ----
 
+    // How much the cells grow per try when the big bubbles do not fit,
+    // and the tries at most.
+    const CELL_GROW = 1.12;
+    const CELL_GROW_TRIES = 40;
+    // The row of spheres in a part too thin for the fill: how far from
+    // every sphere its first one is (per smallest gap), how close to a
+    // sphere a point counts as covered (per radius), the smallest radius
+    // (in texels of the field), and the sweeps at most.
+    const THIN_FAR = 2;
+    const THIN_COVERED = 0.25;
+    const THIN_TEXELS = 1.5;
+    const THIN_PASSES = 8;
+
     /**
      * The bubbles in the extruded shape: the lattice's, then the fill's.
      * Deterministic for the options.
      */
     function placeBubbles(shape: Shape2D, o: FillOptions): BubbleFill {
+        // Too many big bubbles for the shape: grow the cells until they
+        // fit, so the whole shape is covered.
+        let cell = Math.max(o.cellSize, 1e-3);
+        for (let i = 0; i < CELL_GROW_TRIES; i++) {
+            const fill = placeAt(shape, o, cell, true);
+            if (fill) {
+                return fill;
+            }
+            cell *= CELL_GROW;
+        }
+        return placeAt(shape, o, cell, false) as BubbleFill;
+    }
+
+    // The bubbles for a cell size. With `fit`, null when the big bubbles
+    // alone would take more than their share of `maxCount`.
+    function placeAt(
+        shape: Shape2D,
+        o: FillOptions,
+        cell: number,
+        fit: boolean,
+    ): BubbleFill | null {
         const halfDepth = Math.max(o.halfDepth, 1e-3);
         const bevel = Math.min(Math.max(o.bevel ?? 0, 0), halfDepth);
-        const cell = Math.max(o.cellSize, 1e-3);
         const roundness = Math.min(Math.max(o.roundness, 0), 1);
         const radiusVar = Math.min(Math.max(o.cellSizeRandomness, 0), 1);
         const seed = o.seed >>> 0;
@@ -397,10 +437,13 @@ export function bubbleKernel() {
             Math.max(Math.floor(o.maxCount ?? BUBBLE_MAX_COUNT), 0),
             BUBBLE_MAX_COUNT,
         );
+        // With a fill, the big bubbles leave it half the count.
+        const latticeMax =
+            o.minSize < 1 ? Math.max(Math.floor(maxCount / 2), 1) : maxCount;
         const { protrude, bulgeZ } = fillShape({ ...o, cellSize: cell });
         const sphereR = SPHERE_R * cell;
 
-        // 1. The big bubbles' centres: Bridson's Poisson disk sampling, grown
+        // The big bubbles' centres: Bridson's Poisson disk sampling, grown
         //    from seeds on a coarse grid (in random order) so every part of
         //    the shape gets some, however small.
         const spacing =
@@ -504,7 +547,7 @@ export function bubbleKernel() {
         }
         for (
             let si = 0;
-            si < seeds.length / 2 && pts.length / 3 < maxCount;
+            si < seeds.length / 2 && pts.length / 3 < latticeMax;
             si++
         ) {
             const sx = seeds[si * 2];
@@ -514,7 +557,7 @@ export function bubbleKernel() {
                 continue;
             }
             add(sx, sy, sz);
-            while (active.length > 0 && pts.length / 3 < maxCount) {
+            while (active.length > 0 && pts.length / 3 < latticeMax) {
                 const e = Math.floor(rand() * active.length);
                 const q = active[e];
                 let found = false;
@@ -532,6 +575,9 @@ export function bubbleKernel() {
                 }
             }
             active.length = 0;
+        }
+        if (fit && maxCount > 0 && pts.length / 3 >= latticeMax) {
+            return null;
         }
         // Their radii: random within cellSizeRandomness, and kept from
         // poking out of the shape too far.
@@ -585,7 +631,7 @@ export function bubbleKernel() {
         }
         const latticeCount = out.length / 4;
 
-        // 2. The fill.
+        // The fill.
         const tMin = 0.5 * Math.max(o.minSize, 0) * cell;
         let voxel = 0;
         let voxels = 0;
@@ -798,15 +844,31 @@ export function bubbleKernel() {
                     // Larger than the gap, so it cuts into its neighbours; no
                     // larger than the shape allows, and small enough that
                     // every neighbour keeps its centre.
-                    let r = Math.min(k * dS[v], dB[v]);
+                    // Far from every sphere, the gap is not tracked: such
+                    // a voxel is in a part too thin for a big bubble.
+                    // Measure the gap, so its spheres join up.
+                    const far = dS[v] === Infinity;
+                    let gap = dS[v];
+                    if (far) {
+                        fill.near(cx, cy, cz, dB[v] + tMin + maxR, (s) => {
+                            const d =
+                                Math.hypot(
+                                    cx - out[s * 4],
+                                    cy - out[s * 4 + 1],
+                                    cz - out[s * 4 + 2],
+                                ) - out[s * 4 + 3];
+                            gap = Math.min(gap, d);
+                        });
+                    }
+                    let r = Math.min(k * gap, dB[v]);
                     // One held back by the shape just short of its nearest
                     // neighbour may poke out a little more to reach it, so
                     // it shares a wall rather than floating loose.
-                    const reachIt = FILL_REACH * dS[v];
+                    const reachIt = FILL_REACH * gap;
                     if (r < reachIt && reachIt <= dB[v] + tMin) {
                         r = reachIt;
                     }
-                    if (r <= dS[v]) {
+                    if (r <= gap && !far) {
                         // It could not reach any neighbour: a loose bubble
                         // in a pocket of the outline. Leave the gap.
                         clear[v] = -1;
@@ -838,6 +900,115 @@ export function bubbleKernel() {
                     // The voxel itself is inside the new sphere now.
                     clear[v] = Math.min(clear[v], -r);
                 }
+
+                // The parts too thin for the fill's smallest sphere, with
+                // no sphere near: a row of smaller ones along their middle.
+                const thinStart = out.length / 4;
+                const W = shape.sdfW;
+                const H = shape.sdfH;
+                const texel = Math.max(rw / W, rh / H);
+                const raw = (i: number, j: number) =>
+                    shape.sdf[(j * W + i) * 4];
+                // x, y, radius per texel on the middle line of a thin part.
+                const thin: [number, number, number][] = [];
+                for (let j = 1; j < H - 1; j++) {
+                    for (let i = 1; i < W - 1; i++) {
+                        const d = raw(i, j);
+                        if (
+                            !(d < 0) ||
+                            d > raw(i - 1, j) ||
+                            d > raw(i + 1, j) ||
+                            d > raw(i, j - 1) ||
+                            d > raw(i, j + 1) ||
+                            d > raw(i - 1, j - 1) ||
+                            d > raw(i + 1, j - 1) ||
+                            d > raw(i - 1, j + 1) ||
+                            d > raw(i + 1, j + 1)
+                        ) {
+                            continue;
+                        }
+                        const x = rx + ((i + 0.5) / W) * rw;
+                        const y = ry + ((j + 0.5) / H) * rh;
+                        const c = -sampleSd2(shape, x, y)[0];
+                        const e = -extrudeSd(-c, -halfDepth, bevel);
+                        if (!(e > 0)) {
+                            continue;
+                        }
+                        const r = Math.min(
+                            c + Math.min(protrude, FILL_POKE_K * c),
+                            halfDepth +
+                                Math.min(
+                                    protrude + bulgeZ,
+                                    FILL_POKE_K * halfDepth,
+                                ),
+                            e + Math.min(protrude, FILL_POKE_K * e),
+                        );
+                        if (r < tMin && r >= THIN_TEXELS * texel) {
+                            thin.push([x, y, r]);
+                        }
+                    }
+                }
+                thin.sort((a, b) => b[2] - a[2]);
+                const done = new Uint8Array(thin.length);
+                let placedSome = true;
+                for (let pass = 0; pass < THIN_PASSES && placedSome; pass++) {
+                    placedSome = false;
+                    for (let t = 0; t < thin.length; t++) {
+                        if (out.length / 4 >= maxCount) {
+                            break;
+                        }
+                        if (done[t]) {
+                            continue;
+                        }
+                        const [cx, cy, r0] = thin[t];
+                        let gap = Infinity;
+                        let nearest = -1;
+                        fill.near(cx, cy, 0, THIN_FAR * tMin + maxR, (s) => {
+                            const d =
+                                Math.hypot(
+                                    cx - out[s * 4],
+                                    cy - out[s * 4 + 1],
+                                    out[s * 4 + 2],
+                                ) - out[s * 4 + 3];
+                            if (d < gap) {
+                                gap = d;
+                                nearest = s;
+                            }
+                        });
+                        if (gap < THIN_COVERED * r0) {
+                            done[t] = 1;
+                            continue;
+                        }
+                        // The first of a part, or the next of its row.
+                        const first = gap > THIN_FAR * tMin;
+                        const next = nearest >= thinStart && gap < r0;
+                        if (!first && !next) {
+                            continue;
+                        }
+                        let r = r0;
+                        fill.near(cx, cy, 0, r, (s) => {
+                            const dx = cx - out[s * 4];
+                            const dy = cy - out[s * 4 + 1];
+                            const dz = out[s * 4 + 2];
+                            const lim =
+                                0.98 *
+                                Math.sqrt(
+                                    dx * dx +
+                                        dy * dy +
+                                        dz * dz +
+                                        out[s * 4 + 3] ** 2,
+                                );
+                            if (lim < r) {
+                                r = lim;
+                            }
+                        });
+                        fill.add(out.length / 4, cx, cy, 0);
+                        out.push(cx, cy, 0, r);
+                        maxR = Math.max(maxR, r);
+                        done[t] = 1;
+                        placedSome = true;
+                    }
+                }
             }
         }
 
@@ -860,6 +1031,7 @@ export function bubbleKernel() {
             count,
             latticeCount,
             capped: count >= maxCount,
+            cellSize: cell,
             reach,
             voxel,
             voxels,
@@ -1126,9 +1298,16 @@ export function bubbleKernel() {
      * grid the shader walks and the one it finds the borders with, and each
      * bubble's drift.
      */
+    let placed: { key: string; fill: BubbleFill } | null = null;
     function buildFoam(a: FoamInput): FoamData {
-        const fill = placeBubbles(a.shape, a.fill);
-        const cellSize = a.fill.cellSize;
+        // The placement does not depend on wobble or containment.
+        const key = JSON.stringify([a.shapeKey, a.fill]);
+        if (a.shapeKey === undefined || placed?.key !== key) {
+            placed = { key, fill: placeBubbles(a.shape, a.fill) };
+        }
+        // A copy: a worker gives the result's buffers away.
+        const fill = { ...placed.fill, spheres: placed.fill.spheres.slice() };
+        const cellSize = fill.cellSize;
         // In a container the bubbles are blown up to fill it: r² grows by
         // the same amount for all, which leaves every wall between two
         // bubbles where it is and only pushes the foam's outside out, into
