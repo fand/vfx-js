@@ -43,7 +43,7 @@ function insideCount(shape: ReturnType<typeof buildShape>) {
 const build = (
     px: Uint8Array | Float32Array,
     channel: Parameters<typeof buildShape>[3],
-) => buildShape(px, W, H, channel, 0.1, W / H, 0, 0);
+) => buildShape(px, W, H, channel, W / H, 0, 0);
 
 describe("buildShape channels", () => {
     test('"alpha": where alpha ≥ 0.5', () => {

@@ -65,8 +65,15 @@ export type ShapeData = {
     sdfRect: [number, number, number, number];
     /** Half size of the element in world units (the long side is 1). */
     shapeHalf: [number, number];
-    /** RGBA: x, y, z / halfDepth (-1..1), 0. */
+    /**
+     * RGBA: x, y, z / halfDepth (-1..1), 0. The first half are on the
+     * side wall, the second on the caps.
+     */
     spawn: Float32Array;
+    /** Length of the outline, in world units: the side wall's area per depth. */
+    spawnSide: number;
+    /** Area of both caps, in world units. */
+    spawnCap: number;
     /** Width / height of the element when it was captured. */
     aspect: number;
 };
@@ -78,7 +85,6 @@ export type ShapeJob = {
     mw: number;
     mh: number;
     channel: SourceChannel;
-    halfDepthHint: number;
     aspect: number;
     smoothRadius: number;
     smoothPasses: number;
@@ -260,7 +266,6 @@ export function shapeKernel() {
         mw: number,
         mh: number,
         channel: SourceChannel,
-        halfDepthHint: number,
         aspect: number,
         smoothRadius = 1,
         smoothPasses = 1,
@@ -360,6 +365,8 @@ export function shapeKernel() {
                 sdfRect,
                 shapeHalf,
                 spawn: new Float32Array(0),
+                spawnSide: 0,
+                spawnCap: 0,
                 aspect,
             };
         }
@@ -386,15 +393,16 @@ export function shapeKernel() {
         }
         const capArea = insideIdx.length * px * px * 2;
         // 4-neighbour edge pixels undercount diagonal edges; ~1.15 on average.
-        const sideArea = edgeIdx.length * 1.15 * px * (2 * halfDepthHint);
-        const pSide = sideArea / (sideArea + capArea);
+        const sideLength = edgeIdx.length * 1.15 * px;
 
+        // The first half are on the side wall, the second on the caps; the
+        // shader picks between them by area at the current depth.
         const rand = mulberry32(0x5eed1234);
         const total = SPAWN_SIZE * SPAWN_SIZE;
         const spawn = new Float32Array(total * 4);
         for (let k = 0; k < total; k++) {
             const o = k * 4;
-            if (rand() < pSide && edgeIdx.length > 0) {
+            if (k < total / 2 && edgeIdx.length > 0) {
                 const i = edgeIdx[Math.floor(rand() * edgeIdx.length)];
                 const x = i % W;
                 const y = (i - x) / W;
@@ -422,6 +430,8 @@ export function shapeKernel() {
             sdfRect,
             shapeHalf,
             spawn,
+            spawnSide: edgeIdx.length > 0 ? sideLength : 0,
+            spawnCap: capArea,
             aspect,
         };
     }
@@ -522,7 +532,6 @@ export function shapeKernel() {
             a.mw,
             a.mh,
             a.channel,
-            a.halfDepthHint,
             a.aspect,
             a.smoothRadius,
             a.smoothPasses,

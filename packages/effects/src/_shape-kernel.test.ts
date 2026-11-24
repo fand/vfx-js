@@ -34,7 +34,6 @@ function job(spawn: boolean, relief: boolean): ShapeJob {
         mw: W,
         mh: H,
         channel: "alpha",
-        halfDepthHint: 0.1,
         aspect: W / H,
         smoothRadius: 1,
         smoothPasses: 1,

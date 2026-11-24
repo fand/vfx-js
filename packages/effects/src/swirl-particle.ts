@@ -378,6 +378,17 @@ const SIM_STEP = 1 / 30;
 // = clampDt's 0.1 s cap / SIM_STEP.
 const MAX_SUBSTEPS = 3;
 const STILL_STEPS = 90;
+// Share of the surface that is side wall, for spawning: the caps keep
+// their area, the wall grows with the depth.
+function spawnSideShare(shape: ShapeData | null, halfDepth: number): number {
+    if (!shape) {
+        return 0;
+    }
+    const side = shape.spawnSide * 2 * halfDepth;
+    const total = side + shape.spawnCap;
+    return total > 0 ? side / total : 0;
+}
+
 // Near / far planes relative to the camera distance.
 const NEAR_K = 0.05 / 3.2;
 const FAR_K = 1 + 6 / 3.2;
@@ -506,14 +517,19 @@ float rnd(uint v) {
 const GLSL_SPAWN = `
 uniform sampler2D spawnTex;
 uniform int spawnSize;
+// Share of births on the side wall, by area at the current depth.
+uniform float spawnSideShare;
 
 uint spawnKey(uint id, float gen) {
     return pcg(id ^ (uint(gen) * 2654435769u));
 }
 
 // xy = world position, z = position along the depth / halfDepth (-1..1).
+// The first half of the points are on the side wall, the second on the caps.
 vec4 spawnPoint(uint key) {
-    int idx = int(key % uint(spawnSize * spawnSize));
+    int half_ = spawnSize * spawnSize / 2;
+    bool side = float(key & 0xffffu) < spawnSideShare * 65536.0;
+    int idx = int((key >> 16u) % uint(half_)) + (side ? 0 : half_);
     return texelFetch(spawnTex, ivec2(idx % spawnSize, idx / spawnSize), 0);
 }
 `;
@@ -1946,7 +1962,6 @@ export class SwirlParticleEffect implements Effect {
             mw: r.width,
             mh: r.height,
             channel,
-            halfDepthHint: this.#r.depth / 2,
             aspect: r.aspect,
             smoothRadius: 1,
             smoothPasses: 1,
@@ -2191,6 +2206,7 @@ export class SwirlParticleEffect implements Effect {
             rounding: Math.min(0.025, halfDepth * 0.5),
             stateWidth: this.#stateWidth,
             spawnSize: SPAWN_SIZE,
+            spawnSideShare: spawnSideShare(this.#shape, halfDepth),
         };
         if (this.#sdfTex && this.#spawnTex) {
             uniforms.sdfTex = this.#sdfTex;

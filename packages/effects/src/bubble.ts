@@ -2218,7 +2218,6 @@ export class BubbleEffect implements Effect {
             mw: r.width,
             mh: r.height,
             channel,
-            halfDepthHint: this.params.depth / 2,
             aspect: r.aspect,
             smoothRadius: SMOOTH_RADIUS,
             smoothPasses: SMOOTH_PASSES,

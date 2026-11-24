@@ -59,16 +59,7 @@ function mask(mw: number, mh: number): Uint8Array {
 }
 
 function shapeOf(): ShapeData {
-    const s = buildShape(
-        mask(512, 212),
-        512,
-        212,
-        "alpha",
-        0.05,
-        512 / 212,
-        2,
-        2,
-    );
+    const s = buildShape(mask(512, 212), 512, 212, "alpha", 512 / 212, 2, 2);
     if (!s) {
         throw new Error("empty shape");
     }
@@ -432,7 +423,7 @@ describe("placeBubbles at its limits", () => {
                 px[(y * mw + x) * 4 + 3] = 255;
             }
         }
-        const thin = buildShape(px, mw, mh, "alpha", 0.05, mw / mh, 2, 2);
+        const thin = buildShape(px, mw, mh, "alpha", mw / mh, 2, 2);
         if (!thin) {
             throw new Error("empty shape");
         }
@@ -456,7 +447,7 @@ describe("placeBubbles in a part thinner than minSize", () => {
             px[(y * mw + x) * 4 + 3] = 255;
         }
     }
-    const thin = buildShape(px, mw, mh, "alpha", 0.05, mw / mh, 2, 2);
+    const thin = buildShape(px, mw, mh, "alpha", mw / mh, 2, 2);
     if (!thin) {
         throw new Error("empty shape");
     }
