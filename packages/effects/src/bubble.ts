@@ -285,6 +285,12 @@ export type BubbleParams = OrbitCameraParams & {
     lightIntensity: number;
     /** Softness of the lights' edges, 0 to 1. */
     lightSoftness: number;
+    /**
+     * What the films reflect around them: `"studio"` (default), soft box
+     * lights and an even sky; `"noise"`, uneven patches of light, like
+     * clouds or a room, at random.
+     */
+    lighting: "studio" | "noise";
 
     /** Render scale, 0.25 to 2. Below 1 is cheaper and softer. */
     resolution: number;
@@ -364,6 +370,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     backdropSoftness: 0.03,
     lightIntensity: 1.2,
     lightSoftness: 0.8,
+    lighting: "studio",
     yaw: 20,
     pitch: 11.5,
     orbitAnimation: 11.5,
@@ -476,6 +483,8 @@ uniform float reflection;
 uniform float rimCos;
 // The backdrop is reflected all around (1), or only behind (0).
 uniform float backdropAround;
+// The lights are uneven patches of noise (1), or the studio's boxes (0).
+uniform float noiseLights;
 uniform vec3 tint;
 uniform float tintStrength;
 uniform float opacity;
@@ -587,7 +596,28 @@ float plainFilm(float c) {
 // their surroundings, as studio lights are, so a cap facing one shows a
 // highlight at the few percent a film reflects head on; past that, a
 // grazing film reflects them no more, so rims stay soft.
+// Uneven light around the foam in direction d: bright patches of a slow
+// noise, slightly warm or cool, over a dim gradient. x: the patches, y:
+// the dim part, as the studio's lights and sky.
+vec2 noiseLight(vec3 d, out vec3 hue) {
+    // A mirror ball shows the whole sphere of directions, so the noise
+    // is slow: a few patches all round.
+    vec3 q = d * 0.7 + vec3(3.1, 0.0, 0.0);
+    float n = 0.8 * snoise(q) + 0.2 * snoise(q * 2.3 + 7.3);
+    float soft = 0.08 + 0.25 * lightSoftness;
+    float patch_ = smoothstep(0.25 - soft, 0.25 + soft, n);
+    float dim = 0.25 + 0.75 * clamp(0.5 + 0.6 * n, 0.0, 1.0);
+    float h = snoise(q * 0.6 + 11.0);
+    hue = mix(vec3(1.0, 0.92, 0.82), vec3(0.82, 0.9, 1.0), 0.5 + 0.5 * h);
+    return vec2(patch_, dim * smoothstep(-0.9, 0.6, d.y));
+}
+
 vec3 reflected(vec3 R, vec3 pV, vec3 dV) {
+    if (noiseLights > 0.5 && !(backdropAround > 0.5 && backdropMode != 0) && (backdropMode == 0 || dV.z >= -1e-4)) {
+        vec3 hue;
+        vec2 l = noiseLight(dV, hue) * lightIntensity;
+        return (min(R, vec3(0.05)) * LIGHT_GAIN * l.x + R * 0.35 * l.y) * hue;
+    }
     if (backdropAround > 0.5 && backdropMode != 0 && dV.z >= -1e-4) {
         // The backdrop again, on a plane as far in front: towards the
         // side both planes blur to its mean.
@@ -2117,6 +2147,7 @@ export class BubbleEffect implements Effect {
                 swirlOffset: this.#swirlOffset,
                 reflection: Math.max(finite(p.reflection, d.reflection), 0),
                 backdropAround: p.backdropAround ? 1 : 0,
+                noiseLights: p.lighting === "noise" ? 1 : 0,
                 rimCos: RIM_COS * (1 - clamp(p.rim, 0, 1, d.rim)),
                 tint: colorOf(p.tint, d.tint),
                 tintStrength: clamp(p.tintStrength, 0, 1, d.tintStrength),
