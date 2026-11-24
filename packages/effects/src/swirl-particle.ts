@@ -570,9 +570,9 @@ float lifeOf(uint id, float gen) {
 }
 
 // Round onto the 16-bit float grid, up or down at random. In 16-bit
-// state targets, an age step smaller than half a step of the grid would
-// otherwise round away every frame and the particle would never die;
-// this way the steps add up on average.
+// state targets, a step smaller than half a step of the grid would
+// otherwise round away every frame: the particle would never die or
+// move. This way the steps add up on average.
 float roundHalf(float x, float r) {
     float e = exp2(floor(log2(max(abs(x), 6.2e-5))) - 10.0);
     return floor(x / e + r) * e;
@@ -702,6 +702,15 @@ void main() {
 
     v = mix(v, target, 1.0 - exp(-dt * 5.0));
     p += v * dt;
+    if (halfState == 1) {
+        // As for the age: small moves would round away, and slow particles freeze.
+        uint k = id * 2654435761u + uint(frameSeed) * 2246822519u;
+        p = vec3(
+            roundHalf(p.x, rnd(k + 31u)),
+            roundHalf(p.y, rnd(k + 37u)),
+            roundHalf(p.z, rnd(k + 41u))
+        );
+    }
 
     outPos = vec4(p, ageN);
     outVel = vec4(v, gen);
