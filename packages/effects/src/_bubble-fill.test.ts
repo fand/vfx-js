@@ -84,7 +84,6 @@ const OPTS: FillOptions = {
     roundness: 0.3,
     cellSizeRandomness: 0.25,
     seed: 1,
-    skin: 0,
     minSize: 0.25,
 };
 

@@ -31,8 +31,6 @@ export type FillOptions = {
     /** 0 to 1: the big bubbles' radii shrink by a random share of this. */
     cellSizeRandomness: number;
     seed: number;
-    /** Moves the foam's outside in (positive) or out, world units. */
-    skin: number;
     /**
      * Smallest gap the fill fills, per cell size: it places spheres while
      * an empty ball of diameter `minSize * cellSize` fits. 1 or more: no
@@ -134,9 +132,12 @@ export function bubbleKernel() {
     /** Spheres placed at most. */
     const BUBBLE_MAX_COUNT = 4096;
 
-    // Radius per lattice spacing at roundness 0 and 1.
-    const SPHERE_R_FLAT = 1.0;
-    const SPHERE_R_ROUND = 0.52;
+    // A big bubble's radius per cell size.
+    const SPHERE_R = 0.86;
+    // Least distance between two big bubbles' centres, per diameter, at
+    // roundness 0 (heavy overlap: flat walls) and 1 (spheres that touch).
+    const SPACING_FLAT = 0.3;
+    const SPACING_ROUND = 1.0;
     // A filling sphere's radius per clearance at roundness 0 and 1: it cuts
     // into its neighbours by (k - 1) times its clearance. At most 2, so the
     // spheres placed before keep their centres (no empty cells).
@@ -157,9 +158,6 @@ export function bubbleKernel() {
     // far from the front and back (as far as the depth allows), per cell size.
     const CENTRE_DEPTH = 0.1;
     const CENTRE_Z_MARGIN = 0.35;
-    // Least distance between two big bubbles' centres, per cell size: about
-    // as many bubbles as a lattice of that spacing.
-    const POISSON_SPACING = 0.85;
     // Candidates tried round each centre before it is retired.
     const POISSON_TRIES = 30;
     // Voxels of the fill's clearance field, at most, and their size per
@@ -177,7 +175,7 @@ export function bubbleKernel() {
     /** How far a sphere may poke out of the shape, from the options. */
     function fillShape(o: FillOptions): FillShape {
         return {
-            protrude: Math.max(SPHERE_PROTRUDE * o.cellSize - o.skin, 0),
+            protrude: SPHERE_PROTRUDE * o.cellSize,
             bulgeZ: SPHERE_BULGE_Z * o.cellSize,
         };
     }
@@ -400,14 +398,15 @@ export function bubbleKernel() {
             BUBBLE_MAX_COUNT,
         );
         const { protrude, bulgeZ } = fillShape({ ...o, cellSize: cell });
-        const sphereR =
-            cell *
-            (SPHERE_R_FLAT + (SPHERE_R_ROUND - SPHERE_R_FLAT) * roundness);
+        const sphereR = SPHERE_R * cell;
 
         // 1. The big bubbles' centres: Bridson's Poisson disk sampling, grown
         //    from seeds on a coarse grid (in random order) so every part of
         //    the shape gets some, however small.
-        const spacing = POISSON_SPACING * cell;
+        const spacing =
+            2 *
+            sphereR *
+            (SPACING_FLAT + (SPACING_ROUND - SPACING_FLAT) * roundness);
         const centreDepth = CENTRE_DEPTH * cell;
         const zLim = Math.max(halfDepth - CENTRE_Z_MARGIN * cell, 0);
         // Thinner than this, the centres spread over a plane.
@@ -807,6 +806,12 @@ export function bubbleKernel() {
                     if (r < reachIt && reachIt <= dB[v] + tMin) {
                         r = reachIt;
                     }
+                    if (r <= dS[v]) {
+                        // It could not reach any neighbour: a loose bubble
+                        // in a pocket of the outline. Leave the gap.
+                        clear[v] = -1;
+                        continue;
+                    }
                     const n0 = out.length / 4;
                     fill.near(cx, cy, cz, r, (s) => {
                         const dx = cx - out[s * 4];
@@ -866,19 +871,28 @@ export function bubbleKernel() {
     /**
      * The grid over the spheres: each cell lists every sphere whose ball,
      * grown by `wobble` times its radius (its drift), touches the cell.
-     * Cells start at `cell` and shrink until no list is longer than
-     * {@link BUBBLE_LIST_MAX}.
+     * With `fill` (what a container adds to every r² deep inside the
+     * shape), a sphere also reaches as far as its r² + fill does, but
+     * only into the cells where it can own a point: the fill is the same
+     * for all spheres, so it does not change which one has the least
+     * power. Cells start at `cell` and shrink until no list is longer
+     * than {@link BUBBLE_LIST_MAX}.
      */
     function buildSphereGrid(
         input: Float32Array,
         wobble: number,
         cell: number,
+        fill = 0,
     ): SphereGrid {
         let spheres = input;
         let dropped = 0;
-        const grow = 1 + Math.max(wobble, 0);
         for (;;) {
-            const g = tryGrid(spheres, grow, Math.max(cell, 1e-4));
+            const g = tryGrid(
+                spheres,
+                Math.max(wobble, 0),
+                Math.max(cell, 1e-4),
+                Math.max(fill, 0),
+            );
             if (g.ok) {
                 return { ...g.grid, dropped };
             }
@@ -897,16 +911,24 @@ export function bubbleKernel() {
 
     function tryGrid(
         spheres: Float32Array,
-        grow: number,
+        wobble: number,
         cell0: number,
+        fill: number,
     ):
         | { ok: true; grid: Omit<SphereGrid, "dropped"> }
         | { ok: false; drop: number[] } {
         const count = spheres.length / 4;
+        // How far a sphere reaches, drift included: with its own radius,
+        // and with the fill.
+        const own = (s: number) => spheres[s * 4 + 3] * (1 + wobble);
+        const reach = (s: number) => {
+            const r = spheres[s * 4 + 3];
+            return Math.sqrt(r * r + fill) + wobble * r;
+        };
         const lo = [Infinity, Infinity, Infinity];
         const hi = [-Infinity, -Infinity, -Infinity];
         for (let s = 0; s < count; s++) {
-            const r = spheres[s * 4 + 3] * grow;
+            const r = reach(s);
             for (let a = 0; a < 3; a++) {
                 lo[a] = Math.min(lo[a], spheres[s * 4 + a] - r);
                 hi[a] = Math.max(hi[a], spheres[s * 4 + a] + r);
@@ -931,12 +953,16 @@ export function bubbleKernel() {
             const cells = dims[0] * dims[1] * dims[2];
             const counts = new Int32Array(cells);
             let maxList = 0;
-            const each = (f: (s: number, id: number) => void) => {
+            // Every sphere that reaches a cell, with the nearest and the
+            // farthest distance from its centre to the cell.
+            const pairs = (
+                f: (s: number, id: number, near: number, far: number) => void,
+            ) => {
                 for (let s = 0; s < count; s++) {
                     const cx = spheres[s * 4];
                     const cy = spheres[s * 4 + 1];
                     const cz = spheres[s * 4 + 2];
-                    const r = spheres[s * 4 + 3] * grow;
+                    const r = reach(s);
                     const c = [cx, cy, cz];
                     const a0 = c.map((v, a) =>
                         Math.max(0, Math.floor((v - r - lo[a]) / cell)),
@@ -950,20 +976,65 @@ export function bubbleKernel() {
                     for (let z = a0[2]; z <= a1[2]; z++) {
                         const bz = lo[2] + z * cell;
                         const ez = Math.max(bz - cz, 0, cz - bz - cell);
+                        const fz = Math.max(
+                            Math.abs(bz - cz),
+                            Math.abs(bz + cell - cz),
+                        );
                         for (let y = a0[1]; y <= a1[1]; y++) {
                             const by = lo[1] + y * cell;
                             const ey = Math.max(by - cy, 0, cy - by - cell);
+                            const fy = Math.max(
+                                Math.abs(by - cy),
+                                Math.abs(by + cell - cy),
+                            );
                             for (let x = a0[0]; x <= a1[0]; x++) {
                                 const bx = lo[0] + x * cell;
                                 const ex = Math.max(bx - cx, 0, cx - bx - cell);
-                                if (ex * ex + ey * ey + ez * ez > r * r) {
+                                const near2 = ex * ex + ey * ey + ez * ez;
+                                if (near2 > r * r) {
                                     continue;
                                 }
-                                f(s, x + dims[0] * (y + dims[1] * z));
+                                const fx = Math.max(
+                                    Math.abs(bx - cx),
+                                    Math.abs(bx + cell - cx),
+                                );
+                                f(
+                                    s,
+                                    x + dims[0] * (y + dims[1] * z),
+                                    Math.sqrt(near2),
+                                    Math.sqrt(fx * fx + fy * fy + fz * fz),
+                                );
                             }
                         }
                     }
                 }
+            };
+            // With the fill, the least power any point of a cell can have
+            // is at most minU; a sphere whose power stays above it over the
+            // whole cell owns no point there.
+            let minU: Float64Array | null = null;
+            if (fill > 0) {
+                const m = new Float64Array(cells).fill(Infinity);
+                pairs((s, id, _near, far) => {
+                    const r = spheres[s * 4 + 3];
+                    const u = (far + wobble * r) ** 2 - r * r;
+                    if (u < m[id]) {
+                        m[id] = u;
+                    }
+                });
+                minU = m;
+            }
+            const each = (f: (s: number, id: number) => void) => {
+                pairs((s, id, near) => {
+                    if (minU && near > own(s)) {
+                        const r = spheres[s * 4 + 3];
+                        const l = Math.max(near - wobble * r, 0) ** 2 - r * r;
+                        if (l > minU[id]) {
+                            return;
+                        }
+                    }
+                    f(s, id);
+                });
             };
             each((_s, id) => {
                 counts[id]++;
@@ -1045,8 +1116,10 @@ export function bubbleKernel() {
     // How much a container blows the bubbles up at containment 1, as a share
     // of what would close every gap: less leaves creases between them.
     const CONTAIN_GROW = 0.3;
-    // The fill inside the shape: the gap it closes, per cell size.
-    const FILL_GAP = 0.35;
+    // The fill inside the shape: the gap it closes, per smallest bubble
+    // (minSize cell sizes): the gaps the placement leaves are about that
+    // wide.
+    const FILL_GAP = 1.4;
 
     /**
      * BubbleEffect's foam: the bubbles placed, blown up in a container, the
@@ -1078,41 +1151,21 @@ export function bubbleKernel() {
                 grow = Math.max(grow, r1 - r0);
             }
         }
-        // The fill inside the shape: enough to close a gap of FILL_GAP cell
-        // sizes next to the biggest bubble. The grid lists each sphere as far
-        // as it reaches with it, so no cell misses an owner.
+        // The fill inside the shape: enough to close a gap of FILL_GAP
+        // smallest bubbles next to the biggest bubble. The grid lists each sphere as far
+        // as it can own a point with it.
         let fillG = 0;
-        let listed = spheres;
         if (a.containment > 0) {
             let maxR = 0;
             for (let i = 0; i < spheres.length / 4; i++) {
                 maxR = Math.max(maxR, spheres[i * 4 + 3]);
             }
-            const h = FILL_GAP * cellSize;
+            const h = FILL_GAP * Math.min(a.fill.minSize, 1) * cellSize;
             fillG = a.containment * (2 * maxR * h + h * h);
-            listed = spheres.slice();
-            for (let i = 0; i < listed.length / 4; i++) {
-                listed[i * 4 + 3] = Math.sqrt(listed[i * 4 + 3] ** 2 + fillG);
-            }
         }
-        const grid = buildSphereGrid(listed, a.wobble, cellSize);
+        const grid = buildSphereGrid(spheres, a.wobble, cellSize, fillG);
         let edgeGrid: SphereGrid | null = null;
-        if (listed !== spheres) {
-            // Back to the true radii, in the grid's order (it may leave some
-            // out).
-            let j = 0;
-            for (let i = 0; i < grid.count; i++) {
-                while (
-                    spheres[j * 4] !== grid.spheres[i * 4] ||
-                    spheres[j * 4 + 1] !== grid.spheres[i * 4 + 1] ||
-                    spheres[j * 4 + 2] !== grid.spheres[i * 4 + 2]
-                ) {
-                    j++;
-                }
-                grid.spheres[i * 4 + 3] = spheres[j * 4 + 3];
-                grid.sphereData[i * 4 + 3] = spheres[j * 4 + 3];
-                j++;
-            }
+        if (fillG > 0) {
             // The same spheres by their own radii: no list gets longer, so
             // none is left out and the indices match.
             const g = buildSphereGrid(grid.spheres, a.wobble, cellSize);
@@ -1137,8 +1190,6 @@ export function bubbleKernel() {
         BUBBLE_TEX_W,
         BUBBLE_LIST_MAX,
         BUBBLE_MAX_COUNT,
-        SPHERE_R_FLAT,
-        SPHERE_R_ROUND,
         SPHERE_PROTRUDE,
         SPHERE_BULGE_Z,
         fillShape,
@@ -1155,8 +1206,6 @@ export const {
     BUBBLE_TEX_W,
     BUBBLE_LIST_MAX,
     BUBBLE_MAX_COUNT,
-    SPHERE_R_FLAT,
-    SPHERE_R_ROUND,
     SPHERE_PROTRUDE,
     SPHERE_BULGE_Z,
     fillShape,

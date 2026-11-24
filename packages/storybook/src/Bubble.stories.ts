@@ -235,7 +235,8 @@ export const random: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { cellSizeRandomness: 0.6 } },
 };
 
-// From a flat-walled foam (roundness 0) to nearly separate spheres (1).
+// At the same bubble size, from a flat-walled foam (roundness 0) to whole
+// spheres that touch (1).
 export const roundness0: StoryObj<Args> = {
     args: { source: "VFX-JS logo", params: { roundness: 0 } },
 };

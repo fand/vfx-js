@@ -46,7 +46,6 @@ test("the worker's kernel places the same foam as the module's", () => {
             roundness: 0.3,
             cellSizeRandomness: 0.25,
             seed: 3,
-            skin: 0,
             minSize: 0.25,
         },
         wobble: 0.06,

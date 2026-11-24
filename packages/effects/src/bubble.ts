@@ -89,7 +89,7 @@ export type BubblePointer = "none" | "tilt";
  * Params of {@link BubbleEffect}: the foam's own, and the camera's
  * ({@link OrbitCameraParams}). All are read every frame. The placement
  * params (`depth`, `bevel`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `seed`, `skin`, `minSize`) place the bubbles
+ * `roundness`, `seed`, `minSize`) place the bubbles
  * again on the CPU when they change, which takes a few to a few tens of
  * milliseconds.
  */
@@ -116,8 +116,8 @@ export type BubbleParams = OrbitCameraParams & {
     bevel: number;
 
     /**
-     * Size of the big bubbles: about the spacing of their centres, in
-     * the same units as `depth`. Smaller bubbles fill the gaps between
+     * Size of the big bubbles: their radius is 0.86 of it, in the same
+     * units as `depth`. Smaller bubbles fill the gaps between
      * them (see `minSize`). Placement param.
      */
     cellSize: number;
@@ -127,22 +127,16 @@ export type BubbleParams = OrbitCameraParams & {
      */
     cellSizeRandomness: number;
     /**
-     * How round the bubbles are, 0 to 1: a big bubble's radius goes from
-     * a whole `cellSize` at 0 (heavy overlap: a flat-walled foam with
-     * shallow round caps) to about half of it at 1 (nearly separate
-     * spheres that just touch); the filling bubbles cut into their
-     * neighbours alike. Placement param.
+     * How round the bubbles are, 0 to 1, at the same size: how far apart
+     * the big bubbles sit. At 0 they overlap heavily (more of them, cut
+     * by flat walls into a polyhedral foam with shallow caps); at 1 their
+     * centres are a diameter apart, so they are whole spheres that just
+     * touch, with smaller bubbles in the gaps. The filling bubbles cut
+     * into their neighbours alike. Placement param.
      */
     roundness: number;
     /** Seed of the random placement. Placement param. */
     seed: number;
-    /**
-     * Moves the foam's outside in (positive) or out (negative) from the
-     * silhouette, world units. At 0, big bubbles poke out of the
-     * silhouette by 0.3 `cellSize` at most, small ones by less.
-     * Placement param.
-     */
-    skin: number;
     /**
      * The smallest bubbles, as a share of `cellSize`, 0.05 to 1: gaps
      * between the big bubbles, and along the outline, are filled with
@@ -152,7 +146,7 @@ export type BubbleParams = OrbitCameraParams & {
     minSize: number;
     /**
      * How much the shape acts as a container, 0 to 1. 0 lets the bubbles
-     * poke out of the silhouette (see `skin`) and bulge out of its front
+     * poke out of the silhouette (by 0.3 `cellSize` at most) and bulge out of its front
      * and back. Above 0, what pokes out is squashed towards the shape,
      * keeping its roundness: a cap that stood h above the shape stands
      * (1 - containment) h. At 1 the bubbles are pressed flat against the
@@ -324,7 +318,6 @@ const DEFAULT_PARAMS: BubbleParams = {
     cellSizeRandomness: 0.25,
     roundness: 0.3,
     seed: 1,
-    skin: 0,
     minSize: 0.25,
     containment: 0,
     wobble: 0.06,
@@ -1554,10 +1547,14 @@ export class BubbleEffect implements Effect {
     // Places the bubbles off the page's thread, where it can. Made when
     // first needed (again after dispose()).
     #kernel: KernelWorker | null = null;
-    // The foam asked of the kernel (its key), and the one it returned and
-    // is not yet uploaded. A newer request makes older replies stale.
-    #foamWanted: string | null = null;
-    #foamReady: { key: string; data: FoamData } | null = null;
+    // One job at a time: while it runs, param changes wait, and when it
+    // comes back the next frame asks for the foam of the params then. A
+    // reply is drawn even if the params moved on (a step closer), unless
+    // the shape changed under it. The token drops replies after dispose().
+    #foamBusy = false;
+    #foamReady: { key: string; version: number; data: FoamData } | null = null;
+    // The key whose job failed, so it is not asked again every frame.
+    #foamFailed: string | null = null;
     #foamToken = 0;
     // Bumped by each new shape, so its foam is placed again.
     #shapeVersion = 0;
@@ -1662,7 +1659,6 @@ export class BubbleEffect implements Effect {
                 d.cellSizeRandomness,
             ),
             seed: clampInt(p.seed, 0, 0x7fffffff, d.seed),
-            skin: clamp(p.skin, -cellSize / 2, cellSize / 2, d.skin),
             minSize: clamp(p.minSize, 0.05, 1, d.minSize),
         };
         const wobble = clamp(p.wobble, 0, WOBBLE_MAX, d.wobble);
@@ -1703,11 +1699,23 @@ export class BubbleEffect implements Effect {
     // it can) whenever the shape or a param it depends on changes. Until
     // the new foam comes back, the last one is drawn.
     #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
+        const ready = this.#foamReady;
+        if (ready) {
+            this.#foamReady = null;
+            if (ready.version === this.#shapeVersion) {
+                this.#uploadFoam(ctx, ready.key, ready.data);
+            }
+        }
         const r = this.#resolved();
-        const key = `${this.#shapeVersion}|${JSON.stringify(r.fill)}|${r.wobble}|${r.containment}`;
-        if (this.#foamData?.key !== key && this.#foamWanted !== key) {
-            this.#foamWanted = key;
-            const token = ++this.#foamToken;
+        const version = this.#shapeVersion;
+        const key = `${version}|${JSON.stringify(r.fill)}|${r.wobble}|${r.containment}`;
+        if (
+            !this.#foamBusy &&
+            this.#foamData?.key !== key &&
+            this.#foamFailed !== key
+        ) {
+            this.#foamBusy = true;
+            const token = this.#foamToken;
             this.#kernel ??= new KernelWorker(
                 bubbleKernel as never,
                 BUBBLE_KERNEL_SOURCE,
@@ -1727,22 +1735,17 @@ export class BubbleEffect implements Effect {
                 .then(
                     (data) => {
                         if (token === this.#foamToken) {
-                            this.#foamReady = { key, data };
+                            this.#foamBusy = false;
+                            this.#foamReady = { key, version, data };
                         }
                     },
                     () => {
                         if (token === this.#foamToken) {
-                            this.#foamWanted = null;
+                            this.#foamBusy = false;
+                            this.#foamFailed = key;
                         }
                     },
                 );
-        }
-        const ready = this.#foamReady;
-        if (ready) {
-            this.#foamReady = null;
-            if (ready.key === key) {
-                this.#uploadFoam(ctx, ready.key, ready.data);
-            }
         }
         return this.#foamData;
     }
@@ -2044,8 +2047,9 @@ export class BubbleEffect implements Effect {
         this.#kernel?.dispose();
         this.#kernel = null;
         this.#foamToken++;
-        this.#foamWanted = null;
+        this.#foamBusy = false;
         this.#foamReady = null;
+        this.#foamFailed = null;
         this.#backdrop.dispose(this.#gl);
         this.#gl = null;
         this.#passes.dispose();
