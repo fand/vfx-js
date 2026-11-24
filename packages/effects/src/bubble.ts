@@ -287,7 +287,9 @@ export type BubbleParams = OrbitCameraParams & {
     pointer: BubblePointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
-     * the whole canvas.
+     * the whole canvas. Default 100. Use `"fullscreen"` with
+     * `cameraOrigin: "viewport"`, where an element off the centre leans out
+     * of its rect; it costs full-canvas passes per element.
      */
     pad: number | "fullscreen";
     /**
@@ -358,7 +360,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     pointerStrength: 1,
     resolution: 1,
     antialias: true,
-    pad: "fullscreen",
+    pad: 100,
     debug: "off",
 };
 

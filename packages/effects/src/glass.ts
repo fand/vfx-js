@@ -246,7 +246,9 @@ export type GlassParams = OrbitCameraParams & {
     pointer: GlassPointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
-     * the whole canvas.
+     * the whole canvas. Default 100. Use `"fullscreen"` with
+     * `cameraOrigin: "viewport"`, where an element off the centre leans out
+     * of its rect; it costs full-canvas passes per element.
      */
     pad: number | "fullscreen";
     /**
@@ -305,7 +307,7 @@ const DEFAULT_PARAMS: GlassParams = {
     pointerStrength: 1,
     resolution: 1,
     antialias: true,
-    pad: "fullscreen",
+    pad: 100,
     debug: "off",
 };
 
@@ -882,9 +884,9 @@ function capLipschitz(k: number): number {
  * and `pitch` 14, a faster orbit animation (`orbitSpeed` 3.3), and
  * `zoom` 0.7, so the glass is a little smaller than the element. Set `drag: true` to orbit it with
  * pointer drags that start on the element, and `pointer: "tilt"` to turn
- * it towards the pointer. The default
- * `pad: "fullscreen"` leaves room for an off-centre element to lean out
- * of its rect with `cameraOrigin: "viewport"`.
+ * it towards the pointer. With `cameraOrigin: "viewport"`, set
+ * `pad: "fullscreen"` to leave room for an off-centre element to lean out
+ * of its rect.
  *
  * All params are read every frame, so you can mutate `params` live.
  */
