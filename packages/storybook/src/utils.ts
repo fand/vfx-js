@@ -1038,6 +1038,13 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     const line = pane.addFolder({ title: "Line" });
     line.addBinding(p, "color", { view: "color" });
     line.addBinding(p, "intensity", range(0, 5, 0.01));
+    line.addBinding(p, "coreIntensity", range(0, 5, 0.01));
+    line.addBinding(p, "coreWhiteness", range(0, 1, 0.01));
+    line.addBinding(p, "coreSoftness", range(0, 12, 0.05));
+    line.addBinding(p, "coreBlendOnTop");
+    const halo = pane.addFolder({ title: "Halo" });
+    halo.addBinding(p, "haloIntensity", range(0, 5, 0.01));
+    halo.addBinding(p, "haloSize", range(0, 60, 0.1));
     line.addBinding(p, "thickness", range(0.5, 10, 0.1));
     line.addBinding(p, "amplitude", range(0, 60, 0.5));
     line.addBinding(p, "mainAmplitude", range(0, 30, 0.5));
@@ -1049,7 +1056,15 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
 
     const motion = pane.addFolder({ title: "Motion" });
     motion.addBinding(p, "speed", range(0, 5, 0.01));
-    motion.addBinding(p, "flicker", range(0, 1, 0.01));
+    motion.addBinding(p, "flicker", {
+        ...range(0, 1, 0.01),
+        label: "Shape flicker",
+    });
+
+    const brightness = pane.addFolder({ title: "Brightness flicker" });
+    brightness.addBinding(p, "flickerIntensity", range(0, 1, 0.01));
+    brightness.addBinding(p, "flickerSpeed", range(0, 30, 0.1));
+    brightness.addBinding(p, "flickerSeed", range(0, 10000, 1));
 
     const reveal = pane.addFolder({ title: "Reveal" });
     reveal.addBinding(p, "start", range(0, 1, 0.001));
@@ -1058,8 +1073,70 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     reveal.addBinding(p, "fade", range(0, 300, 1));
 
     const glow = pane.addFolder({ title: "Glow" });
+    glow.addBinding(p, "glowMode", {
+        options: { Pyramid: "pyramid", Layers: "layers" },
+    });
     glow.addBinding(p, "glow", range(0, 5, 0.01));
+    glow.addBinding(p, "glowWhiteness", range(0, 1, 0.01));
     glow.addBinding(p, "glowFalloff", range(0, 1, 0.01));
+    glow.addBinding(p, "glowSpread", range(0, 3, 0.01));
+    glow.addBinding(p, "glowBias", range(-2, 2, 0.01));
+    glow.addBinding(p, "glowIntensityMultiplier", range(0, 10, 0.01));
+    glow.addBinding(p, "glowSizeMultiplier", range(0, 4, 0.01));
+    glow.addBinding(p, "glowPreGamma", range(0.1, 3, 0.01));
+    p.glowLayers.forEach((layer, i) => {
+        const folder = glow.addFolder({
+            title: `Layer ${i + 1}`,
+            expanded: false,
+        });
+        folder.addBinding(layer, "size", range(0, 200, 0.5));
+        folder.addBinding(layer, "intensity", range(0, 5, 0.01));
+    });
+
+    for (const key of ["coreDistortion", "glowDistortion"] as const) {
+        const distortion = pane.addFolder({
+            title:
+                key === "coreDistortion"
+                    ? "Core Distortion"
+                    : "Glow Distortion",
+            expanded: false,
+        });
+        const d = p[key];
+        if (key === "glowDistortion") {
+            distortion.addBinding(p, "glowDistortAllLayers", {
+                label: "All glow layers",
+            });
+            distortion.addBinding(p, "glowFlow", {
+                ...range(0, 120, 1),
+                label: "Flow reach",
+            });
+        }
+        distortion.addBinding(d, "amount", range(0, 100, 0.5));
+        distortion.addBinding(d, "type", {
+            options: { Fluid: "fluid", Smoke: "smoke", Energy: "energy" },
+        });
+        distortion.addBinding(d, "composite", {
+            options: { Distort: "distort", Multiply: "multiply" },
+        });
+        distortion.addBinding(d, "invert");
+        distortion.addBinding(d, "windSpeed", range(-240, 240, 1));
+        distortion.addBinding(d, "windDirection", range(0, 360, 1));
+        distortion.addBinding(d, "noiseSpeed", range(0, 3, 0.01));
+        distortion.addBinding(d, "noiseScale", range(1, 300, 1));
+        distortion.addBinding(d, "noiseBias", range(0.1, 3, 0.01));
+        distortion.addBinding(d, "noiseComplexity", {
+            ...range(1, 8, 1),
+            label: "Noise octaves",
+        });
+        distortion.addBinding(d, "noiseDetail", range(0, 1, 0.01));
+        distortion.addBinding(d, "noiseAspectRatio", range(0.1, 5, 0.01));
+        distortion.addBinding(d, "directionality", range(0, 1, 0.01));
+        distortion.addBinding(d, "motionBlur", {
+            ...range(0, 0.25, 0.005),
+            label: "Shutter (s)",
+        });
+        distortion.addBinding(d, "seed", range(0, 10000, 1));
+    }
 
     const edge = pane.addFolder({ title: "Edge" });
     edge.addBinding(p, "edge", {
@@ -1080,6 +1157,9 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         p.pad = padState.fullscreen ? "fullscreen" : padState.pad;
     };
     const output = pane.addFolder({ title: "Output" });
+    output.addBinding(p, "toneMapping", {
+        options: { Exponential: "exponential", Linear: "linear" },
+    });
     output.addBinding(p, "source");
     output.addBinding(padState, "fullscreen").on("change", writePad);
     output.addBinding(padState, "pad", range(0, 400, 1)).on("change", writePad);

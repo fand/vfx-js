@@ -31,6 +31,7 @@
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
     "lint": "biome check .",
+    "test": "tsc -p tsconfig.esm.json && node --test test/*.test.mjs",
     "format": "biome check --write .",
     "lint-staged": "lint-staged"
   },

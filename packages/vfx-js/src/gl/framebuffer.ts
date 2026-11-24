@@ -112,7 +112,7 @@ export class Framebuffer implements Restorable {
         // done manually here because ordering matters).
         this.texture.restore();
         this.depthTexture?.restore();
-        this.#allocate();
+        this.#allocate(false);
     }
 
     dispose(): void {
@@ -264,7 +264,7 @@ export class Framebuffer implements Restorable {
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
-    #allocate(): void {
+    #allocate(deleteOldHandles = true): void {
         const gl = this.gl;
         const oldFbo = this.fbo;
         const oldResolveFbo = this.resolveFbo;
@@ -392,15 +392,18 @@ export class Framebuffer implements Restorable {
         this.texture.source = null;
 
         // Delete after assigning the new FBO so this.fbo is never stale.
-        // On restore() the old handle is dead; deleteFramebuffer is a no-op.
-        if (oldFbo) {
-            gl.deleteFramebuffer(oldFbo);
+        // Pre-loss handles belong to the old context. Deleting them after
+        // restoration raises INVALID_OPERATION, so only retire live handles.
+        if (deleteOldHandles) {
+            if (oldFbo) {
+                gl.deleteFramebuffer(oldFbo);
+            }
+            this.#deleteMultisample(
+                oldResolveFbo,
+                oldColorRenderbuffer,
+                oldDepthRenderbuffer,
+            );
         }
-        this.#deleteMultisample(
-            oldResolveFbo,
-            oldColorRenderbuffer,
-            oldDepthRenderbuffer,
-        );
     }
 
     /** Allocate multisampled renderbuffers and attach them to `fbo`. */

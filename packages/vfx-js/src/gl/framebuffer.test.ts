@@ -81,6 +81,28 @@ function makeCtx(
 }
 
 describe("Framebuffer", () => {
+    it.each([
+        {},
+        { depth: true },
+        { samples: 4 as const, depth: true, mipmap: true },
+    ])("restore never deletes handles from the lost context: %j", (options) => {
+        const gl = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 16, 16, options);
+        const oldFbo = fb.fbo;
+        fb.restore();
+        expect(fb.fbo).not.toBe(oldFbo);
+        expect(gl.deleteFramebuffer).not.toHaveBeenCalled();
+        expect(gl.deleteRenderbuffer).not.toHaveBeenCalled();
+        expect(gl.deleteTexture).not.toHaveBeenCalled();
+        const restoredFbo = fb.fbo;
+        fb.setSize(32, 32);
+        expect(gl.deleteFramebuffer).toHaveBeenCalledWith(restoredFbo);
+        expect(gl.deleteFramebuffer).not.toHaveBeenCalledWith(oldFbo);
+        const currentFbo = fb.fbo;
+        fb.dispose();
+        expect(gl.deleteFramebuffer).toHaveBeenCalledWith(currentFbo);
+    });
+
     it("deletes the old FBO on setSize", () => {
         const gl = makeMockGl();
         const fb = new Framebuffer(makeCtx(gl), 10, 10);

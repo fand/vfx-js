@@ -1,0 +1,947 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { saberFlickerGain } from "../lib/esm/_saber-flicker.js";
+import { SaberEffect } from "../lib/esm/saber.js";
+import { SABER_PRESETS } from "../lib/esm/saber-presets.js";
+
+test("brightness flicker is bounded, deterministic, continuous and independently frozen", () => {
+    for (const seed of [0, 17, -51]) {
+        for (const time of [-3.7, 0, 0.01, 0.25, 1, 1234.56]) {
+            const gain = saberFlickerGain(time, 0.8, 12, seed);
+            assert.ok(gain >= 0.2 - 1e-12 && gain <= 1);
+            assert.equal(gain, saberFlickerGain(time, 0.8, 12, seed));
+            assert.equal(saberFlickerGain(time, 0, 12, seed), 1);
+            assert.equal(
+                saberFlickerGain(time, 1, 0, seed),
+                saberFlickerGain(0, 1, 0, seed),
+            );
+        }
+        assert.ok(
+            Math.abs(
+                saberFlickerGain(1 - 1e-6, 1, 12, seed) -
+                    saberFlickerGain(1 + 1e-6, 1, 12, seed),
+            ) < 1e-7,
+        );
+    }
+    assert.notEqual(
+        saberFlickerGain(0.27, 1, 12, 1),
+        saberFlickerGain(0.27, 1, 12, 2),
+    );
+});
+
+test("presets reset appearance without changing input/reveal or sharing mutable state", () => {
+    const effect = new SaberEffect({
+        preset: "unstable",
+        source: false,
+        edge: "luminance",
+        pad: 177,
+        end: 0.4,
+    });
+    const layers = effect.params.glowLayers;
+    const first = layers[0];
+    for (const name of Object.keys(SABER_PRESETS)) {
+        effect.setParams({ preset: name });
+        const fresh = new SaberEffect({
+            preset: name,
+            source: false,
+            edge: "luminance",
+            pad: 177,
+            end: 0.4,
+        });
+        assert.deepEqual(effect.params, fresh.params, name);
+        assert.equal(effect.params.glowLayers, layers);
+        assert.equal(effect.params.glowLayers[0], first);
+        effect.params.coreDistortion.amount = 123;
+        effect.params.glowLayers[0].size = 123;
+        assert.notEqual(fresh.params.coreDistortion.amount, 123);
+        assert.notEqual(SABER_PRESETS[name].glowLayers[0].size, 123);
+    }
+    effect.setParams({
+        preset: "fire",
+        coreIntensity: 2,
+        glowDistortion: { amount: 7 },
+    });
+    assert.equal(effect.params.coreIntensity, 2);
+    assert.equal(effect.params.glowDistortion.amount, 7);
+    assert.equal(
+        effect.params.glowDistortion.windSpeed,
+        SABER_PRESETS.fire.glowDistortion.windSpeed,
+    );
+    assert.throws(() => effect.setParams({ preset: "missing" }), RangeError);
+});
+
+test("core appearance and brightness flicker preserve the glow cache", () => {
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    const original = f.render(effect);
+    effect.setParams({
+        coreIntensity: 0.5,
+        coreWhiteness: 1,
+        flickerIntensity: 0.8,
+        flickerSpeed: 7,
+        flickerSeed: 11,
+    });
+    const changed = f.render(effect);
+    assert.equal(f.draws.length, 1);
+    assert.equal(changed.uniforms.core, original.uniforms.core);
+    assert.equal(changed.uniforms.layer0, original.uniforms.layer0);
+    assert.equal(changed.uniforms.coreWhiteness, 1);
+    assert.ok(changed.uniforms.coreGain <= original.uniforms.coreGain * 0.5);
+    assert.ok(changed.uniforms.glowGain < original.uniforms.glowGain);
+    effect.params.coreSoftness = 2;
+    const soft = f.render(effect);
+    assert.notEqual(soft.uniforms.core, original.uniforms.core);
+    assert.equal(soft.uniforms.layer0, original.uniforms.layer0);
+    assert.ok(
+        !f.draws.some(
+            (d) => d.uniforms.roomTex || d.uniforms.payloadOn !== undefined,
+        ),
+    );
+    f.render(effect);
+    assert.equal(
+        f.draws.length,
+        1,
+        "animated brightness reuses both cached shapes",
+    );
+    effect.params.coreSoftness = 0;
+    assert.equal(f.render(effect).uniforms.core, original.uniforms.core);
+    assert.equal(f.draws.length, 1);
+    effect.params.coreSoftness = 2;
+    effect.invalidate();
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("halo and original-core overlay remain independent of glow and cache static shapes", () => {
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    const base = f.render(effect);
+    effect.setParams({ haloIntensity: 1, haloSize: 4 });
+    const halo = f.render(effect);
+    assert.notEqual(halo.uniforms.haloTex, base.uniforms.core);
+    assert.equal(halo.uniforms.layer0, base.uniforms.layer0);
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.setParams({
+        haloIntensity: 2,
+        coreBlendOnTop: true,
+        flickerIntensity: 0.4,
+    });
+    const gain = f.render(effect);
+    assert.equal(
+        f.draws.length,
+        1,
+        "gain/overlay/flicker reuse the cached halo",
+    );
+    assert.equal(gain.uniforms.haloTex, halo.uniforms.haloTex);
+    assert.ok(gain.frag.includes("#define CORE_OVERLAY"));
+    effect.params.haloSize = 8;
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.setParams({ haloIntensity: 0 });
+    assert.ok(!f.render(effect).frag.includes("#define HALO"));
+    assert.equal(f.draws.length, 1);
+    effect.setParams({ haloIntensity: 1, haloSize: 0 });
+    assert.ok(!f.render(effect).frag.includes("#define HALO"));
+    effect.setParams({ haloSize: 4 });
+    effect.invalidate();
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("display curve and glow tint preserve cached shapes and reset with presets", () => {
+    const effect = new SaberEffect({ preset: "laser" });
+    const f = fixture();
+    effect.init(f.ctx);
+    const before = f.render(effect);
+    effect.setParams({ toneMapping: "linear", glowWhiteness: 0.8 });
+    const after = f.render(effect);
+    assert.equal(f.draws.length, 1);
+    assert.equal(after.uniforms.core, before.uniforms.core);
+    assert.equal(after.uniforms.layer0, before.uniforms.layer0);
+    assert.equal(after.uniforms.coreWhiteness, before.uniforms.coreWhiteness);
+    assert.equal(after.uniforms.linearLight, 1);
+    assert.equal(after.uniforms.whiteMix, 0.8);
+    effect.setParams({ preset: "laser" });
+    assert.equal(effect.params.toneMapping, "exponential");
+    assert.equal(effect.params.glowWhiteness, 0.15);
+    effect.dispose();
+});
+
+test("soft original overlay stays soft and cached while distorted core animates", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        coreBlendOnTop: true,
+        coreSoftness: 3,
+        coreDistortion: { amount: 12, noiseDetail: 1 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    const initial = f.render(effect);
+    const original = initial.uniforms.originalCore;
+    assert.notEqual(original, initial.uniforms.core);
+    assert.ok(f.draws.some((d) => d.target === original));
+    const animated = f.render(effect);
+    assert.equal(animated.uniforms.originalCore, original);
+    assert.ok(!f.draws.some((d) => d.target === original));
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.params.coreSoftness = 0;
+    const sharp = f.render(effect);
+    assert.notEqual(sharp.uniforms.originalCore, original);
+    effect.params.coreSoftness = 3;
+    effect.invalidate();
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.target === original));
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("shutter settings invalidate distortion but preserve the contour field", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        coreDistortion: { amount: 12, windSpeed: 0, noiseSpeed: 0 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    effect.setParams({ coreDistortion: { motionBlur: 0.05 } });
+    f.render(effect);
+    const frozen = f.draws.find((d) => d.uniforms.glowPass === 0);
+    assert.equal(frozen.uniforms.motionBlur, 0);
+    assert.ok(
+        !f.draws.some(
+            (d) => d.uniforms.roomTex || d.uniforms.payloadOn !== undefined,
+        ),
+    );
+    effect.setParams({ coreDistortion: { windSpeed: 100, motionBlur: 1 } });
+    f.render(effect);
+    const animated = f.draws.find((d) => d.uniforms.glowPass === 0);
+    assert.equal(animated.uniforms.motionBlur, 0.25);
+    assert.ok(animated.uniforms.windVelocity[1] > 0);
+    effect.dispose();
+});
+
+test("fine noise changes invalidate static distortion without rebuilding the field", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        glowMode: "layers",
+        coreDistortion: { amount: 5, windSpeed: 0, noiseSpeed: 0 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    effect.setParams({
+        coreDistortion: { noiseDetail: 1, noiseComplexity: 8 },
+    });
+    f.render(effect);
+    assert.ok(
+        f.draws.some(
+            (d) => d.uniforms.noiseDetail === 1 && d.uniforms.complexity === 8,
+        ),
+    );
+    assert.ok(
+        !f.draws.some(
+            (d) => d.uniforms.roomTex || d.uniforms.payloadOn !== undefined,
+        ),
+    );
+    effect.dispose();
+});
+
+test("flow-only glow caches blurs while reach, direction and wind sign stay live", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        glowMode: "layers",
+        glowFlow: 24,
+        glowDistortion: { amount: 0, windSpeed: 0, noiseSpeed: 0 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.flowOffset?.[1] > 0));
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    for (const options of [
+        { glowFlow: 48 },
+        { glowDistortion: { windDirection: 270 } },
+        { glowDistortion: { windSpeed: -20 } },
+    ]) {
+        effect.setParams(options);
+        f.render(effect);
+        const distortion = f.draws.find((d) => d.uniforms.flowOffset);
+        assert.ok(
+            distortion,
+            "flow changes redraw distortion even with amount zero",
+        );
+        assert.ok(
+            !f.draws.some((d) => d.uniforms.axis),
+            "base blurs are reused",
+        );
+    }
+    effect.setParams({ glowFlow: 0 });
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.uniforms.flowOffset));
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("directionality invalidates a static core without rebuilding the field", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        coreDistortion: { amount: 20, windSpeed: 0, noiseSpeed: 0 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    effect.setParams({ coreDistortion: { directionality: 1 } });
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.directionality === 1));
+    assert.ok(!f.draws.some((d) => d.uniforms.payloadOn !== undefined));
+    effect.dispose();
+});
+
+test("analytic directional core falls back for reveals and multiple lines", () => {
+    const effect = new SaberEffect({
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        coreDistortion: { amount: 20, directionality: 1, noiseDetail: 1 },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.frag.includes("#define ANALYTIC_CORE")));
+    effect.setParams({ end: 0.5 });
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.frag.includes("#define ANALYTIC_CORE")));
+    effect.setParams({ end: 1, lines: 2 });
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.frag.includes("#define ANALYTIC_CORE")));
+    effect.dispose();
+});
+
+function fixture({ width = 128, height = 96, pixelRatio = 1 } = {}) {
+    const targets = [];
+    const draws = [];
+    const reads = [];
+    const released = [];
+    const clears = [];
+    let restored;
+    const ctx = {
+        time: 2,
+        src: { width, height },
+        target: null,
+        dims: {
+            pixelRatio,
+            element: [width / pixelRatio, height / pixelRatio],
+            elementPixel: [width, height],
+            canvas: [width / pixelRatio, height / pixelRatio],
+            canvasPixel: [width, height],
+            contentRect: [0, 0, width, height],
+            srcRect: [0, 0, width, height],
+            canvasRect: [0, 0, width, height],
+        },
+        createRenderTarget(opts = {}) {
+            const target = {
+                width: opts.size?.[0] ?? width,
+                height: opts.size?.[1] ?? height,
+                explicit: !!opts.size,
+                disposed: false,
+                dispose() {
+                    this.disposed = true;
+                },
+            };
+            targets.push(target);
+            return target;
+        },
+        onContextRestored(callback) {
+            restored = callback;
+        },
+        clear(target) {
+            clears.push(target);
+        },
+        releaseGeometry(geometry) {
+            released.push(geometry);
+        },
+        readPixels(target) {
+            return new Promise((resolve, reject) => {
+                reads.push({ target, resolve, reject });
+            });
+        },
+        draw(draw) {
+            assert.ok(!draw.target?.disposed, "writes to a disposed target");
+            for (const value of Object.values(draw.uniforms)) {
+                if (!targets.includes(value)) {
+                    continue;
+                }
+                assert.notEqual(value, draw.target, "samples its own output");
+                assert.ok(!value.disposed, "samples a disposed target");
+            }
+            draws.push(draw);
+        },
+    };
+    return {
+        ctx,
+        targets,
+        draws,
+        reads,
+        released,
+        clears,
+        restore: () => restored(),
+        render(effect) {
+            draws.length = 0;
+            ctx.time += 1 / 60;
+            effect.render(ctx);
+            return draws.at(-1);
+        },
+        resize() {
+            for (const t of targets) {
+                if (!t.explicit && !t.disposed) {
+                    t.width = 256;
+                    t.height = 192;
+                }
+            }
+            ctx.dims.element = [256, 192];
+            ctx.dims.elementPixel = [256, 192];
+            ctx.dims.contentRect = [0, 0, 256, 192];
+            ctx.dims.srcRect = [0, 0, 256, 192];
+        },
+    };
+}
+
+function rectangleMask(width, height) {
+    const pixels = new Uint8Array(width * height * 4);
+    for (let y = 2; y < height - 2; y++) {
+        for (let x = 2; x < width - 2; x++) {
+            pixels[(y * width + x) * 4] = 255;
+        }
+    }
+    return pixels;
+}
+
+test("reveal traces the source once and keeps its arc while the output moves", async () => {
+    const f = fixture({ width: 300, height: 200 });
+    f.ctx.dims.srcRect = [10, 20, 40, 30];
+    const effect = new SaberEffect({ end: 0.5, glow: 0, pad: "fullscreen" });
+    effect.init(f.ctx);
+    f.render(effect);
+    assert.equal(f.reads.length, 1);
+    assert.equal(f.reads[0].target.width, 40);
+    assert.equal(f.reads[0].target.height, 30);
+    f.reads[0].resolve(rectangleMask(40, 30));
+    await Promise.resolve();
+    f.render(effect);
+    const splat = f.draws.find((d) => d.geometry);
+    assert.ok(splat);
+    const positions = splat.geometry.attributes.position.data;
+    assert.ok(positions[0] >= 10 && positions[0] <= 50);
+    assert.ok(positions[1] >= 20 && positions[1] <= 50);
+    assert.equal(
+        f.draws.find((d) => d.uniforms.roomTex).uniforms.revealEnd,
+        0.5,
+    );
+    f.ctx.dims.canvasRect = [-35, -70, 300, 200];
+    f.render(effect);
+    const moved = f.draws.find((d) => d.geometry);
+    assert.equal(moved.geometry, splat.geometry);
+    assert.deepEqual(moved.uniforms.outputRect, [-35, -70, 300, 200]);
+    assert.equal(f.reads.length, 1, "translation reuses the trace");
+    assert.equal(
+        f.draws.find((d) => d.uniforms.roomTex).uniforms.revealEnd,
+        0.5,
+    );
+    effect.params.pad = 50;
+    f.render(effect);
+    assert.equal(f.reads.length, 1, "padding also reuses the trace");
+    effect.invalidate();
+    f.render(effect);
+    assert.equal(f.reads.length, 2, "changed content requests a fresh trace");
+    assert.equal(f.draws.find((d) => d.uniforms.roomTex).uniforms.revealEnd, 0);
+    effect.dispose();
+    assert.ok(f.reads.every((r) => r.target.disposed));
+});
+
+test("a readback from a disposed instance cannot disturb a subsequent init", async () => {
+    const f = fixture({ width: 20, height: 16 });
+    const effect = new SaberEffect({ end: 0.5, glow: 0 });
+    effect.init(f.ctx);
+    f.render(effect);
+    effect.dispose();
+    effect.init(f.ctx);
+    f.render(effect);
+    f.reads[0].reject(new Error("old context lost"));
+    await Promise.resolve();
+    f.render(effect);
+    assert.equal(f.reads.length, 2, "the current readback remains in flight");
+    f.reads[1].resolve(rectangleMask(20, 16));
+    await Promise.resolve();
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.geometry));
+    assert.equal(f.reads.length, 2);
+    effect.dispose();
+});
+
+test("nested options are isolated; partial updates preserve independent groups", () => {
+    const options = { glowDistortion: { amount: 10, windSpeed: 40 } };
+    const a = new SaberEffect(options);
+    const b = new SaberEffect();
+    a.setParams({ glowDistortion: { amount: 20 } });
+    assert.equal(a.params.glowDistortion.windSpeed, 40);
+    assert.equal(a.params.coreDistortion.amount, 0);
+    assert.equal(b.params.glowDistortion.amount, 0);
+    assert.equal(options.glowDistortion.amount, 10);
+    a.params.glowLayers[0].size = 99;
+    assert.equal(b.params.glowLayers[0].size, 3);
+    a.setParams({ glowLayers: b.params.glowLayers });
+    a.params.glowLayers[0].size = 22;
+    assert.equal(b.params.glowLayers[0].size, 3);
+});
+
+test("undistorted layers compose directly; disabled glow skips all glow work", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ glowMode: "layers" });
+    effect.init(f.ctx);
+    const composite = f.render(effect);
+    assert.ok(composite.uniforms.layer0);
+    assert.equal(f.draws.filter((d) => d.uniforms.layer0).length, 1);
+    for (const params of [
+        { glow: 0 },
+        { glow: 1, glowIntensityMultiplier: 0 },
+        { glowIntensityMultiplier: 1, glowSizeMultiplier: 0 },
+        { glowSizeMultiplier: 1, glowSpread: 0 },
+        {
+            glowSpread: 1,
+            glowLayers: [0, 0, 0, 0].map((size) => ({ size, intensity: 1 })),
+        },
+    ]) {
+        effect.setParams(params);
+        assert.equal(f.render(effect).uniforms.glowGain, 0);
+        assert.equal(
+            f.draws.length,
+            2,
+            "only core and final composition remain",
+        );
+    }
+});
+
+test("a steady single outline builds its displacement room only when needed", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ lines: 1, mainAmplitude: 0, glow: 0 });
+    effect.init(f.ctx);
+    f.render(effect);
+    assert.equal(
+        f.draws.some((d) => d.uniforms.maxRoom !== undefined),
+        false,
+    );
+    assert.equal(f.targets.length, 3, "field plus two reusable scratch images");
+    effect.params.lines = 4;
+    f.render(effect);
+    assert.equal(
+        f.draws.filter((d) => d.uniforms.maxRoom !== undefined).length,
+        1,
+    );
+    assert.equal(
+        f.draws.some((d) => d.uniforms.stepSize !== undefined),
+        false,
+        "the cached outline need not be rebuilt",
+    );
+    assert.equal(f.targets.length, 3, "core and room reuse the flood buffers");
+    f.render(effect);
+    assert.equal(
+        f.draws.some((d) => d.uniforms.maxRoom !== undefined),
+        false,
+    );
+    effect.invalidate();
+    f.render(effect);
+    assert.equal(
+        f.draws.filter((d) => d.uniforms.maxRoom !== undefined).length,
+        1,
+    );
+});
+
+test("static light is reused while glow distortion and composition stay live", () => {
+    const f = fixture();
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+        glowDistortion: { amount: 20 },
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    f.render(effect);
+    assert.equal(
+        f.draws.length,
+        2,
+        "animated glow distortion plus final composition",
+    );
+    assert.equal(f.draws[0].uniforms.glowPass, 1);
+    effect.params.color = "#ff8800";
+    effect.params.glowBias = 1;
+    const composite = f.render(effect);
+    assert.equal(f.draws.length, 2);
+    assert.equal(composite.uniforms.glowBias, 1);
+    assert.deepEqual(composite.uniforms.color, [1, 136 / 255, 0]);
+    effect.setParams({ glowDistortion: { windSpeed: 0, noiseSpeed: 0 } });
+    f.render(effect);
+    f.render(effect);
+    assert.equal(
+        f.draws.length,
+        1,
+        "fully static light only needs composition",
+    );
+    effect.params.thickness += 0.25;
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.roomTex));
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    assert.ok(f.draws.some((d) => d.uniforms.glowPass === 1));
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    effect.params.glowLayers[0].size += 1;
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.uniforms.roomTex));
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    effect.setParams({ coreDistortion: { amount: 5 } });
+    f.render(effect);
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.glowPass === 0));
+    assert.ok(
+        f.draws.some((d) => d.uniforms.axis),
+        "animated core distortion refreshes the glow",
+    );
+    assert.ok(!f.draws.some((d) => d.uniforms.roomTex));
+    f.restore();
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.payloadOn !== undefined));
+    assert.ok(f.draws.some((d) => d.uniforms.roomTex));
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+});
+
+test("clock changes refresh animated light, and unchanged frames reuse it", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ glowMode: "layers" });
+    effect.init(f.ctx);
+    f.render(effect);
+    f.draws.length = 0;
+    effect.render(f.ctx);
+    assert.equal(f.draws.length, 1);
+    f.ctx.time = 42;
+    f.draws.length = 0;
+    effect.render(f.ctx);
+    assert.ok(f.draws.some((d) => d.uniforms.roomTex));
+    effect.params.speed = 0;
+    f.render(effect);
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    effect.params.dynamic = true;
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.roomTex));
+    assert.ok(f.draws.some((d) => d.uniforms.axis));
+});
+
+test("crossing a glow mip boundary preserves unaffected layer targets", () => {
+    const f = fixture();
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        glowLayers: [1, 2, 3, 6].map((size) => ({ size, intensity: 1 })),
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    const old = f.draws.filter((d) => d.uniforms.axis).map((d) => d.target);
+    effect.params.glowLayers[3].size = 6.1;
+    f.render(effect);
+    const next = f.draws.filter((d) => d.uniforms.axis).map((d) => d.target);
+    assert.deepEqual(next.slice(0, 6), old.slice(0, 6));
+    assert.ok(old.slice(6).every((target) => target.disposed));
+});
+
+test("equal radii share a blur, including a tiny target with a very wide glow", () => {
+    const f = fixture({ width: 1, height: 1 });
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        glowLayers: [1, 0.5, 0.25, 0.125].map((intensity) => ({
+            size: 1000,
+            intensity,
+        })),
+    });
+    effect.init(f.ctx);
+    const result = f.render(effect);
+    assert.equal(f.draws.filter((d) => d.uniforms.axis).length, 2);
+    assert.equal(f.targets.filter((t) => t.explicit).length, 2);
+    assert.equal(result.uniforms.layer0, result.uniforms.layer3);
+    assert.deepEqual(result.uniforms.weights, [1000, 500, 250, 125]);
+    const weights = f.draws.find((d) => d.uniforms.axis).uniforms.weights;
+    assert.ok(weights.every((x) => Number.isFinite(x) && x >= 0));
+    effect.params.glowLayers[1].size = 500;
+    f.render(effect);
+    assert.equal(f.draws.filter((d) => d.uniforms.axis).length, 4);
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("glow distortion leaves the visible core target unchanged", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ glowMode: "layers" });
+    effect.init(f.ctx);
+    const original = f.render(effect);
+    effect.setParams({ glowDistortion: { amount: 20 }, glowPreGamma: 0.8 });
+    const glow = f.render(effect);
+    assert.equal(glow.uniforms.core, original.uniforms.core);
+    assert.notEqual(glow.uniforms.glowTex, original.uniforms.glowTex);
+    effect.setParams({ coreDistortion: { amount: 8 } });
+    const core = f.render(effect);
+    assert.notEqual(core.uniforms.core, original.uniforms.core);
+    assert.equal(core.uniforms.coreGain, original.uniforms.coreGain);
+    effect.setParams({
+        coreDistortion: { amount: 0 },
+        glowDistortion: { amount: 0 },
+        glowPreGamma: 1,
+    });
+    assert.equal(f.render(effect).uniforms.core, original.uniforms.core);
+});
+
+test("a one-level pyramid applies the same CSS brightness weight as higher DPR", () => {
+    for (const pixelRatio of [1, 2]) {
+        const f = fixture({ pixelRatio });
+        const effect = new SaberEffect({ pad: 4, glowMode: "pyramid" });
+        effect.init(f.ctx);
+        f.render(effect);
+        const down = f.draws.filter(
+            (draw) => draw.uniforms.pyramidGain !== undefined,
+        );
+        if (pixelRatio === 1) {
+            assert.equal(down.length, 1);
+            assert.equal(down[0].uniforms.pyramidGain, 2);
+        } else {
+            assert.equal(down.length, 2);
+            assert.ok(down.every((draw) => draw.uniforms.pyramidGain === 1));
+            const up = f.draws.find(
+                (draw) => draw.uniforms.weightSmall !== undefined,
+            );
+            assert.equal(up.uniforms.weightLarge, 0);
+            assert.equal(up.uniforms.weightSmall, 2);
+        }
+        effect.dispose();
+    }
+});
+
+test("large padding restricts field draws, clearing scratch once and rebuilding for wide lines", () => {
+    const f = fixture({ width: 1000, height: 800 });
+    f.ctx.dims.element = [200, 100];
+    f.ctx.dims.elementPixel = [200, 100];
+    f.ctx.dims.contentRect = [0, 0, 200, 100];
+    f.ctx.dims.srcRect = [0, 0, 200, 100];
+    f.ctx.dims.canvasRect = [-400, -350, 1000, 800];
+    const effect = new SaberEffect({
+        pad: "fullscreen",
+        glow: 0,
+        lines: 1,
+        mainAmplitude: 0,
+        variation: 0,
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    const region = f.draws.find(
+        (draw) => draw.uniforms.payloadOn !== undefined,
+    ).geometry;
+    assert.ok(region);
+    assert.equal(f.clears.length, 3);
+    assert.equal(
+        f.draws.find((draw) => draw.uniforms.roomTex).geometry,
+        region,
+    );
+    f.render(effect);
+    assert.equal(f.draws.length, 1, "unchanged light only composites");
+    assert.equal(
+        f.clears.length,
+        3,
+        "scratch stays clear between cached frames",
+    );
+
+    effect.params.thickness = 400;
+    f.render(effect);
+    const full = f.draws.find((draw) => draw.uniforms.payloadOn !== undefined);
+    assert.ok(
+        full,
+        "expanding the line rebuilds the formerly restricted field",
+    );
+    assert.equal(full.geometry, undefined);
+    assert.ok(f.released.includes(region));
+    effect.params.thickness = 2;
+    f.render(effect);
+    assert.equal(f.clears.length, 6);
+    assert.ok(
+        f.draws.find((draw) => draw.uniforms.payloadOn !== undefined).geometry,
+    );
+    effect.dispose();
+});
+
+test("minified alpha uses the same area footprint for field and reveal, bypassing native resolution", () => {
+    for (const pixelRatio of [1, 2, 4]) {
+        const f = fixture({
+            width: 256 * pixelRatio,
+            height: 192 * pixelRatio,
+            pixelRatio,
+        });
+        f.ctx.src = { width: 512, height: 256 };
+        f.ctx.dims.element = [128, 64];
+        f.ctx.dims.elementPixel = [128 * pixelRatio, 64 * pixelRatio];
+        f.ctx.dims.contentRect = [0, 0, ...f.ctx.dims.elementPixel];
+        f.ctx.dims.srcRect = [...f.ctx.dims.contentRect];
+        const effect = new SaberEffect({ pad: 64, end: 0.5, glow: 0 });
+        effect.init(f.ctx);
+        f.render(effect);
+        const seed = f.draws.find(
+            (draw) => draw.uniforms.payloadOn !== undefined,
+        );
+        const trace = f.draws.find((draw) => draw.uniforms.maskSize);
+        const expected =
+            pixelRatio === 4
+                ? [0, 0]
+                : [1 / (128 * pixelRatio), 1 / (64 * pixelRatio)];
+        assert.deepEqual(seed.uniforms.maskFilterStep, expected);
+        assert.deepEqual(trace.uniforms.maskFilterStep, expected);
+        effect.dispose();
+    }
+});
+
+test("layout changes invalidate the field even when target dimensions stay fixed", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ glow: 0 });
+    effect.init(f.ctx);
+    f.render(effect);
+    const builtField = () =>
+        f.draws.some((d) => d.uniforms.payloadOn !== undefined);
+    f.render(effect);
+    assert.equal(builtField(), false);
+    f.ctx.dims.canvasRect[0] -= 10;
+    f.render(effect);
+    assert.equal(
+        builtField(),
+        false,
+        "local padding does not rebuild on scrolling",
+    );
+    effect.params.pad = "fullscreen";
+    f.render(effect);
+    f.ctx.dims.canvasRect[0] -= 10;
+    f.render(effect);
+    assert.equal(builtField(), true, "fullscreen field follows the element");
+    f.render(effect);
+    assert.equal(builtField(), false);
+    f.ctx.dims.pixelRatio = 2;
+    f.render(effect);
+    assert.equal(builtField(), true);
+    f.ctx.dims.srcRect[0] -= 1;
+    f.render(effect);
+    assert.equal(
+        builtField(),
+        true,
+        "a preceding effect changed its source rect",
+    );
+});
+
+test("layer radii are independent of pad; zero spread bypasses glow passes", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ glowMode: "layers", pad: 100 });
+    effect.init(f.ctx);
+    f.render(effect);
+    const axes = () =>
+        f.draws.filter((d) => d.uniforms.axis).map((d) => d.uniforms.axis);
+    const original = axes();
+    effect.params.pad = 200;
+    f.render(effect);
+    assert.deepEqual(axes(), original);
+    effect.params.glowSpread = 0;
+    assert.equal(f.render(effect).uniforms.glowGain, 0);
+    assert.equal(
+        f.draws.some((d) => d.uniforms.weights || d.uniforms.axis),
+        false,
+    );
+});
+
+test("glow protects wide halos by effective radius, independent of layer order", () => {
+    const f = fixture();
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        glowDistortion: { amount: 20, noiseScale: 48 },
+        glowLayers: [96, 3, 48, 12].map((size) => ({ size, intensity: 1 })),
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    const shares = () =>
+        f.draws.find((d) => d.uniforms.nearShares).uniforms.nearShares;
+    assert.deepEqual(shares(), [0, 1, 0, 1]);
+    assert.equal(
+        f.draws.find((d) => d.uniforms.glowPass === 1).uniforms.layered,
+        1,
+    );
+    effect.params.glowSizeMultiplier = 4;
+    f.render(effect);
+    assert.deepEqual(shares(), [0, 1, 0, 0]);
+    effect.params.glowDistortAllLayers = true;
+    f.render(effect);
+    assert.deepEqual(shares(), [1, 1, 1, 1]);
+    effect.params.glowDistortAllLayers = false;
+    f.render(effect);
+    assert.deepEqual(shares(), [0, 1, 0, 0]);
+    effect.params.glowMode = "pyramid";
+    f.render(effect);
+    assert.equal(
+        f.draws.find((d) => d.uniforms.glowPass === 1).uniforms.layered,
+        0,
+    );
+});
+
+test("resize, mode switches and disposal release explicit targets without feedback", () => {
+    const f = fixture();
+    const effect = new SaberEffect({
+        glowMode: "layers",
+        coreDistortion: { amount: 8 },
+        glowDistortion: { amount: 20 },
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    const first = f.targets.filter((t) => t.explicit);
+    f.resize();
+    f.render(effect);
+    assert.ok(first.every((t) => t.disposed));
+    const resized = f.targets.filter((t) => t.explicit && !t.disposed);
+    effect.params.glowMode = "pyramid";
+    f.render(effect);
+    assert.ok(resized.every((t) => t.disposed));
+    f.restore();
+    f.render(effect);
+    effect.params.glowMode = "layers";
+    f.render(effect);
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
