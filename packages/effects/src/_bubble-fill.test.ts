@@ -59,7 +59,16 @@ function mask(mw: number, mh: number): Uint8Array {
 }
 
 function shapeOf(): ShapeData {
-    const s = buildShape(mask(512, 212), 512, 212, 0.05, 512 / 212, 2, 2);
+    const s = buildShape(
+        mask(512, 212),
+        512,
+        212,
+        "alpha",
+        0.05,
+        512 / 212,
+        2,
+        2,
+    );
     if (!s) {
         throw new Error("empty shape");
     }
@@ -72,7 +81,6 @@ const shape = shapeOf();
 const OPTS: FillOptions = {
     halfDepth: 0.05,
     cellSize: 0.1,
-    jitter: 0.6,
     roundness: 0.3,
     cellSizeRandomness: 0.25,
     seed: 1,

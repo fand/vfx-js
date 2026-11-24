@@ -186,8 +186,8 @@ export default {
     },
 } satisfies Meta<Args>;
 
-// The VFX-JS logo as a cluster of soap bubbles: big bubbles on a
-// jittered lattice, smaller ones filling the gaps between them and along
+// The VFX-JS logo as a cluster of soap bubbles: big bubbles spread
+// evenly at random, smaller ones filling the gaps between them and along
 // the outline, cut by flat shared walls where they meet.
 export const logo: StoryObj<Args> = {
     args: { source: "VFX-JS logo" },

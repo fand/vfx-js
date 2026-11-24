@@ -1243,7 +1243,6 @@ export function attachBubblePane(
     bind(bubbles, "bevel", range(0, 0.4, 0.005));
     bind(bubbles, "cellSize", range(0.02, 0.6, 0.005));
     bind(bubbles, "cellSizeRandomness", range(0, 1, 0.01));
-    bind(bubbles, "jitter", range(0, 0.9, 0.01));
     bind(bubbles, "seed", range(0, 100, 1));
     bind(bubbles, "roundness", range(0, 1, 0.01));
     bind(bubbles, "skin", range(-0.1, 0.1, 0.001));

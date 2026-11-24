@@ -4,8 +4,8 @@
 // 1. The silhouette is read back from the element (`ctx.src` alpha) and
 //    turned into a 2D signed distance field; the 3D volume is its
 //    extrusion (see `_silhouette.ts`).
-// 2. The bubbles are placed on the CPU (`_bubble-fill.ts`): a sphere per
-//    cell of a jittered lattice inside the volume, sized by `cellSize`,
+// 2. The bubbles are placed on the CPU (`_bubble-fill.ts`): spheres
+//    spread through the volume by Poisson disk sampling, sized by `cellSize`,
 //    `roundness` and `cellSizeRandomness`, then smaller spheres in the
 //    gaps left between them and along the outline, down to `minSize`.
 //    Where spheres overlap, they are cut by their radical plane and share
@@ -34,14 +34,12 @@ import type {
 import {
     BUBBLE_LIST_MAX,
     BUBBLE_TEX_W,
-    type BubbleFill,
-    buildSphereGrid,
+    bubbleKernel,
     type FillOptions,
-    hash4,
-    JITTER_MAX,
-    placeBubbles,
-    type SphereGrid,
+    type FoamData,
 } from "./_bubble-fill.js";
+import { BUBBLE_KERNEL_SOURCE } from "./_bubble-kernel-source.js";
+import { KernelWorker } from "./_kernel-worker.js";
 import {
     OrbitCamera,
     type OrbitCameraParams,
@@ -91,7 +89,7 @@ export type BubblePointer = "none" | "tilt";
  * Params of {@link BubbleEffect}: the foam's own, and the camera's
  * ({@link OrbitCameraParams}). All are read every frame. The placement
  * params (`depth`, `bevel`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `jitter`, `seed`, `skin`, `minSize`) place the bubbles
+ * `roundness`, `seed`, `skin`, `minSize`) place the bubbles
  * again on the CPU when they change, which takes a few to a few tens of
  * milliseconds.
  */
@@ -118,7 +116,7 @@ export type BubbleParams = OrbitCameraParams & {
     bevel: number;
 
     /**
-     * Size of the big bubbles: the spacing of the lattice they sit on, in
+     * Size of the big bubbles: about the spacing of their centres, in
      * the same units as `depth`. Smaller bubbles fill the gaps between
      * them (see `minSize`). Placement param.
      */
@@ -136,11 +134,6 @@ export type BubbleParams = OrbitCameraParams & {
      * neighbours alike. Placement param.
      */
     roundness: number;
-    /**
-     * How far each big bubble's centre wanders from its lattice cell's
-     * centre, 0 (a regular lattice) to 0.9. Placement param.
-     */
-    jitter: number;
     /** Seed of the random placement. Placement param. */
     seed: number;
     /**
@@ -330,7 +323,6 @@ const DEFAULT_PARAMS: BubbleParams = {
     cellSize: 0.1,
     cellSizeRandomness: 0.25,
     roundness: 0.3,
-    jitter: 0.6,
     seed: 1,
     skin: 0,
     minSize: 0.25,
@@ -388,12 +380,8 @@ const DEBUG_VIEWS: Record<BubbleDebugView, number> = {
     cells: 3,
 };
 const MAX_LAYERS = 16;
-// How much a container blows the bubbles up at containment 1, as a share
-// of what would close every gap: less leaves creases between them.
-const CONTAIN_GROW = 0.3;
-// The fill inside the shape: the gap it closes, and the depth it takes
-// to, per cell size.
-const FILL_GAP = 0.35;
+// The depth the fill inside the shape takes to reach its full size, per
+// cell size.
 const FILL_DEPTH = 0.5;
 const WOBBLE_MAX = 0.15;
 // Long side of the silhouette read back from the element, in px, and
@@ -1494,25 +1482,14 @@ function uploadDataTexture(
 }
 
 // The bubbles and the grid over them, as uploaded.
-type Foam = {
-    placeKey: string;
-    gridKey: string;
-    fill: BubbleFill;
-    /** How much the container blew the largest-growing bubble up. */
-    grow: number;
-    /** What the fill adds to r² deep inside the shape. */
-    fillG: number;
-    grid: SphereGrid;
-    /** The grid the borders are found with (`grid` itself out of a container). */
-    edgeGrid: SphereGrid;
+type Foam = FoamData & {
+    key: string;
     raw: WebGLTexture[];
     sphereTex: EffectTexture;
     cellTex: EffectTexture;
     indexTex: EffectTexture;
     edgeCellTex: EffectTexture;
     edgeIndexTex: EffectTexture;
-    /** Per sphere its drift's frequencies and phases, 3 each, in cycles. */
-    drift: Float32Array;
     /** The spheres as drifted for the frame, and when it was. */
     moved: Float32Array;
     movedKey: string;
@@ -1526,7 +1503,7 @@ type Foam = {
  * vfx.add(img, { effect: new BubbleEffect({ roundness: 0.7 }) });
  * ```
  *
- * The volume is filled with big spheres on a jittered lattice
+ * The volume is filled with big spheres spread at random but evenly
  * (`cellSize`), and the gaps they leave, between them and along the
  * outline, with smaller ones down to `minSize`. Where spheres overlap,
  * they are cut by a flat wall they share (a power diagram); where they
@@ -1574,6 +1551,16 @@ export class BubbleEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #lutTex: EffectTexture | null = null;
     #foamData: Foam | null = null;
+    // Places the bubbles off the page's thread, where it can. Made when
+    // first needed (again after dispose()).
+    #kernel: KernelWorker | null = null;
+    // The foam asked of the kernel (its key), and the one it returned and
+    // is not yet uploaded. A newer request makes older replies stale.
+    #foamWanted: string | null = null;
+    #foamReady: { key: string; data: FoamData } | null = null;
+    #foamToken = 0;
+    // Bumped by each new shape, so its foam is placed again.
+    #shapeVersion = 0;
     readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
 
     #time = 0;
@@ -1667,7 +1654,6 @@ export class BubbleEffect implements Effect {
             halfDepth,
             bevel: clamp(p.bevel, 0, halfDepth, Math.min(d.bevel, halfDepth)),
             cellSize,
-            jitter: clamp(p.jitter, 0, JITTER_MAX, d.jitter),
             roundness: clamp(p.roundness, 0, 1, d.roundness),
             cellSizeRandomness: clamp(
                 p.cellSizeRandomness,
@@ -1713,92 +1699,57 @@ export class BubbleEffect implements Effect {
         };
     }
 
-    // The bubbles for the params: placed again when a placement param
-    // changes, the grid built again when the drift's reach does.
+    // The bubbles for the params, placed by the kernel (in a worker where
+    // it can) whenever the shape or a param it depends on changes. Until
+    // the new foam comes back, the last one is drawn.
     #foam(ctx: EffectContext, shape: ShapeData): Foam | null {
         const r = this.#resolved();
-        const placeKey = JSON.stringify(r.fill);
-        const gridKey = `${placeKey}|${r.wobble}|${r.containment}`;
-        const old = this.#foamData;
-        if (old && old.gridKey === gridKey) {
-            return old;
-        }
-        const fill =
-            old && old.placeKey === placeKey
-                ? old.fill
-                : placeBubbles(shape, r.fill);
-        // In a container the bubbles are blown up to fill it: r² grows by
-        // the same amount for all, which leaves every wall between two
-        // bubbles where it is and only pushes the foam's outside out,
-        // into the gaps and against the container. At 1 it covers a gap
-        // of the fill's smallest size next to the biggest bubble.
-        let spheres = fill.spheres;
-        let grow = 0;
-        if (r.containment > 0) {
-            let maxR = 0;
-            for (let i = 0; i < fill.count; i++) {
-                maxR = Math.max(maxR, fill.spheres[i * 4 + 3]);
-            }
-            const g = 0.5 * r.fill.minSize * r.cellSize;
-            const add = r.containment * CONTAIN_GROW * (2 * maxR * g + g * g);
-            spheres = fill.spheres.slice();
-            for (let i = 0; i < fill.count; i++) {
-                const r0 = spheres[i * 4 + 3];
-                const r1 = Math.sqrt(r0 * r0 + add);
-                spheres[i * 4 + 3] = r1;
-                grow = Math.max(grow, r1 - r0);
-            }
-        }
-        // The fill inside the shape: enough to close a gap of FILL_GAP cell
-        // sizes next to the biggest bubble. The grid lists each sphere as
-        // far as it reaches with it, so no cell misses an owner.
-        let fillG = 0;
-        let listed = spheres;
-        if (r.containment > 0) {
-            let maxR = 0;
-            for (let i = 0; i < spheres.length / 4; i++) {
-                maxR = Math.max(maxR, spheres[i * 4 + 3]);
-            }
-            const h = FILL_GAP * r.cellSize;
-            fillG = r.containment * (2 * maxR * h + h * h);
-            listed = spheres.slice();
-            for (let i = 0; i < listed.length / 4; i++) {
-                listed[i * 4 + 3] = Math.sqrt(listed[i * 4 + 3] ** 2 + fillG);
-            }
-        }
-        const grid = buildSphereGrid(listed, r.wobble, r.cellSize);
-        let edgeGrid = grid;
-        if (listed !== spheres) {
-            // Back to the true radii, in the grid's order (it may leave
-            // some out).
-            let j = 0;
-            for (let i = 0; i < grid.count; i++) {
-                while (
-                    spheres[j * 4] !== grid.spheres[i * 4] ||
-                    spheres[j * 4 + 1] !== grid.spheres[i * 4 + 1] ||
-                    spheres[j * 4 + 2] !== grid.spheres[i * 4 + 2]
-                ) {
-                    j++;
-                }
-                grid.spheres[i * 4 + 3] = spheres[j * 4 + 3];
-                grid.sphereData[i * 4 + 3] = spheres[j * 4 + 3];
-                j++;
-            }
-            // The same spheres by their own radii: no list gets longer, so
-            // none is left out and the indices match.
-            const g = buildSphereGrid(grid.spheres, r.wobble, r.cellSize);
-            if (g.dropped === 0) {
-                edgeGrid = g;
-            }
-        }
-        const drift = new Float32Array(grid.count * 6);
-        for (let i = 0; i < grid.count; i++) {
-            const [x, y, z, w] = hash4(r.fill.seed, i, 977, 31);
-            drift.set(
-                [0.6 + 0.8 * y, 0.6 + 0.8 * z, 0.6 + 0.8 * w, z, w, x],
-                i * 6,
+        const key = `${this.#shapeVersion}|${JSON.stringify(r.fill)}|${r.wobble}|${r.containment}`;
+        if (this.#foamData?.key !== key && this.#foamWanted !== key) {
+            this.#foamWanted = key;
+            const token = ++this.#foamToken;
+            this.#kernel ??= new KernelWorker(
+                bubbleKernel as never,
+                BUBBLE_KERNEL_SOURCE,
             );
+            this.#kernel
+                .run<FoamData>("buildFoam", {
+                    shape: {
+                        sdf: shape.sdf,
+                        sdfW: shape.sdfW,
+                        sdfH: shape.sdfH,
+                        sdfRect: shape.sdfRect,
+                    },
+                    fill: r.fill,
+                    wobble: r.wobble,
+                    containment: r.containment,
+                })
+                .then(
+                    (data) => {
+                        if (token === this.#foamToken) {
+                            this.#foamReady = { key, data };
+                        }
+                    },
+                    () => {
+                        if (token === this.#foamToken) {
+                            this.#foamWanted = null;
+                        }
+                    },
+                );
         }
+        const ready = this.#foamReady;
+        if (ready) {
+            this.#foamReady = null;
+            if (ready.key === key) {
+                this.#uploadFoam(ctx, ready.key, ready.data);
+            }
+        }
+        return this.#foamData;
+    }
+
+    #uploadFoam(ctx: EffectContext, key: string, data: FoamData): void {
+        const { grid } = data;
+        const edgeGrid = data.edgeGrid ?? grid;
         this.#freeFoam();
         const gl = ctx.gl;
         const raw: WebGLTexture[] = [];
@@ -1833,27 +1784,20 @@ export class BubbleEffect implements Effect {
             for (const tex of raw) {
                 gl.deleteTexture(tex);
             }
-            return null;
+            return;
         }
         this.#foamData = {
-            placeKey,
-            gridKey,
-            fill,
-            grow,
-            fillG,
-            grid,
-            edgeGrid,
+            ...data,
+            key,
             raw,
             sphereTex: textures[0],
             cellTex: textures[1],
             indexTex: textures[2],
             edgeCellTex: textures[edgeGrid === grid ? 1 : 3],
             edgeIndexTex: textures[edgeGrid === grid ? 2 : 4],
-            drift,
             moved: grid.sphereData.slice(),
             movedKey: "",
         };
-        return this.#foamData;
     }
 
     // Drift the spheres for time t and upload them: a slow wander of
@@ -1969,9 +1913,9 @@ export class BubbleEffect implements Effect {
                 gridDims: grid.dims,
                 edgeCellTex: foam.edgeCellTex,
                 edgeIndexTex: foam.edgeIndexTex,
-                edgeOrigin: foam.edgeGrid.origin,
-                edgeCell: foam.edgeGrid.cell,
-                edgeDims: foam.edgeGrid.dims,
+                edgeOrigin: (foam.edgeGrid ?? grid).origin,
+                edgeCell: (foam.edgeGrid ?? grid).cell,
+                edgeDims: (foam.edgeGrid ?? grid).dims,
                 reachMax: reach,
                 clipOff: (1 - containment) * reach,
                 warpK: containment / Math.max(1 - containment, 1e-3),
@@ -2057,6 +2001,7 @@ export class BubbleEffect implements Effect {
         this.#sdfTex = null;
         this.#lutTex = null;
         this.#freeFoam();
+        this.#shapeVersion++;
         const sdf = uploadFloatTexture(gl, shape.sdfW, shape.sdfH, shape.sdf);
         const lut = uploadFloatTexture(
             gl,
@@ -2096,6 +2041,11 @@ export class BubbleEffect implements Effect {
         this.#sdfTex = null;
         this.#lutTex = null;
         this.#freeFoam();
+        this.#kernel?.dispose();
+        this.#kernel = null;
+        this.#foamToken++;
+        this.#foamWanted = null;
+        this.#foamReady = null;
         this.#backdrop.dispose(this.#gl);
         this.#gl = null;
         this.#passes.dispose();
