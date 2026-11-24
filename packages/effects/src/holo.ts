@@ -328,6 +328,21 @@ const DEFAULT_PARAMS: HoloParams = {
 };
 
 const COMPOSED_KEYS = new Set(["material", "quality", "structureScale"]);
+
+// Keys that are not params, e.g. `pointer` given as in the other effects:
+// it goes in `holo`.
+function warnUnknownParams(p: object): void {
+    for (const k of Object.keys(p)) {
+        if (Object.hasOwn(DEFAULT_PARAMS, k)) {
+            continue;
+        }
+        warnOnce(
+            COMPOSED_KEYS.has(k) || SCENE_KEYS.has(k) || k === "settings"
+                ? `HoloEffect: "${k}" goes in \`holo\`: { holo: { ${k} } }; ignored.`
+                : `HoloEffect: unknown param "${k}"; ignored.`,
+        );
+    }
+}
 const SCENE_KEYS = new Set<string>([
     "exposure",
     "tone",
@@ -937,12 +952,14 @@ export class HoloEffect implements Effect {
      * ```
      */
     constructor(initial: Partial<HoloParams> = {}) {
+        warnUnknownParams(initial);
         this.params = { ...DEFAULT_PARAMS, ...initial };
         this.#sync(); // check holo now, so its warnings point here
     }
 
     /** Assigns params, as other effects do. A new `holo` replaces the whole holo.spot side. */
     setParams(updates: Partial<HoloParams>): void {
+        warnUnknownParams(updates);
         Object.assign(this.params, updates);
         this.#sync();
     }
