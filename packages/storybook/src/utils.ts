@@ -1035,7 +1035,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         step,
     });
 
-    const line = pane.addFolder({ title: "Line" });
+    const line = pane.addFolder({ title: "Core" });
     line.addBinding(p, "color", { view: "color" });
     line.addBinding(p, "intensity", range(0, 5, 0.01));
     line.addBinding(p, "coreIntensity", range(0, 5, 0.01));
@@ -1046,20 +1046,6 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     halo.addBinding(p, "haloIntensity", range(0, 5, 0.01));
     halo.addBinding(p, "haloSize", range(0, 60, 0.1));
     line.addBinding(p, "thickness", range(0.5, 10, 0.1));
-    line.addBinding(p, "amplitude", range(0, 60, 0.5));
-    line.addBinding(p, "mainAmplitude", range(0, 30, 0.5));
-    line.addBinding(p, "scale", range(5, 300, 1));
-    line.addBinding(p, "sharpness", range(0, 1, 0.01));
-    line.addBinding(p, "burst", range(0, 1, 0.01));
-    line.addBinding(p, "lines", range(1, 4, 1));
-    line.addBinding(p, "variation", range(0, 1, 0.01));
-
-    const motion = pane.addFolder({ title: "Motion" });
-    motion.addBinding(p, "speed", range(0, 5, 0.01));
-    motion.addBinding(p, "flicker", {
-        ...range(0, 1, 0.01),
-        label: "Shape flicker",
-    });
 
     const brightness = pane.addFolder({ title: "Brightness flicker" });
     brightness.addBinding(p, "flickerIntensity", range(0, 1, 0.01));
@@ -1073,15 +1059,9 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     reveal.addBinding(p, "fade", range(0, 300, 1));
 
     const glow = pane.addFolder({ title: "Glow" });
-    glow.addBinding(p, "glowMode", {
-        options: { Pyramid: "pyramid", Layers: "layers" },
-    });
     glow.addBinding(p, "glow", range(0, 5, 0.01));
     glow.addBinding(p, "glowWhiteness", range(0, 1, 0.01));
-    glow.addBinding(p, "glowFalloff", range(0, 1, 0.01));
-    glow.addBinding(p, "glowSpread", range(0, 3, 0.01));
     glow.addBinding(p, "glowBias", range(-2, 2, 0.01));
-    glow.addBinding(p, "glowIntensityMultiplier", range(0, 10, 0.01));
     glow.addBinding(p, "glowSizeMultiplier", range(0, 4, 0.01));
     glow.addBinding(p, "glowPreGamma", range(0.1, 3, 0.01));
     p.glowLayers.forEach((layer, i) => {

@@ -1,6 +1,10 @@
-// Import through Storybook/Vite. Optional Baseline is the pre-appearance class.
+// Import through Storybook/Vite. Optional Baseline is the pre-consolidation class.
 import { SABER_PRESETS } from "../../src/saber-presets.ts";
-import { createSaberFixture, imageStats } from "./saber-quality.mjs";
+import {
+    createSaberFixture,
+    imageStats,
+    STEADY_OPTIONS,
+} from "./saber-quality.mjs";
 
 function difference(a, b) {
     let maximum = 0;
@@ -20,14 +24,7 @@ export async function runAppearanceChecks({ Baseline } = {}) {
         softness: [],
         failures: [],
     };
-    const options = {
-        source: false,
-        pad: 160,
-        glowMode: "layers",
-        lines: 1,
-        mainAmplitude: 0,
-        variation: 0,
-    };
+    const options = { ...STEADY_OPTIONS, source: false, pad: 160 };
     if (Baseline) {
         for (const pixelRatio of [1, 2]) {
             const old = await createSaberFixture({
@@ -46,7 +43,7 @@ export async function runAppearanceChecks({ Baseline } = {}) {
             });
             current.destroy();
             if (delta.maximum > 1) {
-                result.failures.push(`Default compatibility DPR ${pixelRatio}`);
+                result.failures.push(`Steady compatibility DPR ${pixelRatio}`);
             }
         }
     }
@@ -102,10 +99,9 @@ export async function runAppearanceChecks({ Baseline } = {}) {
             result.failures.push("Flicker or glow independence");
         }
         result.tint = [];
-        for (const glowMode of ["pyramid", "layers"]) {
+        {
             fixture.effect.setParams({
                 preset: "laser",
-                glowMode,
                 coreWhiteness: 0,
             });
             const colored = fixture.screen(2);
@@ -113,9 +109,9 @@ export async function runAppearanceChecks({ Baseline } = {}) {
             const white = fixture.screen(2);
             const delta = difference(colored, white);
             const glError = fixture.gl.getError();
-            result.tint.push({ glowMode, ...delta, glError });
+            result.tint.push({ ...delta, glError });
             if (!delta.changed || glError) {
-                result.failures.push(`Core tint ${glowMode}`);
+                result.failures.push(`Core tint layers`);
             }
         }
         fixture.effect.setParams({
@@ -192,4 +188,55 @@ void main() { outColor = texture(core, uv); }
         }
     }
     return result;
+}
+
+// Preserved recipes must retain exact displayed pixels. Deliberately excludes
+// Ice/Unstable, whose removed multi-line topology was reauthored.
+export async function preservedPresetChecks(
+    Baseline,
+    {
+        pixelRatios = [1, 2],
+        times = [0, 0.5, 2, 7],
+        presets = Object.keys(SABER_PRESETS).filter(
+            (name) => !["ice", "unstable"].includes(name),
+        ),
+    } = {},
+) {
+    const rows = [];
+    for (const pixelRatio of pixelRatios) {
+        for (const preset of presets) {
+            const config = {
+                pixelRatio,
+                options: { preset, source: false, pad: 160 },
+            };
+            const old = await createSaberFixture({
+                ...config,
+                Effect: Baseline,
+            });
+            let expected;
+            try {
+                expected = times.map((time) => old.screen(time));
+                if (old.gl.getError()) {
+                    throw new Error(`Baseline WebGL error: ${preset}`);
+                }
+            } finally {
+                old.destroy();
+            }
+            const current = await createSaberFixture(config);
+            try {
+                for (const [i, time] of times.entries()) {
+                    rows.push({
+                        preset,
+                        pixelRatio,
+                        time,
+                        ...difference(expected[i], current.screen(time)),
+                        glError: current.gl.getError(),
+                    });
+                }
+            } finally {
+                current.destroy();
+            }
+        }
+    }
+    return { rows, failures: rows.filter((row) => row.maximum || row.glError) };
 }

@@ -1,5 +1,5 @@
 // Finds the outline once and caches it: distance and normal to the nearest contour point.
-// Each frame, pushes the outline along its normal by noise to draw thin lines, then blurs them into the glow.
+// Independent distortion animates the cached contour and its four glow layers.
 // For the reveal, a traced copy of the outline gives each contour point its position along its loop, and the core pass cuts the lines by it.
 import type {
     Effect,
@@ -8,17 +8,9 @@ import type {
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
-import {
-    type BloomPyramid,
-    createBloomPyramid,
-    disposeBloomPyramid,
-    upsampleBloomPyramid,
-} from "./_bloom-common.js";
 import { type Contour, traceContours } from "./_contour.js";
 import { parseHexColor } from "./_figma-common.js";
-import { SNOISE3D } from "./_noise.js";
 import { padOutputRect } from "./_pad.js";
-import { FRAG_SABER_PYRAMID_DOWNSAMPLE } from "./_saber-blur.js";
 import { GLSL_LINE_COVERAGE } from "./_saber-coverage.js";
 import { saberFlickerGain } from "./_saber-flicker.js";
 import {
@@ -271,271 +263,37 @@ void main() {
 }
 `;
 
-// Room for the line on each side of the contour: how far it may move along the normal
-// before it meets the line from the other side of a stroke or gap.
-// Marches from the contour point; past the middle the field reports a nearer contour.
-const FRAG_ROOM = `#version 300 es
-precision highp float;
-out vec4 outColor;
-uniform sampler2D field;
-uniform float maxRoom;
-uniform float pixelRatio;
-
-float march(vec2 q, vec2 dir, float side, vec2 size) {
-    float best = maxRoom;
-    for (int k = 1; k <= 12; k++) {
-        float s = maxRoom * float(k) / 12.0;
-        vec2 x = q + dir * s;
-        if (any(lessThan(x, vec2(0.0))) || any(greaterThan(x, size))) {
-            break;
-        }
-        vec4 f = texture(field, x / size);
-        float overshoot = s - side * f.r;
-        if (f.a > 0.5 && overshoot > 0.0) {
-            best = min(best, s - overshoot * 0.5);
-        }
-    }
-    return max(best, 0.0);
-}
-
-void main() {
-    vec2 size = vec2(textureSize(field, 0));
-    vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
-    // A separable 4 CSS px blur reaches sqrt(4²+4²) from the contour.
-    if (f.a < 0.5 || abs(f.r) > 6.0 * pixelRatio) {
-        outColor = vec4(maxRoom, maxRoom, 0.0, 1.0);
-        return;
-    }
-    vec2 q = gl_FragCoord.xy - f.r * f.gb;
-    outColor = vec4(march(q, f.gb, 1.0, size), march(q, -f.gb, -1.0, size), 0.0, 1.0);
-}
-`;
-
-// Box blur along one axis, to smooth the room along the contour.
-const FRAG_ROOM_BLUR = `#version 300 es
-precision highp float;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 dir;
-uniform float pixelRatio;
-
-void main() {
-    vec2 p = gl_FragCoord.xy;
-    vec2 size = vec2(textureSize(src, 0));
-    vec4 sum = vec4(0.0);
-    for (int i = -4; i <= 4; i++) {
-        sum += texture(src, (p + dir * float(i) * pixelRatio) / size);
-    }
-    outColor = sum / 9.0;
-}
-`;
-
-// Noise for the lines.
-// `jag` is value noise on a lattice; sharpness 1 interpolates linearly,
-// so a line runs straight inside a cell and kinks at cell edges.
-const GLSL_JAG = `
-${SNOISE3D}
-
-uniform float sharpness;
-uniform float minCell;
-
-// Finer octaves move only a little faster than coarse ones.
-const float OCTAVE_PACE = 1.2;
-const vec2 DRIFT = vec2(0.3, 0.12);
-
-float hash(vec3 p) {
-    p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-    p += dot(p, p.yxz + 33.33);
-    return fract((p.x + p.y) * p.z) * 2.0 - 1.0;
-}
-
-// One lattice corner, moving smoothly through time.
-// Two random values are crossfaded with cos and sin weights, so the spread stays the same mid-way.
-// Each corner has its own phase, so the corners never change in step.
-float corner(vec2 i, float t) {
-    float z = t + hash(vec3(i, 7.7)) * 0.5 + 0.5;
-    float zi = floor(z);
-    float phase = z - zi;
-    // Zero endpoint velocity avoids a sudden direction change at each new key.
-    float angle = phase * phase * (3.0 - 2.0 * phase) * 1.5707963;
-    return hash(vec3(i, zi)) * cos(angle) + hash(vec3(i, zi + 1.0)) * sin(angle);
-}
-
-float lattice(vec3 p, float sharp) {
-    vec2 i = floor(p.xy);
-    vec2 f = p.xy - i;
-    vec2 smoothF = f * f * (3.0 - 2.0 * f);
-    vec2 w = mix(smoothF, f, sharp);
-    vec2 e = vec2(1.0, 0.0);
-    float a = mix(corner(i, p.z), corner(i + e.xy, p.z), w.x);
-    float b = mix(corner(i + e.yx, p.z), corner(i + e.xx, p.z), w.x);
-    return mix(a, b, w.y);
-}
-
-// Octaves halve both the cell and the amplitude, so the slope is the same at every scale.
-// That gives straight runs with sharp kinks, like midpoint displacement.
-// Octaves finer than minCell fade out, so the line does not turn to fur.
-float jag(vec2 x, float t, float cell, float sharp) {
-    const mat2 turn = mat2(0.8, 0.6, -0.6, 0.8);
-    vec2 p = x / cell;
-    float sum = 0.0;
-    float amp = 1.0;
-    for (int i = 0; i < 6; i++) {
-        float fade = clamp(log2(cell / minCell) + 1.0, 0.0, 1.0);
-        if (fade <= 0.0) {
-            break;
-        }
-        // A slow slide on top of the morph, so kinks crawl along the outline.
-        sum += lattice(vec3(p + DRIFT * t, t), sharp) * amp * fade;
-        p = turn * p * 2.0 + 17.1;
-        t = t * OCTAVE_PACE + 3.7;
-        cell *= 0.5;
-        amp *= 0.5;
-    }
-    return clamp(sum * 0.7, -1.0, 1.0);
-}
-`;
-
-// Core lines: the contour pushed along its normal by noise.
-// Line 0 is a calm main line; the others are arcs that come and go.
-// Writes one HDR intensity channel.
+// Integrate a steady contour from its distance field, with optional arc reveal.
 const FRAG_CORE = `#version 300 es
 precision highp float;
-in vec2 uvContent;
 out vec4 outColor;
-uniform vec2 contentSize;
 uniform sampler2D field;
-uniform sampler2D roomTex;
-uniform float amplitude;
-uniform float mainAmplitude;
-uniform float scale;
-uniform float thickness;
-uniform float time;
-uniform float burst;
-uniform float flicker;
-uniform float pixelRatio;
-uniform int lines;
 uniform sampler2D arcTex;
+uniform float thickness;
+uniform float pixelRatio;
 uniform int reveal;
 uniform float revealStart;
 uniform float revealEnd;
 uniform float segments;
 uniform float fade;
-uniform float variation;
-${GLSL_JAG}
 ${GLSL_LINE_COVERAGE}
 
-// Main line noise cell, as a share of scale.
-const float MAIN_CELL = 0.3;
-// Per line: reach as a share of amplitude, width as a share of thickness, and brightness.
-const float TIER_REACH[4] = float[4](0.0, 0.6, 0.8, 1.0);
-// Furthest any tier can reach, as a share of amplitude, with variation at most.
-const float MAX_REACH = 1.5;
-const float TIER_WIDTH[4] = float[4](1.0, 0.6, 0.45, 0.35);
-const float TIER_WEIGHT[4] = float[4](1.0, 0.6, 0.8, 0.6);
-// How much faster each tier's shape changes than the one before.
-const float TIER_PACE = 1.5;
-// Within this much of zero the noise keeps a line on the main line, so it sprouts in short arcs.
-const float PLUCK[4] = float[4](0.0, 0.06, 0.06, 0.06);
-// Mild preference for arcs on the outside.
-const float OUTWARD_BIAS = 0.15;
-// Noise cell and pace of the companion line.
-const float COMPANION_CELL = 0.35;
-const float COMPANION_PACE = 2.5;
-// Reach of the companion line outside the active spots, as a share of its reach.
-const float COMPANION_CALM = 0.3;
-// Each tier's noise cell is this many times finer than the one before.
-const float TIER_CELL_STEP = 1.8;
-const float CURL_SHARPNESS = 0.4;
-// Size of the stretches that vary in brightness and reach, in units of scale.
-const float VARY_SIZE = 5.0;
-// Size of the active spots, in units of scale.
-const float ACTIVITY_SIZE = 3.0;
-const float TOWARDS_PIXEL = 0.6;
-const float SNAPS_PER_SECOND = 16.0;
-// Length of the soft cut at each end of the reveal, and of the bright head, in CSS px.
 const float CUT_SOFTNESS = 3.0;
 const float HEAD_LENGTH = 12.0;
 const float HEAD_GAIN = 1.5;
-// Shortest reveal segment, in CSS px.
 const float MIN_SEGMENT = 160.0;
-// Noise time per second at speed 1.
-const float PACE = 4.0;
-
-// Where the lines are active along the outline, 0..1.
-// Spots come and go and wander along the outline; burst makes them sparse.
-float activity(vec2 q, float t, float seed) {
-    vec2 drift = vec2(0.12, 0.05) * t;
-    float n = snoise(vec3(q / (scale * ACTIVITY_SIZE) + drift + seed, t * 0.3)) * 0.5 + 0.5;
-    float low = burst * 0.7;
-    return smoothstep(low, low + 0.2, n);
-}
-
-// Slow variation along the outline, -1..1, for brightness, width and reach.
-float vary(vec2 q, float t, float seed) {
-    return snoise(vec3(q / (scale * VARY_SIZE) + seed * 13.1, t * 0.15 + seed));
-}
-
-// Arc that leaves the main line to the side of the noise's sign and returns to it.
-// While the noise is within the threshold of zero the line lies on the main line, so it never crosses as one wave.
-float pluck(float noise, float threshold) {
-    return sign(noise) * max(abs(noise) - threshold, 0.0) / (1.0 - threshold);
-}
-
-// Keep the displacement inside the room on each side of the contour.
-// Past the limit the line folds back, so it bounces off with a kink instead of running flat.
-// Squeeze first when the room is tight, so it folds at most once.
-float fit(float disp, float lineAmp, vec2 room) {
-    float limit = min((disp > 0.0 ? room.x : room.y) * 0.9, lineAmp) + 1e-3;
-    float t = abs(disp) / limit * min(1.0, 2.0 * limit / max(lineAmp, 1e-3));
-    return sign(disp) * limit * (1.0 - abs(1.0 - min(t, 2.0)));
-}
 
 void main() {
-    // Decide per 2x2 quad, so derivatives stay valid in drawn quads.
+    // Decide once per derivative quad, retaining all lanes needed for coverage.
     vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
-    float reach = max(lines > 1 ? amplitude * MAX_REACH : 0.0, mainAmplitude);
-    if (quad.a < 0.5 || abs(quad.r) > reach + thickness + 4.0) {
+    if (quad.a < 0.5 || abs(quad.r) > thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    vec2 size = vec2(textureSize(field, 0));
     vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
     float d = f.r;
     vec2 n = f.gb;
     vec2 q = gl_FragCoord.xy - d * n;
-    // Noise lives in element-local coordinates, independent of output padding.
-    vec2 origin = gl_FragCoord.xy - uvContent * contentSize;
-    vec2 qLocal = q - origin;
-    vec2 tangent = vec2(-n.y, n.x);
-    vec2 room = vec2(0.0);
-    vec2 roomNext = vec2(0.0);
-    if (mainAmplitude > 0.0 || lines > 1) {
-        room = texture(roomTex, q / size).rg;
-        roomNext = texture(roomTex, (q + tangent) / size).rg;
-    }
-
-    // Mix smooth time with time that snaps to new shapes.
-    float snap = floor(time * SNAPS_PER_SECOND);
-    float snapped = snap / SNAPS_PER_SECOND + hash(vec3(snap, 1.7, 9.1)) * 0.5;
-    float t = mix(time, snapped, flicker) * PACE;
-
-    // Sample the noise part of the way from q towards the pixel.
-    // Round a convex corner q stays put, so this keeps kinks there.
-    // It also halves the jitter that per-pixel normal errors put into q.
-    vec2 x = qLocal + n * d * TOWARDS_PIXEL;
-
-    // The main line stays on the outline; it kinks by mainAmplitude only in active spots.
-    float mainOn = mainAmplitude > 0.0 || lines > 1 || variation > 0.0
-        ? activity(qLocal, t, 0.0) : 0.0;
-    float mainDisp = 0.0;
-    float mainNext = 0.0;
-    if (mainAmplitude > 0.0) {
-        float mainAmp = mainAmplitude * mainOn;
-        float mainCell = scale * MAIN_CELL;
-        mainDisp = fit(mainAmp * jag(x, t, mainCell, sharpness), mainAmp, room);
-        mainNext = fit(mainAmp * jag(x + tangent, t, mainCell, sharpness), mainAmp, roomNext);
-    }
 
     // Reveal: which part of each loop shows, a long fading tail behind start, and a bright head at end.
     float shown = 1.0;
@@ -561,77 +319,16 @@ void main() {
         head *= clamp((1.0 - revealEnd) * segmentLength / headLength, 0.0, 1.0);
     }
 
-    float mainWidth = thickness;
-    float mainWeight = 1.0;
-    if (variation > 0.0) {
-        mainWidth *= 1.0 + variation * 0.35 * vary(qLocal, t, 2.0);
-        mainWeight += variation * (0.5 * vary(qLocal, t, 1.0) + 0.8 * mainOn);
-    }
-    float light = 0.0;
-    for (int i = 0; i < 4; i++) {
-        if (i >= lines) {
-            break;
-        }
-        float disp = mainDisp;
-        float dispNext = mainNext;
-        // The main line has hot knots where it is active, and slowly brighter and dimmer stretches.
-        float width = mainWidth;
-        float weight = mainWeight;
-        if (i > 0) {
-            float fi = float(i);
-            // Each tier reaches further, with finer noise, and is thinner and dimmer.
-            float reach = amplitude * TIER_REACH[i] * (1.0 + variation * 0.5 * vary(qLocal, t, 3.0 + fi));
-            // The companion line stays close outside the active spots, so the motion stays local.
-            reach *= i == 1 ? mix(COMPANION_CALM, 1.0, mainOn) : 1.0;
-            // The companion line gets the finest noise, so it kinks often and never runs parallel for long.
-            float cell = i == 1 ? scale * COMPANION_CELL : scale * pow(TIER_CELL_STEP, -(fi - 1.0));
-            // The finest tier bends smoothly, so it curls rather than kinks.
-            float sharp = i == 3 ? sharpness * CURL_SHARPNESS : sharpness;
-            // The companion line runs almost all the way round; the wisps only in active spots.
-            float own = snoise(vec3(qLocal / (scale * 2.0) + fi * 7.3, t * 0.5)) * 0.5 + 0.5;
-            float on = i == 1 ? smoothstep(0.1, 0.3, own) : mainOn * smoothstep(0.35, 0.6, own);
-            vec2 xTier = x + fi * vec2(311.7, 173.3) * pixelRatio;
-            float tTier = t * (i == 1 ? COMPANION_PACE : 1.0 + (fi - 1.0) * TIER_PACE);
-            float tier = fit(reach * pluck(jag(xTier, tTier, cell, sharp) + OUTWARD_BIAS, PLUCK[i]), reach, room);
-            float tierNext = fit(reach * pluck(jag(xTier + tangent, tTier, cell, sharp) + OUTWARD_BIAS, PLUCK[i]), reach, roomNext);
-            // Tiers leave from the main line and return to it.
-            disp = mix(mainDisp, tier, on);
-            dispNext = mix(mainNext, tierNext, on);
-            // Wisps taper towards their ends.
-            width = thickness * TIER_WIDTH[i] * mix(0.4, 1.0, on);
-            // Show arcs only where there is room on their side, outside or inside.
-            float sideRoom = tier >= 0.0 ? room.x : room.y;
-            weight = TIER_WEIGHT[i] * on * smoothstep(2.0, 8.0, sideRoom / pixelRatio);
-            // Fade out where the line lies on the main line, so it does not double it.
-            weight *= mix(0.3, 1.0, smoothstep(0.5, 3.0, abs(disp - mainDisp) / pixelRatio));
-            // Now and then a wisp flares up and dies down.
-            float flare = max(vary(qLocal, t * 1.5, 5.0 + fi), 0.0);
-            weight *= 1.0 + variation * 2.0 * flare * flare * flare;
-            weight *= 1.0 - 0.6 * flicker * (hash(vec3(snap, fi, 4.2)) * 0.5 + 0.5);
-        }
-        // The fading tail also thins out.
-        width *= mix(0.5, 1.0, shown);
-        float g = d - disp;
-        // Slope of the line along the contour, from one step along the tangent.
-        float slope = dispNext - disp;
-        float slopeGrad = sqrt(1.0 + slope * slope);
-        // Screen derivatives jump where q flips sides across the medial axis.
-        // Take the smaller estimate so the jump does not draw a false line.
-        vec2 grad = vec2(dFdx(g), dFdy(g));
-        float screenGrad = length(grad);
-        // An undisplaced core already has a distance field. Dividing it by a
-        // finite-difference gradient thins oblique edges and modulates energy.
-        bool undisplaced = mainAmplitude == 0.0 && (i == 0 || amplitude == 0.0);
-        float dist = abs(g) / (undisplaced ? 1.0 : max(min(screenGrad, slopeGrad), 1e-3));
-        vec2 lineNormal = screenGrad > 1e-3 && (undisplaced || screenGrad <= slopeGrad)
-            ? grad / screenGrad : (n - tangent * slope) / slopeGrad;
-        // A symmetric/quantized mask can have no usable normal. A zero-width
-        // pixel footprint would turn a subpixel line into a fully lit pixel.
-        if (dot(lineNormal, lineNormal) < 0.25) lineNormal = vec2(1.0, 0.0);
-        // Integrate both edges of a thin strip over the pixel. This preserves
-        // its energy while it moves between pixels, instead of widening it.
-        light += weight * lineCoverage(dist, width, lineNormal);
-    }
+    // The tail thins out without changing the distance field's energy.
+    float width = thickness * mix(0.5, 1.0, shown);
+    vec2 grad = vec2(dFdx(d), dFdy(d));
+    float screenGrad = length(grad);
+    vec2 lineNormal = screenGrad > 1e-3 ? grad / screenGrad : n;
+    // Quantized masks can have no usable normal; preserve a pixel footprint.
+    if (dot(lineNormal, lineNormal) < 0.25) lineNormal = vec2(1.0, 0.0);
+    // An undisplaced core is already a distance field. Dividing by its finite
+    // difference gradient would thin oblique edges and modulate their energy.
+    float light = lineCoverage(abs(d), width, lineNormal);
     light *= shown * (1.0 + HEAD_GAIN * head);
     outColor = vec4(vec3(light), 1.0);
 }
@@ -647,7 +344,6 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D core;
 uniform sampler2D glowTex;
-uniform vec2 glowTexel;
 uniform vec3 color;
 uniform float coreGain;
 #ifdef CORE_TINT
@@ -668,7 +364,6 @@ uniform int source;
 uniform float edgeFade;
 uniform float whiteMix;
 uniform int linearLight;
-uniform int smoothGlow;
 #ifdef LAYERED_GLOW
 ${GLSL_SABER_LAYERS}
 #elif defined(HALO)
@@ -680,28 +375,12 @@ float ign(vec2 p) {
 }
 
 void main() {
-    // 5x5 binomial gaussian from 9 bilinear taps, as in bloom.ts.
-    vec2 t = glowTexel;
     float glow = 0.0;
     if (glowGain > 0.0) {
 #ifdef LAYERED_GLOW
         glow = sampleLayeredGlow().r;
 #else
-        if (smoothGlow == 1) {
-            glow += texture(glowTex, uv + vec2(-t.x, -t.y)).r * 25.0;
-            glow += texture(glowTex, uv + vec2( 0.0, -t.y)).r * 30.0;
-            glow += texture(glowTex, uv + vec2( t.x, -t.y)).r * 25.0;
-            glow += texture(glowTex, uv + vec2(-t.x,  0.0)).r * 30.0;
-            glow += texture(glowTex, uv                  ).r * 36.0;
-            glow += texture(glowTex, uv + vec2( t.x,  0.0)).r * 30.0;
-            glow += texture(glowTex, uv + vec2(-t.x,  t.y)).r * 25.0;
-            glow += texture(glowTex, uv + vec2( 0.0,  t.y)).r * 30.0;
-            glow += texture(glowTex, uv + vec2( t.x,  t.y)).r * 25.0;
-            glow *= 1.0 / 256.0;
-        } else {
-            // Layered glow is already reconstructed smoothly at full resolution.
-            glow = texture(glowTex, uv).r;
-        }
+        glow = texture(glowTex, uv).r;
 #endif
         // Bias changes the glow profile only. Zero is neutral; positive tightens it.
         glow = min(pow(max(glow, 0.0), exp2(glowBias)), 4096.0);
@@ -770,13 +449,13 @@ export type SaberParams = {
     intensity: number;
     /** Exponential highlight rolloff (default), or linear light clipped to display range. */
     toneMapping: "exponential" | "linear";
-    /** Visible core brightness only. 1 preserves the default; 0 hides the core. */
+    /** Visible core brightness only. 1 is neutral gain; 0 hides the core. */
     coreIntensity: number;
-    /** Mix the visible core's tint toward white, 0..1. Default 0.15. */
+    /** Mix the visible core's tint toward white, 0..1. */
     coreWhiteness: number;
     /** Visible core Gaussian softness in CSS px. 0 bypasses; leaves glow unchanged. */
     coreSoftness: number;
-    /** Retain the undistorted outline over the visible distorted core. Default false. */
+    /** Retain the undistorted outline over the visible distorted core. */
     coreBlendOnTop: boolean;
     /** Independent warm halo gain. 0 disables its blur and composition. */
     haloIntensity: number;
@@ -784,62 +463,32 @@ export type SaberParams = {
     haloSize: number;
     /** Brightness modulation depth, 0..1. 0 disables; affects core, halo and glow, not source. */
     flickerIntensity: number;
-    /** Brightness-noise keyframes per second, independent of speed. 0 freezes. */
+    /** Brightness-noise keyframes per second, independent of distortion clocks. 0 freezes. */
     flickerSpeed: number;
     /** Integer seed for brightness flicker, independent of distortion seeds. */
     flickerSeed: number;
-    /** Width of the main line in CSS px. The other lines are thinner. */
+    /** Width of the undistorted contour in CSS px. */
     thickness: number;
-    /** How far the furthest wisps reach from the outline, in CSS px. */
-    amplitude: number;
-    /** How far the main line moves off the outline, in CSS px. 0 keeps it straight. */
-    mainAmplitude: number;
-    /** Size of the largest jags, in CSS px. Smaller values give more kinks. */
-    scale: number;
-    /** 0 = smooth bends, 1 = straight runs with sharp kinks. */
-    sharpness: number;
-    /**
-     * 0 = the main line kinks and the wisps lift off all along the outline.
-     * 1 = only in a few spots that wander, with the outline calm elsewhere.
-     */
-    burst: number;
-    /** Animation rate. 0 freezes the lines. */
-    speed: number;
-    /** 0 = lines flow smoothly, 1 = lines snap to new shapes many times a second. */
-    flicker: number;
-    /**
-     * Number of lines, 1..4: the main line, then a faint companion line, then two tiers of wisps.
-     * Each extra line is fainter, thinner and reaches further.
-     */
-    lines: number;
     /** Glow brightness against the lines. */
     glow: number;
-    /** Mix glow toward white independently of the core and colored halo, 0..1. Default 0.15. */
+    /** Mix glow toward white independently of the core and colored halo, 0..1. */
     glowWhiteness: number;
-    /** Glow reach, 0..1. Near 0 is a tight halo, near 1 a long soft tail. */
-    glowFalloff: number;
-    /** `pyramid` keeps the original glow; `layers` uses four independent blurs. */
-    glowMode: "pyramid" | "layers";
-    /** Four size/intensity pairs for `layers` mode. Each size is in CSS px. */
+    /** Four independent size/intensity pairs. Each size is in CSS px. */
     glowLayers: [
         SaberGlowLayer,
         SaberGlowLayer,
         SaberGlowLayer,
         SaberGlowLayer,
     ];
-    /** Layer radius multiplier, 1 = neutral, 0 = no glow. `layers` mode only. */
-    glowSpread: number;
     /** Glow contrast in stops of exponent: pow(glow, 2^bias). 0 = neutral. */
     glowBias: number;
-    /** Additional gain on glow only, in both modes. */
-    glowIntensityMultiplier: number;
-    /** Additional radius multiplier, `layers` mode only. 1 = neutral. */
+    /** Glow layer radius multiplier. 1 = neutral, 0 = no glow. */
     glowSizeMultiplier: number;
     /** Apply pow(core, 1/gamma) before blurring; positive, 1 = neutral. */
     glowPreGamma: number;
     /** Directional glow trail in CSS px, following glowDistortion wind. 0 disables. */
     glowFlow: number;
-    /** Distort every glow layer instead of protecting wide blur layers. Independent halo stays unchanged. Default false. */
+    /** Distort every glow layer instead of protecting wide blur layers. Independent halo stays unchanged. */
     glowDistortAllLayers: boolean;
     /** Warp/modulate the rendered lines before generating their glow. */
     coreDistortion: SaberDistortionParams;
@@ -877,11 +526,6 @@ export type SaberParams = {
      */
     fade: number;
     /**
-     * How much the lines vary along the outline and over time, 0..1: brighter knots, flaring wisps, changing reach.
-     * 0 looks even everywhere.
-     */
-    variation: number;
-    /**
      * Room for the lines and glow around the element, in CSS px.
      * `"fullscreen"` fills the canvas.
      */
@@ -899,11 +543,8 @@ export type SaberOptions = Omit<
     glowDistortion?: Partial<SaberDistortionParams>;
 };
 
-// Smallest kink spacing of the lines, in CSS px.
-const MIN_CELL = 5;
-
-// Largest room for the line that the field build measures, in CSS px.
-const MAX_ROOM = 96;
+// Distance-field support in CSS px. Preserve flood paths for core distortion.
+const FIELD_REACH = 96;
 
 // Light gain of the core line and the glow, before `intensity`.
 const CORE_GAIN = 3;
@@ -925,27 +566,15 @@ const DEFAULT_PARAMS: SaberParams = {
     flickerSpeed: 12,
     flickerSeed: 0,
     thickness: 2,
-    amplitude: 32,
-    mainAmplitude: 1,
-    scale: 24,
-    sharpness: 0.8,
-    burst: 0.45,
-    speed: 1,
-    flicker: 0,
-    lines: 4,
     glow: 1,
     glowWhiteness: WHITE_MIX,
-    glowFalloff: 0.6,
-    glowMode: "pyramid",
     glowLayers: [
         { size: 3, intensity: 1 },
         { size: 12, intensity: 0.5 },
         { size: 36, intensity: 0.25 },
         { size: 96, intensity: 0.125 },
     ],
-    glowSpread: 1,
     glowBias: 0,
-    glowIntensityMultiplier: 1,
     glowSizeMultiplier: 1,
     glowPreGamma: 1,
     glowFlow: 0,
@@ -960,14 +589,13 @@ const DEFAULT_PARAMS: SaberParams = {
     end: 1,
     segments: 3,
     fade: 100,
-    variation: 0.7,
     pad: 80,
 };
 
 /**
  * Electric lines along the outline of an element, with a glow.
- * A bright main line sits on the outline, with a faint companion line beside it.
- * In spots that come and go, thin wisps lift off it and fall back.
+ * Defaults to the Electric preset. Independent core/glow distortion animates
+ * the contour and its four glow layers.
  *
  * ```ts
  * vfx.add(img, { effect: new SaberEffect({ color: "#ff7a1a" }) });
@@ -987,14 +615,13 @@ const DEFAULT_PARAMS: SaberParams = {
  * Over a white element the lines inside its edge are hard to see; use `source: false` to draw the light only.
  * All params are read every frame, so you can change `params` live.
  *
- * `coreDistortion` and `glowDistortion` have independent wind/noise clocks,
- * unaffected by the legacy line `speed`. Set both `windSpeed` and `noiseSpeed`
+ * `coreDistortion` and `glowDistortion` have independent wind/noise clocks.
+ * Set both `windSpeed` and `noiseSpeed`
  * to 0 to freeze a distortion. Amount 0 skips noise; a nonzero `glowFlow`
  * still transports the glow envelope.
- * `glowMode: "layers"` enables four independently sized glows, unaffected by
+ * Four independently sized glow layers are unaffected by
  * `pad` except for clipping at the buffer boundary. Allow roughly three times
  * the largest effective radius, plus distortion reach, when choosing `pad`.
- * `glowFalloff` applies only to the original `pyramid` mode.
  * These controls approximate Saber concepts, not its proprietary renderer or units.
  */
 export class SaberEffect implements Effect {
@@ -1004,12 +631,8 @@ export class SaberEffect implements Effect {
     #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
     #core: EffectRenderTarget | null = null;
-    #room: EffectRenderTarget | null = null;
-    #roomReady = false;
     #region: EffectGeometry | undefined;
     #regionKey: readonly number[] = [];
-    #pyramid: BloomPyramid | null = null;
-    #pyramidLevels = 0;
     #glowPasses = new SaberGlowPasses();
     #dirty = true;
     #builtW = 0;
@@ -1066,10 +689,13 @@ export class SaberEffect implements Effect {
                 ...layer,
             })) as SaberParams["glowLayers"],
         };
+        validateOptions(initial);
+        this.setParams(SABER_PRESETS.electric);
         this.setParams(initial);
     }
 
     setParams(partial: SaberOptions): void {
+        validateOptions(partial);
         const { preset, coreDistortion, glowDistortion, glowLayers, ...rest } =
             partial;
         if (preset !== undefined) {
@@ -1097,15 +723,14 @@ export class SaberEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#disposed = false;
         // Flooding reads texelFetch, so linear filtering is safe. Once the field
-        // has been resolved, A holds the cached room and B holds the live core.
-        // Reusing these scratch images saves two full-size float buffers.
+        // has been resolved, B holds the live core. Reusing this scratch image
+        // saves a full-size float buffer.
         this.#seedA = ctx.createRenderTarget({ float: true });
         this.#seedB = ctx.createRenderTarget({ float: true });
         // The host only clears the stage output.
         // So this keeps the field between frames without `persistent`.
         this.#field = ctx.createRenderTarget({ float: true });
         this.#core = this.#seedB;
-        this.#roomReady = false;
         this.#dirty = true;
         // Restored targets come back empty, so the cached field must be built again.
         ctx.onContextRestored(() => {
@@ -1169,40 +794,11 @@ export class SaberEffect implements Effect {
             this.#builtLayout = layout;
             this.#builtGeometry = geometry;
         }
-        if (
-            !this.#roomReady &&
-            (this.params.mainAmplitude > 0 || Math.round(this.params.lines) > 1)
-        ) {
-            this.#buildRoom(ctx);
-        }
-
         const { pixelRatio } = ctx.dims;
-        const {
-            amplitude,
-            scale,
-            sharpness,
-            speed,
-            thickness,
-            burst,
-            flicker,
-            lines,
-        } = this.params;
-        const animated =
-            this.params.mainAmplitude > 0 ||
-            lines > 1 ||
-            this.params.variation > 0;
+        const { thickness } = this.params;
         const coreKey: CacheKey = [
             this.#fieldVersion,
-            amplitude,
-            scale,
-            sharpness,
             thickness,
-            burst,
-            flicker,
-            lines,
-            this.params.mainAmplitude,
-            this.params.variation,
-            animated ? ctx.time * speed : 0,
             reveal,
             usePayload,
             start,
@@ -1215,20 +811,8 @@ export class SaberEffect implements Effect {
                 frag: FRAG_CORE,
                 uniforms: {
                     field,
-                    roomTex: this.#room ?? field,
-                    contentSize: ctx.dims.element.map((x) => x * pixelRatio),
-                    amplitude: amplitude * pixelRatio,
-                    mainAmplitude:
-                        Math.max(this.params.mainAmplitude, 0) * pixelRatio,
-                    scale: Math.max(scale, 1e-3) * pixelRatio,
                     thickness: thickness * pixelRatio,
-                    minCell: MIN_CELL * pixelRatio,
                     pixelRatio,
-                    sharpness,
-                    burst,
-                    flicker,
-                    lines: Math.round(Math.min(Math.max(lines, 1), 4)),
-                    time: ctx.time * speed,
                     arcTex: usePayload && this.#arc ? this.#arc : field,
                     reveal: reveal ? 1 : 0,
                     // Until the traced contours land, show nothing rather than the whole outline.
@@ -1236,7 +820,6 @@ export class SaberEffect implements Effect {
                     revealEnd: usePayload ? end : 0,
                     segments: Math.max(1, Math.round(this.params.segments)),
                     fade: Math.max(this.params.fade, 0) * pixelRatio,
-                    variation: Math.min(Math.max(this.params.variation, 0), 1),
                 },
                 target: core,
                 geometry: this.#region,
@@ -1261,19 +844,8 @@ export class SaberEffect implements Effect {
                 this.params.coreDistortion.noiseDetail > 0
                     ? {
                           field,
-                          lineWidth:
-                              lines === 1 &&
-                              this.params.mainAmplitude === 0 &&
-                              this.params.variation === 0 &&
-                              !reveal
-                                  ? thickness
-                                  : 0,
-                          // Match the conservative support of FRAG_CORE above.
-                          reach:
-                              Math.max(
-                                  lines > 1 ? amplitude * 1.5 : 0,
-                                  this.params.mainAmplitude,
-                              ) + thickness,
+                          lineWidth: !reveal ? thickness : 0,
+                          reach: thickness,
                       }
                     : undefined,
             );
@@ -1297,7 +869,6 @@ export class SaberEffect implements Effect {
                         { size: 0, intensity: 0 },
                         { size: 0, intensity: 0 },
                     ],
-                    1,
                     1,
                     48,
                 );
@@ -1325,7 +896,6 @@ export class SaberEffect implements Effect {
                                 { size: 0, intensity: 0 },
                             ],
                             1,
-                            1,
                             48,
                         );
                         this.#softOriginalCoreKey = originalKey;
@@ -1351,7 +921,6 @@ export class SaberEffect implements Effect {
                         { size: 0, intensity: 0 },
                     ],
                     1,
-                    1,
                     48,
                 );
                 this.#halo = halo.layer0;
@@ -1364,23 +933,17 @@ export class SaberEffect implements Effect {
         const glowEnabled =
             glow > 0 &&
             intensity > 0 &&
-            this.params.glowIntensityMultiplier > 0 &&
-            (this.params.glowMode === "pyramid" ||
-                (this.params.glowSpread > 0 &&
-                    this.params.glowSizeMultiplier > 0 &&
-                    this.params.glowLayers.some(
-                        (layer) => layer.size > 0 && layer.intensity > 0,
-                    )));
+            this.params.glowSizeMultiplier > 0 &&
+            this.params.glowLayers.some(
+                (layer) => layer.size > 0 && layer.intensity > 0,
+            );
         let glowTex = visibleCore;
         let glowLayers: SaberGlowLayers | undefined;
         if (glowEnabled) {
             const glowBaseKey: CacheKey = [
                 this.#visibleCoreVersion,
-                this.params.glowMode,
                 this.params.glowPreGamma,
-                this.params.glowSpread,
                 this.params.glowSizeMultiplier,
-                this.params.glowFalloff,
                 this.params.pad,
                 this.params.glowDistortion.noiseScale,
                 this.params.glowDistortAllLayers,
@@ -1397,34 +960,23 @@ export class SaberEffect implements Effect {
                     visibleCore,
                     this.params.glowPreGamma,
                 );
-                if (this.params.glowMode === "layers") {
-                    if (this.#pyramid) {
-                        disposeBloomPyramid(this.#pyramid);
-                        this.#pyramid = null;
-                        this.#pyramidLevels = 0;
-                    }
-                    const layers = this.#glowPasses.prepareLayers(
-                        ctx,
-                        glowInput,
-                        this.params.glowLayers,
-                        this.params.glowSpread,
-                        this.params.glowSizeMultiplier,
-                        this.params.glowDistortion.noiseScale,
-                        this.params.glowDistortAllLayers,
-                    );
-                    if (
-                        this.params.glowDistortion.amount > 0 ||
-                        this.params.glowFlow > 0
-                    ) {
-                        glowTex = this.#glowPasses.combineLayers(ctx, layers);
-                    } else {
-                        // Reconstruct the layers directly in the final composite when
-                        // no distortion needs an intermediate, full-size glow image.
-                        glowLayers = layers;
-                    }
+                const layers = this.#glowPasses.prepareLayers(
+                    ctx,
+                    glowInput,
+                    this.params.glowLayers,
+                    this.params.glowSizeMultiplier,
+                    this.params.glowDistortion.noiseScale,
+                    this.params.glowDistortAllLayers,
+                );
+                if (
+                    this.params.glowDistortion.amount > 0 ||
+                    this.params.glowFlow > 0
+                ) {
+                    glowTex = this.#glowPasses.combineLayers(ctx, layers);
                 } else {
-                    this.#glowPasses.releaseLayers();
-                    glowTex = this.#renderGlow(ctx, glowInput);
+                    // Reconstruct the layers directly in the final composite when
+                    // no distortion needs an intermediate, full-size glow image.
+                    glowLayers = layers;
                 }
                 this.#glowBase = glowTex;
                 this.#glowLayers = glowLayers;
@@ -1448,7 +1000,7 @@ export class SaberEffect implements Effect {
                     this.#glowBase,
                     this.params.glowDistortion,
                     "glow",
-                    this.params.glowMode === "layers",
+                    true,
                     undefined,
                     this.params.glowFlow,
                 );
@@ -1493,7 +1045,6 @@ export class SaberEffect implements Effect {
                     intensity *
                     brightness,
                 glowTex,
-                glowTexel: [1.2 / glowTex.width, 1.2 / glowTex.height],
                 color: [r, g, b],
                 coreGain:
                     CORE_GAIN *
@@ -1502,23 +1053,13 @@ export class SaberEffect implements Effect {
                     brightness,
                 coreWhiteness,
                 glowGain: glowEnabled
-                    ? GLOW_GAIN *
-                      glow *
-                      intensity *
-                      Math.max(0, this.params.glowIntensityMultiplier) *
-                      brightness
+                    ? GLOW_GAIN * glow * intensity * brightness
                     : 0,
                 glowBias: Math.min(4, Math.max(-4, this.params.glowBias)),
                 source: source ? 1 : 0,
                 whiteMix: glowWhiteness,
                 linearLight: this.params.toneMapping === "linear" ? 1 : 0,
-                smoothGlow: this.params.glowMode === "pyramid" ? 1 : 0,
-                edgeFade:
-                    this.params.pad === "fullscreen"
-                        ? 0
-                        : this.params.glowMode === "layers"
-                          ? 2 * pixelRatio
-                          : this.params.pad * pixelRatio * 0.5,
+                edgeFade: this.params.pad === "fullscreen" ? 0 : 2 * pixelRatio,
             },
             target: ctx.target,
         });
@@ -1555,15 +1096,8 @@ export class SaberEffect implements Effect {
         this.#seedB = null;
         this.#field = null;
         this.#core = null;
-        this.#room = null;
-        this.#roomReady = false;
         this.#region = undefined;
         this.#regionKey = [];
-        if (this.#pyramid) {
-            disposeBloomPyramid(this.#pyramid);
-        }
-        this.#pyramid = null;
-        this.#pyramidLevels = 0;
         this.#dirty = true;
         this.#builtW = 0;
         this.#builtH = 0;
@@ -1595,10 +1129,10 @@ export class SaberEffect implements Effect {
         const height = field.height;
         const reach = Math.min(
             Math.max(width, height),
-            MAX_ROOM * pixelRatio * 2,
+            FIELD_REACH * pixelRatio * 2,
         );
         const largestJump = 2 ** Math.ceil(Math.log2(Math.max(reach, 1))) / 2;
-        // Preserve flood paths and all room rays, line widths, and luminance
+        // Preserve flood paths, line widths, and luminance
         // prefilter samples. This bound does not depend on animated noise.
         const maskReach =
             this.params.edge === "luminance"
@@ -1611,7 +1145,7 @@ export class SaberEffect implements Effect {
         const margin =
             Math.max(
                 largestJump,
-                (MAX_ROOM + Math.max(this.params.thickness, 0)) * pixelRatio,
+                (FIELD_REACH + Math.max(this.params.thickness, 0)) * pixelRatio,
             ) +
             maskReach +
             8;
@@ -1674,81 +1208,6 @@ export class SaberEffect implements Effect {
             };
         }
         return true;
-    }
-
-    // Blur the core with a bloom pyramid.
-    // Returns the result at half the buffer size.
-    #renderGlow(
-        ctx: EffectContext,
-        core: EffectRenderTarget,
-    ): EffectRenderTarget {
-        const baseW = core.width;
-        const baseH = core.height;
-        const pixelRatio = ctx.dims.pixelRatio;
-        // Levels are counted in CSS px, so the glow looks the same at any pixel ratio.
-        // Level i blurs over about 2^(i+1) buffer px; `shift` turns that into CSS px.
-        // Keep the widest blur inside the pad, so the glow does not hit its edge.
-        const shift = Math.log2(Math.max(pixelRatio, 1e-3));
-        const { pad } = this.params;
-        const cssLevels =
-            pad === "fullscreen"
-                ? 8
-                : Math.max(1, Math.round(Math.log2(Math.max(pad, 4))) - 2);
-        const levels = Math.min(10, Math.max(1, cssLevels + Math.ceil(shift)));
-        let pyramid = this.#pyramid;
-        if (
-            !pyramid ||
-            this.#pyramidLevels !== levels ||
-            pyramid.down[0].width !== Math.max(1, Math.floor(baseW / 2)) ||
-            pyramid.down[0].height !== Math.max(1, Math.floor(baseH / 2))
-        ) {
-            if (pyramid) {
-                disposeBloomPyramid(pyramid);
-            }
-            pyramid = createBloomPyramid(ctx, baseW, baseH, levels);
-            this.#pyramid = pyramid;
-            this.#pyramidLevels = levels;
-        }
-        const down = pyramid.down;
-        // CSS level c = i - shift has weight glowFalloff^c; the weights sum to 1.
-        // Levels finer than 2 CSS px fade out.
-        // Each level also gets 2^(c+1), so a thin line keeps its brightness as it blurs.
-        const falloff = Math.min(Math.max(this.params.glowFalloff, 0), 1);
-        const n = down.length;
-        let total = 0;
-        for (let c = 0; c < cssLevels; c++) {
-            total += falloff ** c;
-        }
-        const weightFor = (i: number) => {
-            const c = i - shift;
-            const weight = c >= 0 ? falloff ** c : Math.max(0, 1 + c);
-            return (weight / total) * 2 ** (c + 1);
-        };
-        let prev = core;
-        for (let i = 0; i < down.length; i++) {
-            ctx.draw({
-                frag: FRAG_SABER_PYRAMID_DOWNSAMPLE,
-                uniforms: {
-                    src: prev,
-                    // A one-level pyramid has no upsample pass to apply its
-                    // weight. Fold that gain into the downsample instead.
-                    pyramidGain: n === 1 ? weightFor(0) : 1,
-                },
-                target: down[i],
-            });
-            prev = down[i];
-        }
-        return upsampleBloomPyramid(ctx, pyramid, (i) => {
-            const levelScale = 2 ** (i + 2);
-            return {
-                texelSize: [
-                    (0.5 * levelScale) / baseW,
-                    (0.5 * levelScale) / baseH,
-                ],
-                weightLarge: weightFor(i),
-                weightSmall: i === n - 2 ? weightFor(n - 1) : 1,
-            };
-        });
     }
 
     // Start a trace when the contours are stale, and turn landed contours into splat points.
@@ -1857,7 +1316,7 @@ export class SaberEffect implements Effect {
             ),
         };
         if (this.#region) {
-            // Later room/core passes reuse these targets. Clear only when the
+            // The core pass reuses a seed target. Clear only when the
             // field changes; untouched pixels then stay transparent throughout.
             ctx.clear(seedA);
             ctx.clear(seedB);
@@ -1899,10 +1358,10 @@ export class SaberEffect implements Effect {
             });
             [read, write] = [write, read];
         };
-        // Lines and the room never reach past MAX_ROOM, so the flood can stop there.
+        // Keep the established field support for distorted contour sampling.
         // Texels further out stay invalid and draw nothing.
         const maxSide = Math.max(field.width, field.height);
-        const reach = Math.min(maxSide, MAX_ROOM * ctx.dims.pixelRatio * 2);
+        const reach = Math.min(maxSide, FIELD_REACH * ctx.dims.pixelRatio * 2);
         for (
             let stepSize = 2 ** Math.ceil(Math.log2(reach)) / 2;
             stepSize >= 1;
@@ -1932,55 +1391,12 @@ export class SaberEffect implements Effect {
         }
         this.#fieldHasPayload = withPayload;
         this.#fieldVersion++;
-        this.#roomReady = false;
 
         this.#dirty = false;
         this.#builtW = field.width;
         this.#builtH = field.height;
         this.#builtEdge = edge;
         this.#builtThreshold = edgeThreshold;
-    }
-
-    #buildRoom(ctx: EffectContext): void {
-        const field = this.#field;
-        const seedA = this.#seedA;
-        const seedB = this.#seedB;
-        if (!field || !seedA || !seedB) {
-            return;
-        }
-        this.#room = seedA;
-
-        ctx.draw({
-            frag: FRAG_ROOM,
-            uniforms: {
-                field,
-                maxRoom: MAX_ROOM * ctx.dims.pixelRatio,
-                pixelRatio: ctx.dims.pixelRatio,
-            },
-            target: seedA,
-            geometry: this.#region,
-        });
-        ctx.draw({
-            frag: FRAG_ROOM_BLUR,
-            uniforms: {
-                src: seedA,
-                dir: [1, 0],
-                pixelRatio: ctx.dims.pixelRatio,
-            },
-            target: seedB,
-            geometry: this.#region,
-        });
-        ctx.draw({
-            frag: FRAG_ROOM_BLUR,
-            uniforms: {
-                src: seedB,
-                dir: [0, 1],
-                pixelRatio: ctx.dims.pixelRatio,
-            },
-            target: this.#room,
-            geometry: this.#region,
-        });
-        this.#roomReady = true;
     }
 }
 
@@ -2074,4 +1490,15 @@ function splatGeometry({
         mode: "points",
         attributes: { position: { data: position, itemSize: 4 } },
     };
+}
+
+function validateOptions(options: SaberOptions): void {
+    const unknown = Reflect.ownKeys(options).filter(
+        (key) => key !== "preset" && !Object.hasOwn(DEFAULT_PARAMS, key),
+    );
+    if (unknown.length > 0) {
+        throw new TypeError(
+            `Unknown Saber option${unknown.length === 1 ? "" : "s"}: ${unknown.map(String).join(", ")}. Legacy line and pyramid glow options have been removed; use coreDistortion, glowDistortion and glowLayers.`,
+        );
+    }
 }

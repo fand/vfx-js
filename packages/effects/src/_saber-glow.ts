@@ -259,7 +259,7 @@ float shadeNoise(vec2 n) {
 #ifdef ANALYTIC_CORE
         // Pulling a thin raster line through a steep warp misses whole pixels.
         // For a single steady contour, integrate the warped distance field
-        // instead. Keep the raster path for reveals and procedural multi-lines.
+        // instead. Keep the raster path for reveals and undetailed distortion.
         vec4 field = texture(contourField, warped);
         vec2 gradient = vec2(dFdx(field.r), dFdy(field.r));
         float slope = max(length(gradient), 1e-3);
@@ -430,7 +430,7 @@ void main() {
 
 // Separate targets ensure neither distortion pass can overwrite its own input.
 // Auto-sized targets belong to the effect host. Explicit mip/layer targets are
-// released on resize, mode changes and disposal.
+// released on resize and disposal.
 export class SaberGlowPasses {
     #core: EffectRenderTarget | null = null;
     #input: EffectRenderTarget | null = null;
@@ -568,20 +568,12 @@ export class SaberGlowPasses {
         ctx: EffectContext,
         src: EffectRenderTarget,
         layers: readonly SaberGlowLayer[],
-        spread: number,
         sizeMultiplier: number,
         noiseScale: number,
     ): EffectRenderTarget {
         return this.combineLayers(
             ctx,
-            this.prepareLayers(
-                ctx,
-                src,
-                layers,
-                spread,
-                sizeMultiplier,
-                noiseScale,
-            ),
+            this.prepareLayers(ctx, src, layers, sizeMultiplier, noiseScale),
         );
     }
 
@@ -598,19 +590,13 @@ export class SaberGlowPasses {
         ctx: EffectContext,
         src: EffectRenderTarget,
         layers: readonly SaberGlowLayer[],
-        spread: number,
         sizeMultiplier: number,
         noiseScale: number,
         distortAllLayers = false,
     ): SaberGlowLayers {
         const sizes = layers.map((layer) =>
             layer.intensity > 0
-                ? Math.max(
-                      0,
-                      layer.size *
-                          Math.max(0, spread) *
-                          Math.max(0, sizeMultiplier),
-                  )
+                ? Math.max(0, layer.size * Math.max(0, sizeMultiplier))
                 : 0,
         );
         const maxSize = Math.max(...sizes);

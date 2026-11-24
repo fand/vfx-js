@@ -7,8 +7,9 @@ shader aliasing or measure GPU cost.
 ## Freeze a comparison
 
 Before editing, copy the built effects ESM directory to an ignored directory.
-Keep all its files, including internal helpers. A baseline must contain the
-layered-glow implementation used by these probes.
+Keep all its files, including internal helpers. For parameter-consolidation
+checks, use the renderer immediately before consolidation, including all nineteen
+preset recipes and the layered-glow implementation used by these probes.
 
 ```sh
 pnpm --filter @vfx-js/core run build:esm
@@ -63,7 +64,7 @@ node packages/effects/test/browser/summarize-saber-comparison.mjs /tmp/results.j
 
 To isolate the large-padding draw-region optimization, compare two fixtures
 of the same candidate. Use `pixelRatio: 2` or `3`,
-`options: { dynamic: true, glowMode: 'layers', pad: 320 }`, and omit
+`options: { preset: 'electric', dynamic: true, pad: 320 }`, and omit
 `transformDraw` for the optimized fixture. For the full-target fixture use:
 
 ```js
@@ -89,7 +90,6 @@ const reveal = await checks.revealChecks();
 const resolution = await checks.resolutionChecks();
 const noise = await checks.noiseChecks();
 const resources = await checks.lifecycleChecks();
-const pyramid = await checks.pyramidChecks();
 const source = await checks.sourceChecks();
 const region = await checks.regionChecks();
 const curves = await checks.curvedCoreChecks({ pixelRatio: 2 });
@@ -102,16 +102,16 @@ const appearance = await appearanceChecks.runAppearanceChecks({
 
 The checks cover impulse energy/variance across mip boundaries, even/odd source
 dimensions, DPR, fractional line widths and positions, padding invariance,
-temporal interpolation, cached versus freshly rendered parameter changes,
+cached versus freshly rendered parameter changes,
 moving reveals, supersampled procedural noise references, context restoration,
 and GPU resource release. Inspect each result's failure fields; the baseline can
 intentionally fail checks that motivated a correction.
 
-The appearance check compares defaults against the supplied baseline, checks
-live preset switching against fresh instances, brightness flicker determinism
-and freezing, glow independence, soft-core energy/peak and GPU disposal. For
-default compatibility, supply a baseline captured immediately before the
-appearance/flicker/preset additions.
+The appearance check compares explicit steady settings against the supplied
+pre-consolidation baseline. It also checks live preset switching against fresh
+instances, brightness flicker determinism and freezing, glow independence,
+soft-core energy/peak and GPU disposal. It does not compare the changed no-preset
+default with the old default.
 
 `saber-quality.mjs` also exports `createSaberFixture`, `GlowProbe`, and
 `DistortionProbe` for focused experiments. `capture(pass)` returns floating-point
@@ -125,12 +125,14 @@ attractive animated result. Storybook includes `thin-lines`,
 
 ## Combustion checks
 
-After freezing a pre-combustion baseline with `prepare-saber-comparison.mjs`,
+After freezing the pre-consolidation baseline with `prepare-saber-comparison.mjs`,
 import `runCombustionChecks` from `saber-combustion-checks.mjs` and pass the
-baseline `SaberEffect` class. It checks smooth/default distortion compatibility,
-independent halo radius/gain, deterministic animated presets and disposal at
-DPR 1/2 in both glow modes. Continue running `runAppearanceChecks` for all-preset
-switching and source/softness independence.
+baseline `SaberEffect` class. It checks distortion compatibility with explicit
+steady settings, independent halo radius/gain, deterministic animated presets
+and disposal at DPR 1/2 using layered glow. Bounds checks retain analytic
+Fire/Embers rendering and raster sampling for synthetic extreme-noise cases.
+Continue running `runAppearanceChecks` for all-preset switching and
+source/softness independence.
 
 
 ## AE preset motion checks
@@ -145,8 +147,24 @@ semantics, not pixel agreement with AE's proprietary renderer.
 `directionalCoreChecks()` compares thin directional warps at DPR 1/2 with a
 4× reference, versus the raster-warp fallback. The analytic path should reduce
 relative error by at least 25%. It only applies to steady single outlines with
-nonzero detail, including free-direction warps; reveals and multiple lines retain raster sampling.
+nonzero detail, including free-direction warps; reveals retain raster sampling.
 
 `shutterChecks()` exercises core/glow shutter sampling at DPR 1/2: frozen clocks
 match the zero-shutter image exactly, seeking is deterministic, and an animated
 shutter changes the rendered image. It does not establish AE motion-blur parity.
+
+
+Parameter-consolidation regression (frozen baseline required):
+
+```js
+const appearance = await import('./saber-appearance-checks.mjs');
+const preserved = await appearance.preservedPresetChecks(saberComparison.Baseline);
+// All 17 unchanged presets, 4 times, DPR 1/2: require failures.length === 0.
+```
+
+`preservedPresetChecks(Baseline, { presets, times, pixelRatios })` can run smaller
+batches. Ice and Unstable intentionally changed topology; inspect their animation
+separately. The no-preset appearance is now Electric. Coverage/cache probes use
+explicit steady settings, avoiding dependence on that default. Glow is always
+layered; obsolete pyramid/legacy-room probes have been removed. Existing motion,
+reveal, softness, resource and context-restoration diagnostics remain.

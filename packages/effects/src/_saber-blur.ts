@@ -7,39 +7,6 @@ export type GaussianKernel = {
     offsets: Float32Array;
 };
 
-// A separable version of the original bloom filter's 1D marginal response:
-// [1,2,2,2,1]/8. The sparse 13-tap filter passes the diagonal checkerboard
-// frequency, amplifying a thin highlight when odd dimensions align the grids.
-// Fold interpolation into six texel weights and pair them into three reads
-// per axis. This remains exact at any UV phase, including odd-sized pyramids.
-export const FRAG_SABER_PYRAMID_DOWNSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform float pyramidGain;
-void main() {
-    vec2 size = vec2(textureSize(src, 0));
-    vec2 p = uv * size - 0.5;
-    vec2 f = fract(p);
-    vec2 left = (3.0 - 2.0 * f) / 8.0;
-    vec2 right = (1.0 + 2.0 * f) / 8.0;
-    vec2 a = (floor(p) - 1.5 + (2.0 - f) / (3.0 - 2.0 * f)) / size;
-    vec2 b = (floor(p) + 1.0) / size;
-    vec2 c = (floor(p) + 2.5 + f / (1.0 + 2.0 * f)) / size;
-    vec4 light = texture(src, a) * left.x * left.y;
-    light += texture(src, vec2(b.x, a.y)) * 0.5 * left.y;
-    light += texture(src, vec2(c.x, a.y)) * right.x * left.y;
-    light += texture(src, vec2(a.x, b.y)) * left.x * 0.5;
-    light += texture(src, b) * 0.25;
-    light += texture(src, vec2(c.x, b.y)) * right.x * 0.5;
-    light += texture(src, vec2(a.x, c.y)) * left.x * right.y;
-    light += texture(src, vec2(b.x, c.y)) * 0.5 * right.y;
-    light += texture(src, c) * right.x * right.y;
-    outColor = light * pyramidGain;
-}
-`;
-
 // Separable [1,4,6,4,1]/16, including half-texel interpolation. Pair the
 // resulting six taps into three bilinear reads per axis. A fixed 2:1 grid
 // (with ceil-sized targets) preserves this phase even for odd input sizes.

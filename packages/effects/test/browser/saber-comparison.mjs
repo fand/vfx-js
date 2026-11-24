@@ -2,24 +2,17 @@ import { SaberEffect as Baseline } from "./baseline/saber.js";
 import * as quality from "./saber-quality.mjs";
 
 export const cases = [
-    {
-        name: "calm-layers",
-        options: {
-            glowMode: "layers",
-            lines: 1,
-            mainAmplitude: 0,
-            variation: 0,
-            pad: 160,
-        },
-    },
-    { name: "electric-layers", options: { glowMode: "layers", pad: 160 } },
+    { name: "calm-layers", options: { ...quality.STEADY_OPTIONS, pad: 160 } },
+    ...["electric", "fire", "energy", "tractor-beam", "ice", "unstable"].map(
+        (preset) => ({
+            name: preset,
+            options: { preset, pad: 160 },
+        }),
+    ),
     {
         name: "fluid-glow",
         options: {
-            glowMode: "layers",
-            lines: 1,
-            mainAmplitude: 0,
-            variation: 0,
+            ...quality.STEADY_OPTIONS,
             pad: 160,
             glowDistortion: {
                 amount: 32,
@@ -28,21 +21,15 @@ export const cases = [
             },
         },
     },
+    { name: "core-only", options: { preset: "electric", glow: 0, pad: 80 } },
     {
-        name: "core-energy",
-        options: {
-            glowMode: "layers",
-            pad: 160,
-            coreDistortion: { amount: 8, type: "energy", noiseScale: 32 },
-        },
+        name: "dynamic-layers",
+        options: { ...quality.STEADY_OPTIONS, dynamic: true, pad: 80 },
     },
-    { name: "electric-pyramid", options: { pad: 80 } },
-    { name: "core-only", options: { glow: 0, pad: 80 } },
-    { name: "dynamic-pyramid", options: { dynamic: true, pad: 80 } },
     {
         name: "fine-noise",
         options: {
-            glowMode: "layers",
+            ...quality.STEADY_OPTIONS,
             pad: 160,
             glowDistortion: {
                 amount: 32,
@@ -55,7 +42,7 @@ export const cases = [
     {
         name: "soft-wide-glow",
         options: {
-            glowMode: "layers",
+            ...quality.STEADY_OPTIONS,
             pad: 320,
             glowBias: -1,
             glowSizeMultiplier: 2,

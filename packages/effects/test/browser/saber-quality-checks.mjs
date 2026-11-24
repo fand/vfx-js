@@ -8,6 +8,7 @@ import {
     DistortionProbe,
     GlowProbe,
     imageStats,
+    STEADY_OPTIONS,
 } from "./saber-quality.mjs";
 
 function stats(image) {
@@ -99,14 +100,7 @@ export async function coreChecks(renderer = "candidate", transformDraw) {
                     transformDraw,
                     sourceWidth: 256,
                     sourceHeight: 256,
-                    options: {
-                        glow: 0,
-                        pad: 24,
-                        thickness,
-                        lines: 1,
-                        mainAmplitude: 0,
-                        variation: 0,
-                    },
+                    options: { ...STEADY_OPTIONS, glow: 0, pad: 24, thickness },
                     paint(c) {
                         c.translate(128 + phase, 128);
                         c.rotate((angle * Math.PI) / 180);
@@ -131,7 +125,7 @@ export async function coreChecks(renderer = "candidate", transformDraw) {
     }
     const fixture = await createSaberFixture({
         Effect,
-        options: { glow: 0, pad: 80 },
+        options: { ...STEADY_OPTIONS, glow: 0, pad: 80 },
     });
     try {
         const before = await fixture.capture("core");
@@ -151,40 +145,6 @@ export async function coreChecks(renderer = "candidate", transformDraw) {
         });
     } finally {
         fixture.destroy();
-    }
-    const temporal = await createSaberFixture({
-        Effect,
-        sourceWidth: 32,
-        sourceHeight: 32,
-        options: { pad: 0, glow: 0 },
-        transformDraw(draw) {
-            if (!draw.uniforms?.roomTex) {
-                return draw;
-            }
-            // Exercise the production corner interpolation directly. Different
-            // texels cover different random corners at their exact key time.
-            const frag = `${draw.frag.slice(0, draw.frag.lastIndexOf("void main() {"))}
-void main() {
-    vec2 i = floor(gl_FragCoord.xy);
-    float key = 1.0 - (hash(vec3(i, 7.7)) * 0.5 + 0.5);
-    float h = 0.001;
-    float middle = corner(i, key);
-    float left = (middle - corner(i, key - h)) / h;
-    float right = (corner(i, key + h) - middle) / h;
-    outColor = vec4(abs(right - left), abs(left), abs(right), 1.0);
-}`;
-            return { ...draw, frag };
-        },
-    });
-    try {
-        const image = await temporal.capture("core");
-        rows.push({
-            renderer,
-            case: "noise-key-velocity-jump",
-            meanJump: stats(image).sum / (image.width * image.height),
-        });
-    } finally {
-        temporal.destroy();
     }
     return rows;
 }
@@ -233,7 +193,6 @@ export async function run({
             if (
                 row.energyRange > 0.01 ||
                 row.relativeL1 > 0.001 ||
-                row.meanJump > 0.01 ||
                 row.invalid
             ) {
                 job.failures.push({ check: "core-stability", row });
@@ -254,13 +213,7 @@ export async function run({
 
 export async function cacheChecks() {
     const fixture = await createSaberFixture({
-        options: {
-            glowMode: "layers",
-            lines: 1,
-            mainAmplitude: 0,
-            variation: 0,
-            pad: 160,
-        },
+        options: { ...STEADY_OPTIONS, pad: 160 },
     });
     const changes = [
         { color: "#ff7a24" },
@@ -272,10 +225,6 @@ export async function cacheChecks() {
         { glow: 1.5 },
         { glowSizeMultiplier: 0 },
         { glowSizeMultiplier: 1.2 },
-        { glowIntensityMultiplier: 0 },
-        { glowIntensityMultiplier: 1.5 },
-        { glowSpread: 0 },
-        { glowSpread: 0.7 },
         {
             glowLayers: [3, 6, 12, 24].map((size) => ({
                 size,
@@ -319,17 +268,6 @@ export async function cacheChecks() {
         { thickness: 0.35 },
         { pad: 320 },
         { pad: 160 },
-        { glowMode: "pyramid" },
-        { glowFalloff: 0.2 },
-        { glowMode: "layers" },
-        { mainAmplitude: 5 },
-        { scale: 50 },
-        { sharpness: 0.3 },
-        { burst: 0.8 },
-        { speed: 0 },
-        { flicker: 0.6 },
-        { lines: 4, amplitude: 48 },
-        { variation: 0.8 },
         { edge: "luminance", edgeThreshold: 0.35 },
         { edge: "alpha", edgeThreshold: 0 },
         { source: true },
@@ -366,14 +304,7 @@ export async function cacheChecks() {
 
 export async function revealChecks() {
     const fixture = await createSaberFixture({
-        options: {
-            pad: "fullscreen",
-            glow: 0,
-            lines: 1,
-            mainAmplitude: 0,
-            variation: 0,
-            end: 0.5,
-        },
+        options: { ...STEADY_OPTIONS, pad: "fullscreen", glow: 0, end: 0.5 },
     });
     try {
         let before;
@@ -420,30 +351,13 @@ export async function revealChecks() {
     }
 }
 
-export async function resolutionChecks({
-    renderer = "candidate",
-    oldRoom = false,
-} = {}) {
+export async function resolutionChecks({ renderer = "candidate" } = {}) {
     const images = [];
     for (const pixelRatio of [1, 2, 3]) {
         const fixture = await createSaberFixture({
             Effect: renderer === "baseline" ? Baseline : undefined,
             pixelRatio,
-            options: { glow: 0, pad: 80 },
-            transformDraw: oldRoom
-                ? (draw) => {
-                      if (
-                          draw.uniforms.maxRoom !== undefined ||
-                          draw.uniforms.dir
-                      ) {
-                          return {
-                              ...draw,
-                              uniforms: { ...draw.uniforms, pixelRatio: 1 },
-                          };
-                      }
-                      return draw;
-                  }
-                : undefined,
+            options: { ...STEADY_OPTIONS, glow: 0, pad: 80 },
         });
         try {
             const source = await fixture.capture("core");
@@ -474,7 +388,6 @@ export async function resolutionChecks({
     }
     return {
         renderer,
-        oldRoom,
         comparisons: [2, 3].map((pixelRatio, i) => ({
             pixelRatio,
             ...difference(images[0], images[i + 1]),
@@ -562,7 +475,7 @@ export async function lifecycleChecks({ repeats = 2, steps = 36 } = {}) {
             Effect: renderer === "baseline" ? Baseline : undefined,
             pixelRatio: 2,
             trackResources: true,
-            options: { glowMode: "layers", pad: 320 },
+            options: { ...STEADY_OPTIONS, pad: 320 },
         });
         const initial = fixture.resources.snapshot();
         const rounds = [];
@@ -572,7 +485,6 @@ export async function lifecycleChecks({ repeats = 2, steps = 36 } = {}) {
                 for (let i = 0; i < steps; i++) {
                     fixture.effect.setParams({
                         pad: [80, 160, 320][i % 3],
-                        glowMode: i % 4 === 0 ? "pyramid" : "layers",
                         glowSizeMultiplier: 0.5 + (i % 6) * 0.25,
                         glowPreGamma: i % 3 === 0 ? 0.8 : 1,
                         coreDistortion: { amount: i % 5 === 0 ? 8 : 0 },
@@ -587,7 +499,6 @@ export async function lifecycleChecks({ repeats = 2, steps = 36 } = {}) {
                 }
                 fixture.effect.setParams({
                     pad: 320,
-                    glowMode: "layers",
                     glowSizeMultiplier: 1,
                     glowPreGamma: 1,
                     coreDistortion: { amount: 0 },
@@ -621,95 +532,6 @@ export async function lifecycleChecks({ repeats = 2, steps = 36 } = {}) {
     return rows;
 }
 
-// Inject a known impulse into the real Saber core target, then read its glow
-// before display tone mapping. This exercises the actual pyramid wiring.
-export async function pyramidChecks({
-    downsample,
-    pixelRatio = 1,
-    sizes = [256, 257, 512, 513],
-    pads = [0, 80],
-} = {}) {
-    const rows = [];
-    for (const size of sizes) {
-        for (const pad of pads) {
-            let output;
-            let phase = 0;
-            const fixture = await createSaberFixture({
-                sourceWidth: size,
-                sourceHeight: size,
-                pixelRatio,
-                options: {
-                    pad,
-                    lines: 1,
-                    mainAmplitude: 0,
-                    variation: 0,
-                    glowMode: "pyramid",
-                },
-                transformDraw(draw, ctx) {
-                    const u = draw.uniforms;
-                    if (u.roomTex) {
-                        return {
-                            ...draw,
-                            frag: `#version 300 es
-precision highp float;
-out vec4 outColor;
-uniform vec2 impulseCenter;
-uniform float impulseWidth;
-void main() {
-    vec2 coverage = clamp(0.5 * (impulseWidth + 1.0)
-        - abs(gl_FragCoord.xy - impulseCenter), 0.0, min(impulseWidth, 1.0));
-    outColor = vec4(vec3(coverage.x * coverage.y), 1.0);
-}`,
-                            uniforms: {
-                                ...u,
-                                impulseCenter: [
-                                    draw.target.width / 2 + phase * pixelRatio,
-                                    draw.target.height / 2 + phase * pixelRatio,
-                                ],
-                                impulseWidth: pixelRatio,
-                            },
-                        };
-                    }
-                    if (
-                        downsample &&
-                        (u.karis !== undefined || u.pyramidGain !== undefined)
-                    ) {
-                        return { ...draw, frag: downsample };
-                    }
-                    if (u.coreGain !== undefined) {
-                        output ??= ctx.createRenderTarget({ float: true });
-                        return {
-                            ...draw,
-                            target: output,
-                            frag: draw.frag.replace(
-                                "outColor = vec4(base.rgb + rgb, a);",
-                                "outColor = vec4(vec3(glow), 1.0);",
-                            ),
-                        };
-                    }
-                    return draw;
-                },
-            });
-            try {
-                for (phase of [0, 0.25, 0.5, 0.75, 1]) {
-                    fixture.effect.invalidate();
-                    rows.push({
-                        size,
-                        pad,
-                        phase,
-                        pixelRatio,
-                        ...stats(await fixture.capture("composite")),
-                        glError: fixture.gl.getError(),
-                    });
-                }
-            } finally {
-                fixture.destroy();
-            }
-        }
-    }
-    return rows;
-}
-
 export async function curvedCoreChecks({
     renderer = "candidate",
     transformDraw,
@@ -729,14 +551,7 @@ export async function curvedCoreChecks({
                     pixelRatio,
                     width: 128,
                     height: 128,
-                    options: {
-                        pad: 8,
-                        glow: 0,
-                        lines: 1,
-                        mainAmplitude: 0,
-                        variation: 0,
-                        thickness,
-                    },
+                    options: { ...STEADY_OPTIONS, pad: 8, glow: 0, thickness },
                     paint(c) {
                         c.canvas.width = 64 * sourceResolution;
                         c.canvas.height = 64 * sourceResolution;
@@ -779,7 +594,7 @@ export async function regionChecks() {
                 for (const full of [true, false]) {
                     const fixture = await createSaberFixture({
                         pixelRatio,
-                        options: { pad, thickness, glow: 0 },
+                        options: { ...STEADY_OPTIONS, pad, thickness, glow: 0 },
                         transformDraw: full
                             ? (draw) =>
                                   draw.geometry?.attributes?.position
@@ -815,7 +630,7 @@ export async function sourceChecks() {
             sourceHeight: 8,
             width: 64,
             height: 64,
-            options: { source, intensity: 0, pad: 8 },
+            options: { ...STEADY_OPTIONS, source, intensity: 0, pad: 8 },
             paint(c) {
                 c.fillStyle = "rgba(255,64,0,0.5)";
                 c.fillRect(0, 0, 4, 4);
@@ -875,7 +690,13 @@ export async function sourceChecks() {
             sourceHeight: 32,
             width: 64,
             height: 64,
-            options: { edge, edgeThreshold: 0, source: false, pad: 8 },
+            options: {
+                ...STEADY_OPTIONS,
+                edge,
+                edgeThreshold: 0,
+                source: false,
+                pad: 8,
+            },
             paint() {},
         });
         try {
@@ -900,8 +721,8 @@ export async function contextRestoreChecks() {
         pixelRatio: 2,
         trackResources: true,
         options: {
+            ...STEADY_OPTIONS,
             pad: 320,
-            glowMode: "layers",
             end: 0.65,
             glowDistortion: { amount: 32 },
         },
@@ -983,7 +804,6 @@ window.saberQualityChecks = {
     resolutionChecks,
     noiseChecks,
     lifecycleChecks,
-    pyramidChecks,
     sourceChecks,
     curvedCoreChecks,
     regionChecks,

@@ -10,6 +10,18 @@ import.meta.hot?.accept();
 
 import { SaberEffect } from "../../src/saber.ts";
 
+// Neutral diagnostic appearance: explicit so default-preset changes cannot
+// accidentally animate coverage, cache, or halo probes. Also accepted by baseline.
+export const STEADY_OPTIONS = Object.freeze({
+    preset: "laser",
+    color: "#3399ff",
+    thickness: 2,
+    coreIntensity: 1,
+    coreWhiteness: 0.15,
+    glow: 1,
+    glowSizeMultiplier: 1,
+});
+
 const frame = () => new Promise(requestAnimationFrame);
 
 function passName({ uniforms: u = {} }) {
@@ -28,7 +40,7 @@ function passName({ uniforms: u = {} }) {
     if (u.coreGain !== undefined) {
         return "composite";
     }
-    if (u.roomTex) {
+    if (u.revealEnd !== undefined) {
         return "core";
     }
     if (u.noiseType !== undefined) {
@@ -109,6 +121,7 @@ export class GlowProbe {
             ...options,
         };
         this.passes = new GlowPasses();
+        this.legacyLayers = GlowPasses !== SaberGlowPasses;
     }
     init(ctx) {
         this.input = ctx.createRenderTarget({ float: true });
@@ -144,9 +157,8 @@ void main() {
                 { size: 0, intensity: 0 },
                 { size: 0, intensity: 0 },
             ],
-            spread,
-            1,
-            48,
+            // Frozen baselines retain the removed spread argument.
+            ...(this.legacyLayers ? [spread, 1, 48] : [spread, 48]),
         );
         ctx.blit(output);
     }

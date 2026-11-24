@@ -66,6 +66,10 @@ const hashes = {};
 for (const file of [
     "baseline/saber.js",
     "baseline/_saber-glow.js",
+    "baseline/_saber-blur.js",
+    "baseline/_saber-coverage.js",
+    "baseline/_saber-flicker.js",
+    "baseline/saber-presets.js",
     "candidate/saber.js",
     "candidate/_saber-glow.js",
     "candidate/_saber-blur.js",

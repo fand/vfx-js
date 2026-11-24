@@ -19,15 +19,7 @@ type Args = {
     fontSize: number;
 } & Pick<
     SaberParams,
-    | "amplitude"
-    | "mainAmplitude"
-    | "scale"
-    | "sharpness"
-    | "speed"
     | "thickness"
-    | "lines"
-    | "burst"
-    | "flicker"
     | "coreIntensity"
     | "coreWhiteness"
     | "coreSoftness"
@@ -39,7 +31,6 @@ type Args = {
     | "flickerSeed"
     | "color"
     | "glow"
-    | "glowFalloff"
     | "source"
     | "pad"
     | "edge"
@@ -49,15 +40,12 @@ type Args = {
     | "end"
     | "segments"
     | "fade"
-    | "variation"
-    | "glowMode"
     | "glowLayers"
-    | "glowSpread"
     | "glowBias"
-    | "glowIntensityMultiplier"
     | "glowSizeMultiplier"
     | "glowPreGamma"
     | "glowFlow"
+    | "glowDistortAllLayers"
     | "coreDistortion"
     | "glowDistortion"
 >;
@@ -71,15 +59,7 @@ export default {
         pixelRatio: 0,
         background: "dark",
         fontSize: 0,
-        amplitude: DEFAULTS.amplitude,
-        mainAmplitude: DEFAULTS.mainAmplitude,
-        scale: DEFAULTS.scale,
-        sharpness: DEFAULTS.sharpness,
-        speed: DEFAULTS.speed,
         thickness: DEFAULTS.thickness,
-        lines: DEFAULTS.lines,
-        burst: DEFAULTS.burst,
-        flicker: DEFAULTS.flicker,
         coreIntensity: DEFAULTS.coreIntensity,
         coreWhiteness: DEFAULTS.coreWhiteness,
         coreSoftness: DEFAULTS.coreSoftness,
@@ -91,7 +71,6 @@ export default {
         flickerSeed: DEFAULTS.flickerSeed,
         color: DEFAULTS.color,
         glow: DEFAULTS.glow,
-        glowFalloff: DEFAULTS.glowFalloff,
         source: DEFAULTS.source,
         pad: DEFAULTS.pad,
         edge: DEFAULTS.edge,
@@ -101,31 +80,18 @@ export default {
         end: DEFAULTS.end,
         segments: DEFAULTS.segments,
         fade: DEFAULTS.fade,
-        variation: DEFAULTS.variation,
-        glowMode: DEFAULTS.glowMode,
         glowLayers: DEFAULTS.glowLayers,
-        glowSpread: DEFAULTS.glowSpread,
         glowBias: DEFAULTS.glowBias,
-        glowIntensityMultiplier: DEFAULTS.glowIntensityMultiplier,
         glowSizeMultiplier: DEFAULTS.glowSizeMultiplier,
         glowPreGamma: DEFAULTS.glowPreGamma,
         glowFlow: DEFAULTS.glowFlow,
+        glowDistortAllLayers: DEFAULTS.glowDistortAllLayers,
         coreDistortion: DEFAULTS.coreDistortion,
         glowDistortion: DEFAULTS.glowDistortion,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
-        amplitude: { control: { type: "range", min: 0, max: 60, step: 0.5 } },
-        mainAmplitude: {
-            control: { type: "range", min: 0, max: 30, step: 0.5 },
-        },
-        scale: { control: { type: "range", min: 5, max: 300, step: 1 } },
-        sharpness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        speed: { control: { type: "range", min: 0, max: 5, step: 0.01 } },
         thickness: { control: { type: "range", min: 0.1, max: 8, step: 0.05 } },
-        lines: { control: { type: "range", min: 1, max: 4, step: 1 } },
-        burst: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        flicker: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         coreIntensity: {
             control: { type: "range", min: 0, max: 5, step: 0.01 },
         },
@@ -146,9 +112,6 @@ export default {
         background: { control: { type: "radio" }, options: ["dark", "light"] },
         color: { control: { type: "color" } },
         glow: { control: { type: "range", min: 0, max: 5, step: 0.01 } },
-        glowFalloff: {
-            control: { type: "range", min: 0, max: 1, step: 0.01 },
-        },
         source: { control: { type: "boolean" } },
         pad: { control: { type: "range", min: 0, max: 400, step: 1 } },
         edge: { control: { type: "radio" }, options: ["alpha", "luminance"] },
@@ -160,13 +123,7 @@ export default {
         end: { control: { type: "range", min: 0, max: 1, step: 0.001 } },
         segments: { control: { type: "range", min: 1, max: 8, step: 1 } },
         fade: { control: { type: "range", min: 0, max: 300, step: 1 } },
-        variation: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        glowMode: { control: "radio", options: ["pyramid", "layers"] },
-        glowSpread: { control: { type: "range", min: 0, max: 3, step: 0.01 } },
         glowBias: { control: { type: "range", min: -2, max: 2, step: 0.01 } },
-        glowIntensityMultiplier: {
-            control: { type: "range", min: 0, max: 10, step: 0.01 },
-        },
         glowSizeMultiplier: {
             control: { type: "range", min: 0, max: 4, step: 0.01 },
         },
@@ -295,10 +252,13 @@ export const smallText: StoryObj<Args> = {
 // Start from a steady outline to isolate each new control group.
 const LAYERED_ARGS: Partial<Args> = {
     source: false,
-    lines: 1,
-    mainAmplitude: 0,
-    variation: 0,
-    glowMode: "layers",
+    coreSoftness: 0,
+    coreBlendOnTop: false,
+    haloIntensity: 0,
+    glowFlow: 0,
+    glowDistortAllLayers: false,
+    coreDistortion: { ...DEFAULTS.coreDistortion, amount: 0 },
+    glowDistortion: { ...DEFAULTS.glowDistortion, amount: 0 },
     pad: 320,
     fontSize: 96,
 };
@@ -351,12 +311,12 @@ const PRESET_DESCRIPTIONS: Record<SaberPresetName, string> = {
         "AE Electric-inspired cyan electrical edges with rising turbulent glow.",
     fire: "AE Fire-inspired rising fractal flames around a torn edge.",
     plasma: "Violet fluid contours and turbulent energy.",
-    ice: "Cool white edges with slow, angular blue branches.",
+    ice: "Crisp cool white edges with slowly shifting blue distortion.",
     toxic: "Soft green light surrounded by drifting smoke.",
     spectral: "A faint turquoise core with a broad flowing halo.",
     embers: "Alias of Burning: a steady outline with a rising warm fringe.",
     laser: "A steady white core with a tight red glow. Static by default; animate start/end for a reveal.",
-    unstable: "Fast yellow arcs, changing shapes and strong flicker.",
+    unstable: "Fast yellow contour distortion and strong brightness flicker.",
 };
 
 const AE_PRESETS: SaberPresetName[] = [
@@ -472,15 +432,17 @@ export const presets: StoryObj<Args> = {
 
 export const thinLines: StoryObj<Args> = {
     args: {
-        source: false,
+        ...LAYERED_ARGS,
         pixelRatio: 1,
         fontSize: 48,
         thickness: 0.35,
         glow: 0.4,
-        glowMode: "layers",
-        mainAmplitude: 2,
-        variation: 0.3,
-        speed: 0.3,
+        coreDistortion: {
+            ...DEFAULTS.coreDistortion,
+            amount: 2,
+            noiseSpeed: 0.06,
+            windSpeed: 0,
+        },
         pad: 160,
     },
     render: (args) => renderText("Fine electric lines", args),

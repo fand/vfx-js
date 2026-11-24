@@ -1,5 +1,5 @@
 // Real WebGL transport and animation checks, independent of preset still images.
-import { createSaberFixture } from "./saber-quality.mjs";
+import { createSaberFixture, STEADY_OPTIONS } from "./saber-quality.mjs";
 export const AE_PRESETS = [
     "arc-reactor",
     "burning",
@@ -60,11 +60,8 @@ export async function runMotionChecks() {
                     sourceHeight: 120,
                     pixelRatio,
                     options: {
-                        lines: 1,
-                        mainAmplitude: 0,
-                        variation: 0,
+                        ...STEADY_OPTIONS,
                         pad: 0,
-                        glowMode: "layers",
                         glowDistortion: {
                             amount: 32,
                             type,
@@ -116,12 +113,9 @@ export async function runMotionChecks() {
             sourceWidth: 160,
             sourceHeight: 80,
             options: {
-                lines: 1,
-                mainAmplitude: 0,
-                variation: 0,
+                ...STEADY_OPTIONS,
                 pad: 80,
                 coreIntensity: 0,
-                glowMode: "layers",
                 glowFlow: 40,
                 glowDistortion: { amount: 0, windSpeed: 0, noiseSpeed: 0 },
                 glowLayers: [
@@ -240,11 +234,9 @@ export async function directionalCoreChecks() {
             pixelRatio,
             paint: (c) => c.fillRect(20, 20, 120, 60),
             options: {
+                ...STEADY_OPTIONS,
                 source: false,
                 pad: 0,
-                lines: 1,
-                mainAmplitude: 0,
-                variation: 0,
                 thickness: 0.7,
                 glow: 0,
                 coreDistortion: {

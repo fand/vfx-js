@@ -53,7 +53,7 @@ await vfx.add(img, {
 | `VoronoiEffect`          | Voronoi cells shrunken in a halo around the cursor              |
 | `PixelateEffect`         | Nearest-neighbour pixelation                                    |
 | `PixelSortEffect`        | Threshold pixel sort, with optional arbitrary sort angle        |
-| `SaberEffect`            | Electric lines and glow along the element's outline             |
+| `SaberEffect`            | Distorted outline with independent core/glow controls             |
 | `ScanlineEffect`         | CRT scanline overlay                                            |
 | `SwirlParticleEffect`    | Particles curling over the extruded 3D silhouette               |
 

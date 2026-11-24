@@ -297,7 +297,7 @@ export const effectDemos: EffectDemo[] = [
     },
     {
         name: "SaberEffect",
-        text: "Electric lines and glow along the outline. Draws outside the element.",
+        text: "Distorted outline and layered glow. Draws outside the element.",
         media: "logo",
         // A small pad keeps the tile cheap.
         create: () => new SaberEffect({ pad: 40 }),
