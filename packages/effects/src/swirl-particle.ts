@@ -139,7 +139,10 @@ export type SwirlParticlePointer = "none" | "repel" | "tilt";
  */
 export type SwirlParticleParams = OrbitCameraParams & {
     /**
-     * Number of particles, at most 1,048,576 (2^20). Live: lowering it
+     * Number of particles, at most 1,048,576 (2^20), and less on a GPU
+     * whose textures are small (262,144 where they are 2048 px; a warning
+     * says so). Each particle takes up to about 190 bytes of GPU
+     * memory, so 2^20 takes about 200 MB. Live: lowering it
      * draws fewer particles without freeing memory; raising it past what
      * is allocated reallocates the particle state (the trails regrow, and
      * the new particles grow in over {@link intro}).
@@ -384,6 +387,14 @@ const TRAIL_SAMPLES = 6;
 // The history slots are tiled in one atlas render target.
 const HIST_COLS = Math.ceil(Math.sqrt(TRAIL_SAMPLES));
 const HIST_ROWS = Math.ceil(TRAIL_SAMPLES / HIST_COLS);
+// The most particles a GPU can hold: the state is a power-of-two square,
+// and the trail history tiles HIST_COLS × HIST_ROWS of it in one texture.
+function maxCountFor(gl: WebGL2RenderingContext): number {
+    const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    const side = Math.floor(maxTex / Math.max(HIST_COLS, HIST_ROWS));
+    const width = 2 ** Math.floor(Math.log2(Math.max(side, 1)));
+    return Math.min(MAX_COUNT, width * width);
+}
 // Ago of a slot that holds no sample.
 const HIST_NEVER = 1e9;
 // Generations wrap at this, so they stay exact in a 16-bit float
@@ -1532,6 +1543,24 @@ export class SwirlParticleEffect implements Effect {
     #halfState = false;
     // This frame's params, checked (see resolveParams).
     readonly #r: Resolved;
+    // The most particles the GPU's textures can hold (see maxCountFor).
+    #maxCount = MAX_COUNT;
+    #warnedCount = false;
+
+    // The params resolved, with `count` held to what the GPU can hold.
+    #resolve(): Resolved {
+        const r = resolveParams(this.params, this.#r);
+        if (r.count > this.#maxCount) {
+            if (!this.#warnedCount) {
+                this.#warnedCount = true;
+                console.warn(
+                    `[VFX-JS] SwirlParticleEffect: count ${r.count} is more than this GPU can hold; using ${this.#maxCount}.`,
+                );
+            }
+            r.count = this.#maxCount;
+        }
+        return r;
+    }
 
     // Reads the silhouette back: when the effect starts, on refresh(),
     // and when the element's aspect ratio changes.
@@ -1638,7 +1667,8 @@ export class SwirlParticleEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
         this.#halfState = !ctx.gl.getExtension("OES_texture_float_linear");
-        const r = resolveParams(this.params, this.#r);
+        this.#maxCount = maxCountFor(ctx.gl);
+        const r = this.#resolve();
         this.#allocState(ctx, stateSizeFromCount(r.count), false);
         this.#createScene(ctx);
 
@@ -1749,7 +1779,7 @@ export class SwirlParticleEffect implements Effect {
         if (!this.#scene || !this.#pos || !this.#vel) {
             return;
         }
-        const r = resolveParams(this.params, this.#r);
+        const r = this.#resolve();
 
         // `antialias` changed: a new buffer with the other sample count.
         const scene =
