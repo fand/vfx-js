@@ -111,7 +111,9 @@ export type GlassParams = OrbitCameraParams & {
      * negative the dark ones (by sinking the bright ones). It makes a
      * button's label or a photo's content show as shape. 0 is off. Read
      * back with the silhouette (see {@link GlassEffect.refresh | refresh()}),
-     * so a video gives a still relief.
+     * so a video gives a still relief. At 0 the relief is not built;
+     * moving it off 0 reads the element back again, so the relief shows
+     * a few frames later.
      */
     relief: number;
     /**
@@ -812,8 +814,11 @@ function fragGlassFor(kind: number): string {
 // The SDF, plus the relief's height map on the same grid. The arrays
 // are emptied once uploaded (see dropArrays); the sizes stay.
 type GlassShape = ShapeData & {
-    /** Luminance 0..1 before the blur, kept to rebuild the relief. */
-    reliefLum: Float32Array;
+    /**
+     * Luminance 0..1 before the blur, kept to rebuild the relief. Null
+     * while `relief` is 0: no relief is built.
+     */
+    reliefLum: Float32Array | null;
     /** Box blur radius of `relief`, in grid px. */
     reliefRadius: number;
     /** RGBA: height 0..1, its gradient in world units, 0. */
@@ -823,6 +828,12 @@ type GlassShape = ShapeData & {
 };
 
 const EMPTY = new Float32Array(0);
+
+// Whether `relief` raises the cap. UI sliders leave remainders like
+// 5e-17; those count as 0, so the default path stays exact.
+function reliefOn(relief: number): boolean {
+    return Number.isFinite(relief) && Math.abs(relief) > 1e-6;
+}
 
 // Free the big arrays once they are on the GPU. A restored context reads
 // the element back again instead. The luminance stays, to rebuild the
@@ -1094,11 +1105,10 @@ export class GlassEffect implements Effect {
         const bulge = num(p.bulge, 0, 100, 0);
         const bulgeWidth = num(p.bulgeWidth, 1e-3, 100, D.bulgeWidth);
         const bulgeSlope = bulge > 0 ? (2 * bulge) / bulgeWidth : 0;
-        // A sunk relief must keep the front cap above the back one. UI
-        // sliders leave remainders like 5e-17; those count as 0, so the
-        // default path stays exact.
+        // A sunk relief must keep the front cap above the back one. Until
+        // the relief is built, the cap stays flat.
         const relief =
-            Number.isFinite(p.relief) && Math.abs(p.relief) > 1e-6
+            reliefOn(p.relief) && this.#reliefTex
                 ? Math.max(
                       p.relief,
                       -2 * halfDepth * (1 - RELIEF_MIN_THICKNESS),
@@ -1198,14 +1208,24 @@ export class GlassEffect implements Effect {
         if (!shape) {
             return false;
         }
-        const lum = reliefLuminance(px, mw, mh, shape);
-        const radius = reliefRadius(this.params.reliefBlur, shape);
-        this.#pending = {
-            ...shape,
-            reliefLum: lum,
-            reliefRadius: radius,
-            ...buildRelief(lum, shape, radius),
-        };
+        if (reliefOn(this.params.relief)) {
+            const lum = reliefLuminance(px, mw, mh, shape);
+            const radius = reliefRadius(this.params.reliefBlur, shape);
+            this.#pending = {
+                ...shape,
+                reliefLum: lum,
+                reliefRadius: radius,
+                ...buildRelief(lum, shape, radius),
+            };
+        } else {
+            this.#pending = {
+                ...shape,
+                reliefLum: null,
+                reliefRadius: -1,
+                relief: EMPTY,
+                reliefMaxGrad: 0,
+            };
+        }
         this.#channel = channel;
         return true;
     }
@@ -1232,10 +1252,27 @@ export class GlassEffect implements Effect {
     }
 
     // Rebuild the relief when `reliefBlur` changes, from the luminance
-    // kept from the readback: no new capture, and the SDF stays.
+    // kept from the readback: no new capture, and the SDF stays. Free it
+    // when `relief` goes to 0; when it leaves 0, read the element again
+    // for its luminance.
     #updateRelief(ctx: EffectContext): void {
         const shape = this.#shape;
         if (!shape) {
+            return;
+        }
+        if (!reliefOn(this.params.relief)) {
+            if (shape.reliefLum) {
+                shape.reliefLum = null;
+                shape.reliefRadius = -1;
+                shape.reliefMaxGrad = 0;
+                this.#freeRelief(ctx.gl);
+            }
+            return;
+        }
+        if (!shape.reliefLum) {
+            if (this.#source.phase === "idle" && !this.#pending) {
+                this.#source.refresh();
+            }
             return;
         }
         const radius = reliefRadius(this.params.reliefBlur, shape);
@@ -1248,14 +1285,21 @@ export class GlassEffect implements Effect {
         shape.relief = EMPTY;
     }
 
-    #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
-        const gl = ctx.gl;
+    #freeRelief(gl: WebGL2RenderingContext): void {
         this.#reliefTex?.dispose();
         if (this.#reliefRaw) {
             gl.deleteTexture(this.#reliefRaw);
         }
         this.#reliefRaw = null;
         this.#reliefTex = null;
+    }
+
+    #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
+        const gl = ctx.gl;
+        this.#freeRelief(gl);
+        if (!shape.reliefLum) {
+            return;
+        }
         const rel = uploadFloatTexture(
             gl,
             shape.sdfW,
