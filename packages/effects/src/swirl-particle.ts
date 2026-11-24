@@ -815,6 +815,8 @@ precision highp sampler2D;
 #define HIST_COLS ${HIST_COLS}
 
 uniform int idOffset;
+// Instances from here on are spare room in the geometry: drawn as nothing.
+uniform int idEnd;
 #ifdef FIREFLY
 uniform float fireflyIntensity;
 uniform vec3 fireflyColor;
@@ -898,6 +900,10 @@ vec4 histAt(int k, ivec2 texel) {
 
 void main() {
     int i = gl_InstanceID + idOffset;
+    if (i >= idEnd) {
+        cull();
+        return;
+    }
     ivec2 texel = ivec2(i % stateWidth, i / stateWidth);
     uint id = uint(i);
     vec4 P = texelFetch(posTex, texel, 0);
@@ -1433,6 +1439,16 @@ function bakePalette(palette: SwirlParticleParams["palette"]): Uint8Array {
 }
 
 // TRAIL_SAMPLES quads, one per trail segment: corner + segment index.
+// Room for `n` instances, rounded up to one of 8 steps per power of two
+// (at most 12.5% spare).
+function instanceBucket(n: number): number {
+    if (n <= 0) {
+        return 0;
+    }
+    const step = 2 ** Math.max(Math.floor(Math.log2(n)) - 3, 0);
+    return Math.ceil(n / step) * step;
+}
+
 function trailGeometry(instanceCount: number): EffectGeometry {
     const corners = [-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5];
     const position = new Float32Array(TRAIL_SAMPLES * 8);
@@ -1590,6 +1606,9 @@ export class SwirlParticleEffect implements Effect {
     #fireflies: EffectGeometry | null = null;
     #nBody = -1;
     #nFire = -1;
+    // Instances the geometry has room for.
+    #bodyCap = -1;
+    #fireCap = -1;
     #slotQuad: EffectGeometry = {
         attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
     };
@@ -2099,21 +2118,27 @@ export class SwirlParticleEffect implements Effect {
         const r = this.#r;
         const nFire = Math.min(r.count, Math.round(r.count * r.fireflyRatio));
         const nBody = r.count - nFire;
-        if (nBody !== this.#nBody) {
+        this.#nBody = nBody;
+        this.#nFire = nFire;
+        // The geometry is made for a bucket of counts, so animating `count`
+        // or `fireflyRatio` does not rebuild it every frame.
+        const bodyCap = instanceBucket(nBody);
+        if (bodyCap !== this.#bodyCap) {
             if (this.#trails) {
                 ctx.releaseGeometry(this.#trails);
             }
             if (this.#heads) {
                 ctx.releaseGeometry(this.#heads);
             }
-            this.#trails = trailGeometry(nBody);
+            this.#trails = trailGeometry(bodyCap);
             this.#heads = {
                 attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
-                instanceCount: nBody,
+                instanceCount: bodyCap,
             };
-            this.#nBody = nBody;
+            this.#bodyCap = bodyCap;
         }
-        if (nFire !== this.#nFire) {
+        const fireCap = instanceBucket(nFire);
+        if (fireCap !== this.#fireCap) {
             if (this.#fireflies) {
                 ctx.releaseGeometry(this.#fireflies);
             }
@@ -2122,9 +2147,9 @@ export class SwirlParticleEffect implements Effect {
                 mode: "points",
                 attributes: {},
                 drawRange: { start: 0, count: 1 },
-                instanceCount: nFire,
+                instanceCount: fireCap,
             };
-            this.#nFire = nFire;
+            this.#fireCap = fireCap;
         }
     }
 
@@ -2447,6 +2472,7 @@ export class SwirlParticleEffect implements Effect {
             histTex: hist,
             attrA,
             idOffset: this.#nFire,
+            idEnd: r.count,
             streak: r.streak,
         };
         if (this.#nBody > 0) {
@@ -2477,6 +2503,7 @@ export class SwirlParticleEffect implements Effect {
                 uniforms: {
                     ...uniforms,
                     idOffset: 0,
+                    idEnd: this.#nFire,
                     time: this.#simTime,
                     fireflyIntensity: r.fireflyIntensity,
                     fireflyColor: r.fireflyColor,
@@ -2729,6 +2756,8 @@ export class SwirlParticleEffect implements Effect {
         this.#fireflies = null;
         this.#nBody = -1;
         this.#nFire = -1;
+        this.#bodyCap = -1;
+        this.#fireCap = -1;
 
         // Start over like a new instance if it is added again.
         this.#source.reset();
