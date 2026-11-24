@@ -1,5 +1,21 @@
 # @vfx-js/astro
 
+## 0.3.0
+
+### Minor Changes
+
+- f10c035: Support `keepPlaying` in `<VFXTransition>` for React (Next.js, React Router) and Astro.
+
+  - `ctx.keepPlaying(nodes, onReturn)` puts the nodes back when the run ends, for nodes a framework still owns.
+  - React: with `keepPlaying`, the old page stays mounted during the run. Each page then sits in a `display: contents` div.
+  - Astro: `keepPlaying` works on `<VFXTransition>`, `<TransitionIn>` and link specs. Old islands unmount when the run ends.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [70c5b2a]
+  - @vfx-js/transitions@0.1.3
+
 ## 0.2.0
 
 ### Minor Changes
