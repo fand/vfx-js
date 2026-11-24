@@ -598,21 +598,63 @@ float warpA0;
 bool capOn = false;
 vec3 capN;
 
-// Shade a film at p with normal n, of the cell round \`center\` with id
+// A film found along the ray, kept to be shaded a little later: the
+// point and normal as seen, the point in its cell (per cell size), and
+// the rest as addFilm takes them.
+struct Film {
+    vec3 p;
+    vec3 n;
+    vec3 l;
+    float id;
+    float outer;
+    float cover;
+    float edge;
+    bool entering;
+};
+// The films not shaded yet. A few are enough: segmentFilms shades them
+// on every step, and at most FOUND_MAX are found between two. The list is
+// kept short, since every pixel pays for its size.
+const int FOUND_MAX = 4;
+Film found[FOUND_MAX];
+int nFound = 0;
+// The share of light that passes the opaque bodies found so far: the
+// walk stops when none is left.
+float through = 1.0;
+
+// Keep a film at p with normal n, of the cell round \`center\` with id
 // \`id\`: \`outer\` is 1 on the foam's outside, 0 on a wall inside it;
 // \`cover\` is how much of the pixel it covers; \`edge\` the distance to
 // the nearest border on the outside (NO_EDGE: none).
-void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover, float edge) {
-    float th = filmThickness((p - center) / cellSize, id);
-    // In the warped shell, shade the point and normal as seen.
-    vec3 roWarp = ro;
-    vec3 rdWarp = rd;
+// The films are shaded apart, in as few places as can be (shadeFilms):
+// each call site of the shading is compiled apart, and it is most of
+// the shader.
+void addFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering, float cover, float edge) {
+    vec3 l = (p - center) / cellSize;
     if (warpOn) {
+        // In the warped shell, keep the point and normal as seen.
         p = roReal + rdReal * (dot(p - ro, rd) / warpL);
         n = normalize(n + warpK * (warpG * dot(warpG, n) + warpZ * dot(warpZ, n)));
-        ro = roReal;
-        rd = rdReal;
     }
+    if (nFound < FOUND_MAX) {
+        found[nFound] = Film(p, n, l, id, outer, cover, edge, entering);
+        nFound++;
+    }
+    if (films == 0) {
+        firstId = id;
+    }
+    if (entering) {
+        through *= 1.0 - opacity * cover;
+    }
+    films++;
+}
+
+// Shade a film, in front of those shaded before.
+void shadeFilm(Film film) {
+    vec3 p = film.p;
+    vec3 n = film.n;
+    float cover = film.cover;
+    float edge = film.edge;
+    float th = filmThickness(film.l, film.id);
     vec3 nf = dot(n, rd) > 0.0 ? -n : n;
     float cosI = clamp(-dot(rd, nf), 0.0, 1.0);
     // White light scattered by the water along the borders.
@@ -634,7 +676,7 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
     );
     // Grazing films reflect most, but a foam is mostly grazing films:
     // their reflectance is held down, more for the walls inside it.
-    R = min(R, vec3(RIM_MAX)) * mix(WALL_DIM, 1.0, outer) * cover;
+    R = min(R, vec3(RIM_MAX)) * mix(WALL_DIM, 1.0, film.outer) * cover;
     vec3 rv = viewRot * reflect(rd, nf);
     vec3 refl = reflected(R, viewRot * p, rv) * reflection;
     col += remain * refl / (1.0 + refl);
@@ -651,7 +693,7 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
         col += remain * a * (0.3 + 0.55 * lightIntensity);
         remain *= 1.0 - a;
     }
-    if (entering && opacity > 0.0) {
+    if (film.entering && opacity > 0.0) {
         // A matte, softly lit body: wrapped diffuse from the upper left,
         // a little rim light.
         vec3 nV = viewRot * n;
@@ -664,12 +706,27 @@ void shadeFilm(vec3 p, vec3 n, vec3 center, float id, float outer, bool entering
         col += remain * o * body;
         remain *= 1.0 - o;
     }
-    if (films == 0) {
-        firstId = id;
+}
+
+// Shade the films found since the last call, front to back.
+void shadeFilms() {
+    // The films are kept as seen: shade them along the ray seen, also
+    // from inside the warped shell.
+    vec3 roWalk = ro;
+    vec3 rdWalk = rd;
+    if (warpOn) {
+        ro = roReal;
+        rd = rdReal;
     }
-    films++;
-    ro = roWarp;
-    rd = rdWarp;
+    for (int i = 0; i < FOUND_MAX; i++) {
+        if (i >= nFound) {
+            break;
+        }
+        shadeFilm(found[i]);
+    }
+    nFound = 0;
+    ro = roWalk;
+    rd = rdWalk;
 }
 
 // ---- the foam: a power diagram of spheres, found through a grid ----
@@ -837,7 +894,7 @@ bool endInside = false;
 vec4 endSph;
 float endId;
 
-// Shade the container's wall at t, where it cuts the cell of sphere i.
+// The film on the container's wall at t, where it cuts the cell of sphere i.
 void wallFilm(int i, float t, bool entering) {
     vec3 p = ro + rd * t;
     vec4 s = sdf3(p);
@@ -846,10 +903,10 @@ void wallFilm(int i, float t, bool entering) {
     if (borderWidth > 0.0) {
         edge = borderDist(p, cand[i]);
     }
-    shadeFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0, edge);
+    addFilm(p, s.yzw, cand[i].xyz, candId[i], 1.0, entering, 1.0, edge);
 }
 
-// Shade a sphere's own surface at t.
+// The film on a sphere's own surface at t.
 void sphereFilm(int i, float t, bool entering, float cover) {
     vec3 p = ro + rd * t;
     vec3 n = (p - cand[i].xyz) / cand[i].w;
@@ -867,7 +924,7 @@ void sphereFilm(int i, float t, bool entering, float cover) {
     if (borderWidth > 0.0) {
         edge = borderDist(p, cand[i]);
     }
-    shadeFilm(p, n, cand[i].xyz, candId[i], 1.0, entering, cover, edge);
+    addFilm(p, n, cand[i].xyz, candId[i], 1.0, entering, cover, edge);
 }
 
 // The films of the foam on [t0, t1] with the spheres loaded: the lower
@@ -876,10 +933,6 @@ void sphereFilm(int i, float t, bool entering, float cover) {
 // holds that point starts with a film on the container's wall.
 void segmentFilms(float t0, float t1, float cone, int layers, bool first) {
     int n = nCand;
-    if (n == 0) {
-        sphereInside = false;
-        return;
-    }
     int own = 0;
     float lo = candBK[0].x * t0 + candBK[0].y;
     for (int i = 1; i < MAX_CAND; i++) {
@@ -896,20 +949,28 @@ void segmentFilms(float t0, float t1, float cone, int layers, bool first) {
     // The fill over the segment, a line there: g0 + gB (t - t0).
     float g0 = 0.0;
     float gB = 0.0;
-    if (fillOn) {
+    if (fillOn && n > 0) {
         g0 = fillAt(t0);
         gB = (fillAt(t1) - g0) / max(t1 - t0, 1e-6);
     }
-    if (first) {
-        sphereInside = t0 * t0 + lo - g0 < 0.0;
-        if (sphereInside && WALL_ON) {
-            wallFilm(own, t0, true);
-        } else if (sphereInside && capOn) {
-            shadeFilm(ro + rd * t0, capN, cand[own].xyz, candId[own], 1.0, true, 1.0, NO_EDGE);
-        }
-    }
     float ta = t0;
     for (int guard = 0; guard <= MAX_CAND; guard++) {
+        // The one place in the walk where films are shaded, in every
+        // cell, empty ones too. A step finds two films at most, and the
+        // walkers add two more between calls.
+        shadeFilms();
+        if (n == 0) {
+            sphereInside = false;
+            return;
+        }
+        if (first && guard == 0) {
+            sphereInside = t0 * t0 + lo - g0 < 0.0;
+            if (sphereInside && WALL_ON) {
+                wallFilm(own, t0, true);
+            } else if (sphereInside && capOn) {
+                addFilm(ro + rd * t0, capN, cand[own].xyz, candId[own], 1.0, true, 1.0, NO_EDGE);
+            }
+        }
         if (films >= layers) {
             return;
         }
@@ -956,7 +1017,7 @@ void segmentFilms(float t0, float t1, float cone, int layers, bool first) {
             // One flat wall on the radical plane, shared by both cells.
             vec3 p = ro + rd * ts;
             vec3 c = 0.5 * (cand[own].xyz + cand[next].xyz);
-            shadeFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0, NO_EDGE);
+            addFilm(p, normalize(cand[next].xyz - cand[own].xyz), c, candId[own] + candId[next], 0.0, false, 1.0, NO_EDGE);
         }
         own = next;
         segOwn = own;
@@ -971,10 +1032,8 @@ float fillCut(float num, float den) {
 // The films on [t0, t1]. With the fill, the stretch is split where the
 // fill bends along the ray, so it is close to a line on each part.
 void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
-    if (!fillOn || nCand == 0) {
-        segmentFilms(t0, t1, cone, layers, first);
-        return;
-    }
+    // Without the fill, the whole stretch in one part.
+    bool split = fillOn && nCand > 0;
     // The middle plane, and where the fill is full along z.
     float zFull = halfDepth - fillDepth;
     vec3 cut = vec3(
@@ -985,10 +1044,13 @@ void sphereSegment(float t0, float t1, float cone, int layers, bool first) {
     float ta = t0;
     for (int k = 0; k < FILL_STEPS + 4; k++) {
         // The next sample of the outline's field.
-        float tn = min(t1, fillT0 + fillDt * (floor((ta - fillT0) / fillDt + 1e-3) + 1.0));
-        for (int c = 0; c < 3; c++) {
-            if (cut[c] > ta + 1e-5 && cut[c] < tn) {
-                tn = cut[c];
+        float tn = t1;
+        if (split) {
+            tn = min(t1, fillT0 + fillDt * (floor((ta - fillT0) / fillDt + 1e-3) + 1.0));
+            for (int c = 0; c < 3; c++) {
+                if (cut[c] > ta + 1e-5 && cut[c] < tn) {
+                    tn = cut[c];
+                }
             }
         }
         segmentFilms(ta, tn, cone, layers, first && k == 0);
@@ -1020,7 +1082,7 @@ void walkGrid(float a, float b, float cone, int layers) {
     bool first = true;
     sphereInside = false;
     for (int i = 0; i < 128; i++) {
-        if (films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+        if (films >= layers || through < 0.02) {
             return;
         }
         float tn = min(tMax.x, min(tMax.y, tMax.z));
@@ -1172,7 +1234,7 @@ bool shellStretch(inout float t, float tEnd, float cone, int layers) {
         // with one.
         vec3 nc = normalize(n0 - s.yzw + 1e-5 * rd);
         if (endInside) {
-            shadeFilm(ro + rd * t, nc, endSph.xyz, endId, 1.0, false, 1.0, NO_EDGE);
+            addFilm(ro + rd * t, nc, endSph.xyz, endId, 1.0, false, 1.0, NO_EDGE);
         }
         capOn = true;
         capN = nc;
@@ -1264,7 +1326,7 @@ void traceSpheres(vec2 tb, float cone, int layers) {
     vec3 tDelta = vec3(0.0);
     ivec3 stp = ivec3(0);
     for (int i = 0; i < 256; i++) {
-        if (t > tb.y || films >= layers || max(remain.r, max(remain.g, remain.b)) < 0.02) {
+        if (t > tb.y || films >= layers || through < 0.02) {
             break;
         }
         if (!walking) {
@@ -1357,6 +1419,7 @@ void main() {
 #else
     traceContained(tb, cone, clamp(maxLayers, 1, MAX_LAYERS));
 #endif
+    shadeFilms();
 
     if (debugView == 1) {
         outColor = heat(cost);
