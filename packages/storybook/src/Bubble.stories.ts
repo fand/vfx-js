@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import {
+    BACKDROP_PALETTES,
+    type BackdropPaletteName,
+    type BackdropPatternName,
     BubbleEffect,
     type BubbleParams,
-    GLASS_PALETTES,
-    type GlassPaletteName,
-    type GlassPatternName,
 } from "@vfx-js/effects";
 import Amagi from "../../docs/public/amagi.png";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -35,7 +35,7 @@ const SOURCES = {
 
 type SourceKey = keyof typeof SOURCES;
 
-const PATTERNS: readonly GlassPatternName[] = [
+const PATTERNS: readonly BackdropPatternName[] = [
     "none",
     "stripes",
     "grid",
@@ -44,7 +44,7 @@ const PATTERNS: readonly GlassPatternName[] = [
 ];
 const IMAGES: Record<string, string> = { "image: jellyfish": Jellyfish };
 const BACKDROP_KEYS = [...PATTERNS, ...Object.keys(IMAGES)];
-const PALETTE_KEYS = Object.keys(GLASS_PALETTES);
+const PALETTE_KEYS = Object.keys(BACKDROP_PALETTES);
 
 type Args = {
     source: SourceKey;
@@ -105,7 +105,8 @@ export default {
         let colors: BubbleParams["backdropColors"] = backdropColors;
         const current = (): BubbleParams => ({
             ...params,
-            backdrop: IMAGES[backdropKey] ?? (backdropKey as GlassPatternName),
+            backdrop:
+                IMAGES[backdropKey] ?? (backdropKey as BackdropPatternName),
             backdropColors: colors,
         });
 
@@ -176,7 +177,7 @@ export default {
                     keys: PALETTE_KEYS,
                     value: typeof colors === "string" ? colors : "mono",
                     onChange: (key) => {
-                        colors = key as GlassPaletteName;
+                        colors = key as BackdropPaletteName;
                         apply();
                     },
                 },

@@ -1129,7 +1129,7 @@ export function attachGlassPane(
     bind(glass, "dispersion", range(0, 0.5, 0.005));
     bind(glass, "paths", range(1, 4, 1));
     bind(glass, "samples", range(1, 16, 1));
-    bind(glass, "bounces", range(1, 6, 1));
+    bind(glass, "bounces", range(0, 5, 1));
     bind(glass, "jitter", range(0, 1, 0.01));
     bind(glass, "tint", { view: "color" });
     bind(glass, "absorption", range(0, 10, 0.1));

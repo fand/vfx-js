@@ -45,8 +45,12 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
 } from "./_orbit-camera.js";
-import { padOutputRect } from "./_pad.js";
+import { padOf, padOutputRect } from "./_pad.js";
 import {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
     backdropKind,
     clampInt,
     GLSL_HEAT,
@@ -56,11 +60,13 @@ import {
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
-import { buildShape, GLSL_SDF, type ShapeData } from "./_silhouette.js";
+import { buildShapeAsync } from "./_shape-worker.js";
+import { GLSL_SDF, type ShapeData } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
     SourceCapture,
     type SourceChannel,
+    type SourceReadback,
     sourceChannelOf,
 } from "./_source.js";
 import {
@@ -69,12 +75,6 @@ import {
     THIN_FILM_THICKNESS_MAX,
     thinFilmLut,
 } from "./_thin-film.js";
-import {
-    GLASS_PALETTES,
-    type GlassImageSource,
-    type GlassPaletteName,
-    type GlassPatternName,
-} from "./glass.js";
 
 /**
  * A {@link BubbleParams.debug} view: texture lookups per pixel
@@ -90,9 +90,13 @@ export type BubblePointer = "none" | "tilt";
  * Params of {@link BubbleEffect}: the foam's own, and the camera's
  * ({@link OrbitCameraParams}). All are read every frame. The placement
  * params (`depth`, `bevel`, `cellSize`, `cellSizeRandomness`,
- * `roundness`, `seed`, `minSize`) place the bubbles
- * again on the CPU when they change, which takes a few to a few tens of
- * milliseconds.
+ * `roundness`, `seed`, `minSize`) place the bubbles again on the CPU, in
+ * a worker, when they change: about 30 ms at the defaults on a desktop,
+ * and up to seconds for a deep shape (`depth` 1 or more) or a small
+ * `minSize`. `wobble` and `containment` rebuild the grid over them,
+ * which is quicker. The last foam is drawn until the new one is ready.
+ * Without workers (e.g. a CSP that blocks `blob:` URLs) the page stalls
+ * for that long.
  */
 export type BubbleParams = OrbitCameraParams & {
     /**
@@ -234,7 +238,7 @@ export type BubbleParams = OrbitCameraParams & {
      * `backdropVisible`, it is drawn behind the foam; otherwise the page
      * shows through it.
      */
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     /** Draw the backdrop behind and around the foam. */
     backdropVisible: boolean;
     /**
@@ -250,7 +254,7 @@ export type BubbleParams = OrbitCameraParams & {
     /** Speed of the pattern, in pattern periods per second. */
     backdropSpeed: number;
     /** The palette of a pattern, as `GlassParams.backdropColors`. */
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     /** Share of the second colour of a two-colour palette, 0 to 1. */
     backdropRatio: number;
     /** Softness of the edges between the palette's colours, 0 to 1. */
@@ -283,7 +287,9 @@ export type BubbleParams = OrbitCameraParams & {
     pointer: BubblePointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
-     * the whole canvas.
+     * the whole canvas. Default 100. Use `"fullscreen"` with
+     * `cameraOrigin: "viewport"`, where an element off the centre leans out
+     * of its rect; it costs full-canvas passes per element.
      */
     pad: number | "fullscreen";
     /**
@@ -354,7 +360,7 @@ const DEFAULT_PARAMS: BubbleParams = {
     pointerStrength: 1,
     resolution: 1,
     antialias: true,
-    pad: "fullscreen",
+    pad: 100,
     debug: "off",
 };
 
@@ -1471,7 +1477,7 @@ function clamp(v: number, lo: number, hi: number, fallback: number): number {
 }
 
 function colorOf(hex: string, fallback: string): [number, number, number] {
-    return hexToRgb(typeof hex === "string" ? hex : fallback);
+    return hexToRgb(hex, fallback);
 }
 
 // A data texture read with texelFetch: RGBA32F, nearest.
@@ -1509,6 +1515,7 @@ function uploadDataTexture(
 type Foam = FoamData & {
     key: string;
     raw: WebGLTexture[];
+    textures: EffectTexture[];
     sphereTex: EffectTexture;
     cellTex: EffectTexture;
     indexTex: EffectTexture;
@@ -1518,8 +1525,18 @@ type Foam = FoamData & {
     params: FoamParams;
     /** The spheres as drifted for the frame, and when it was. */
     moved: Float32Array;
-    movedKey: string;
+    movedTurns: number;
+    /** The largest radius. */
+    maxR: number;
 };
+
+function maxRadius(grid: { count: number; spheres: Float32Array }): number {
+    let maxR = 0;
+    for (let i = 0; i < grid.count; i++) {
+        maxR = Math.max(maxR, grid.spheres[i * 4 + 3]);
+    }
+    return maxR;
+}
 
 // The params the foam depends on, clamped.
 type FoamParams = {
@@ -1573,7 +1590,7 @@ export class BubbleEffect implements Effect {
     // and when the element's aspect ratio changes.
     readonly #source = new SourceCapture({
         longSide: BUBBLE_MASK_LONG,
-        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+        onRead: (r, isCurrent) => this.#onRead(r, isCurrent),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
     #channel: SourceChannel | null = null;
@@ -1607,9 +1624,12 @@ export class BubbleEffect implements Effect {
     // frame.
     #foamFailed: string | null = null;
     #foamToken = 0;
+    // The shape and fill the kernel placed bubbles for last: it keeps that
+    // placement, so the next job with the same pair need not send the SDF.
+    #placedKey: string | null = null;
     // Bumped by each new shape, so its foam is placed again.
     #shapeVersion = 0;
-    readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
 
     #time = 0;
     // The drift and the swirl so far: a change of speed only changes
@@ -1640,6 +1660,12 @@ export class BubbleEffect implements Effect {
             // flight was rejected; start it over.
             this.#source.contextRestored();
             this.#gl = ctx.gl;
+            const foam = this.#foamData;
+            this.#sdfTex?.dispose();
+            this.#lutTex?.dispose();
+            for (const tex of foam?.textures ?? []) {
+                tex.dispose();
+            }
             this.#sdfRaw = null;
             this.#lutRaw = null;
             this.#sdfTex = null;
@@ -1647,12 +1673,27 @@ export class BubbleEffect implements Effect {
             this.#foamData = null;
             this.#foamFailed = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#pending ?? this.#next ?? this.#shape;
+            if (this.#next) {
+                // A placement is in flight; it uploads the new shape.
+                return;
+            }
+            if (foam && this.#shape) {
+                // Upload the last placement again, without placing anew.
+                this.#next = this.#shape;
+                this.#foamReady = {
+                    key: foam.key,
+                    version: this.#shapeVersion,
+                    data: foam,
+                    params: foam.params,
+                };
+                return;
+            }
+            this.#pending = this.#pending ?? this.#shape;
         });
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(this.params.pad, dims);
+        return padOutputRect(padOf(this.params.pad, DEFAULT_PARAMS.pad), dims);
     }
 
     render(ctx: EffectContext): void {
@@ -1683,7 +1724,10 @@ export class BubbleEffect implements Effect {
             time: this.#time,
             dt: this.#still ? 0 : ctx.deltaTime,
             dims: ctx.dims,
-            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            outputRect: padOutputRect(
+                padOf(this.params.pad, DEFAULT_PARAMS.pad),
+                ctx.dims,
+            ),
             mouse: ctx.mouse,
             mouseViewport: ctx.mouseViewport,
             pixelRatio: ctx.pixelRatio,
@@ -1692,7 +1736,7 @@ export class BubbleEffect implements Effect {
         });
         const scene = this.#draw(ctx, cam);
         this.#passes.output(ctx, scene, {
-            pad: this.params.pad,
+            pad: padOf(this.params.pad, DEFAULT_PARAMS.pad),
             antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
@@ -1704,6 +1748,44 @@ export class BubbleEffect implements Effect {
 
     // The params, clamped to what the shader can take, and what follows
     // from them.
+    // The resolved params and their keys, made again only when an input
+    // changes, so a still frame allocates nothing.
+    readonly #keyIn = new Float64Array(10);
+    readonly #keyLast = new Float64Array(10).fill(Number.NaN);
+    #keys: { r: FoamParams; placeKey: string; key: string } | null = null;
+    #foamKeys(): { r: FoamParams; placeKey: string; key: string } {
+        const p = this.params;
+        const a = this.#keyIn;
+        a[0] = this.#shapeVersion;
+        a[1] = p.depth;
+        a[2] = p.bevel;
+        a[3] = p.cellSize;
+        a[4] = p.roundness;
+        a[5] = p.cellSizeRandomness;
+        a[6] = p.seed;
+        a[7] = p.minSize;
+        a[8] = p.wobble;
+        a[9] = p.containment;
+        const last = this.#keyLast;
+        let same = this.#keys !== null;
+        for (let i = 0; same && i < a.length; i++) {
+            same = Object.is(a[i], last[i]);
+        }
+        if (same && this.#keys) {
+            return this.#keys;
+        }
+        last.set(a);
+        const r = this.#resolved();
+        const f = r.fill;
+        const placeKey = `${this.#shapeVersion}|${f.halfDepth}|${f.bevel}|${f.cellSize}|${f.roundness}|${f.cellSizeRandomness}|${f.seed}|${f.minSize}`;
+        this.#keys = {
+            r,
+            placeKey,
+            key: `${placeKey}|${r.wobble}|${r.containment}`,
+        };
+        return this.#keys;
+    }
+
     #resolved(): FoamParams {
         const p = this.params;
         const d = DEFAULT_PARAMS;
@@ -1765,9 +1847,8 @@ export class BubbleEffect implements Effect {
         if (!shape) {
             return null;
         }
-        const r = this.#resolved();
+        const { r, placeKey, key } = this.#foamKeys();
         const version = this.#shapeVersion;
-        const key = `${version}|${JSON.stringify(r.fill)}|${r.wobble}|${r.containment}`;
         if (
             !this.#foamBusy &&
             this.#foamData?.key !== key &&
@@ -1779,14 +1860,17 @@ export class BubbleEffect implements Effect {
                 bubbleKernel as never,
                 BUBBLE_KERNEL_SOURCE,
             );
+            const sendShape = placeKey !== this.#placedKey;
             this.#kernel
                 .run<FoamData>("buildFoam", {
-                    shape: {
-                        sdf: shape.sdf,
-                        sdfW: shape.sdfW,
-                        sdfH: shape.sdfH,
-                        sdfRect: shape.sdfRect,
-                    },
+                    shape: sendShape
+                        ? {
+                              sdf: shape.sdf,
+                              sdfW: shape.sdfW,
+                              sdfH: shape.sdfH,
+                              sdfRect: shape.sdfRect,
+                          }
+                        : undefined,
                     shapeKey: version,
                     fill: r.fill,
                     wobble: r.wobble,
@@ -1796,12 +1880,19 @@ export class BubbleEffect implements Effect {
                     (data) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
+                            this.#placedKey = placeKey;
                             this.#foamReady = { key, version, data, params: r };
                         }
                     },
                     (e) => {
                         if (token === this.#foamToken) {
                             this.#foamBusy = false;
+                            this.#placedKey = null;
+                            if (!sendShape) {
+                                // The kernel lost its placement (its worker
+                                // died): send the shape next frame.
+                                return;
+                            }
                             this.#foamFailed = key;
                             console.warn(
                                 "[VFX-JS] BubbleEffect could not place its bubbles:",
@@ -1838,6 +1929,7 @@ export class BubbleEffect implements Effect {
         this.#freeFoam();
         this.#foamData = foam;
         if (next && sdf) {
+            this.#sdfTex?.dispose();
             gl.deleteTexture(this.#sdfRaw);
             this.#sdfRaw = sdf;
             this.#sdfTex = ctx.wrapTexture(sdf, {
@@ -1889,6 +1981,9 @@ export class BubbleEffect implements Effect {
         }
         ctx.resetState();
         if (textures.length < layers.length) {
+            for (const tex of textures) {
+                tex.dispose();
+            }
             for (const tex of raw) {
                 gl.deleteTexture(tex);
             }
@@ -1898,6 +1993,7 @@ export class BubbleEffect implements Effect {
             ...data,
             key,
             raw,
+            textures,
             sphereTex: textures[0],
             cellTex: textures[1],
             indexTex: textures[2],
@@ -1905,7 +2001,8 @@ export class BubbleEffect implements Effect {
             edgeIndexTex: textures[edgeGrid === grid ? 2 : 4],
             params,
             moved: grid.sphereData.slice(),
-            movedKey: "",
+            movedTurns: Number.NaN,
+            maxR: maxRadius(grid),
         };
     }
 
@@ -1913,11 +2010,11 @@ export class BubbleEffect implements Effect {
     // times the radius, from a random phase per sphere.
     #move(ctx: EffectContext, foam: Foam): void {
         const wobble = foam.params.wobble;
-        const key = `${this.#driftTurns}`;
-        if (foam.movedKey === key) {
+        // Without wobble the spheres stay as uploaded.
+        if (wobble <= 0 || foam.movedTurns === this.#driftTurns) {
             return;
         }
-        foam.movedKey = key;
+        foam.movedTurns = this.#driftTurns;
         const src = foam.grid.sphereData;
         const out = foam.moved;
         const f = foam.drift;
@@ -1973,6 +2070,9 @@ export class BubbleEffect implements Effect {
 
     #freeFoam(): void {
         const f = this.#foamData;
+        for (const tex of f?.textures ?? []) {
+            tex.dispose();
+        }
         if (f && this.#gl) {
             for (const tex of f.raw) {
                 this.#gl.deleteTexture(tex);
@@ -1991,8 +2091,15 @@ export class BubbleEffect implements Effect {
         }
         const p = this.params;
         const d = DEFAULT_PARAMS;
-        const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        const scene = this.#passes.scene(
+            ctx,
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            p.resolution,
+        );
+        const [, , ow, oh] = padOutputRect(
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            ctx.dims,
+        );
         if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }
@@ -2001,10 +2108,7 @@ export class BubbleEffect implements Effect {
         // The cells may be larger than asked, to fit the shape.
         const cellSize = foam.fill.cellSize;
         const grid = foam.grid;
-        let maxR = 0;
-        for (let i = 0; i < grid.count; i++) {
-            maxR = Math.max(maxR, grid.spheres[i * 4 + 3]);
-        }
+        const maxR = foam.maxR;
         // How far any sphere reaches out of the shape, drift included,
         // with a margin for the field's filtering.
         const reach =
@@ -2102,27 +2206,30 @@ export class BubbleEffect implements Effect {
 
     // Build the shape from the element read back. False when the
     // silhouette is empty, to try again later.
-    #onRead(
-        px: Uint8Array | Float32Array,
-        mw: number,
-        mh: number,
-        aspect: number,
-    ): boolean {
+    // Build the shape from the element read back, in the worker. False
+    // when the silhouette is empty, to try again later.
+    async #onRead(
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ): Promise<boolean> {
         const channel = sourceChannelOf(this.params.sourceChannel);
-        const shape = buildShape(
-            px,
-            mw,
-            mh,
+        const built = await buildShapeAsync({
+            pixels: r.pixels,
+            mw: r.width,
+            mh: r.height,
             channel,
-            this.params.depth / 2,
-            aspect,
-            SMOOTH_RADIUS,
-            SMOOTH_PASSES,
-        );
-        if (!shape) {
+            aspect: r.aspect,
+            smoothRadius: SMOOTH_RADIUS,
+            smoothPasses: SMOOTH_PASSES,
+            spawn: false,
+        });
+        if (!built) {
             return false;
         }
-        this.#pending = shape;
+        if (!isCurrent()) {
+            return true; // dropped by the capture anyway
+        }
+        this.#pending = built;
         this.#channel = channel;
         return true;
     }
@@ -2131,6 +2238,8 @@ export class BubbleEffect implements Effect {
         this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
+        this.#sdfTex?.dispose();
+        this.#lutTex?.dispose();
         this.#gl?.deleteTexture(this.#sdfRaw);
         this.#gl?.deleteTexture(this.#lutRaw);
         this.#sdfRaw = null;
@@ -2142,6 +2251,7 @@ export class BubbleEffect implements Effect {
         this.#kernel = null;
         this.#foamToken++;
         this.#foamBusy = false;
+        this.#placedKey = null;
         this.#foamReady = null;
         this.#foamFailed = null;
         this.#backdrop.dispose(this.#gl);

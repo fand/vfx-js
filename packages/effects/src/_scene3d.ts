@@ -9,13 +9,45 @@ import type {
 } from "@vfx-js/core";
 import { parseHexColor } from "./_figma-common.js";
 import { padOutputRect } from "./_pad.js";
-import type {
-    GlassImageSource,
-    GlassPaletteName,
-    GlassPatternName,
-} from "./glass.js";
 
-export const PATTERN_MODES: Record<GlassPatternName, number> = {
+/**
+ * A procedural `backdrop` of `GlassEffect` and `BubbleEffect`,
+ * coloured through the `backdropColors` palette. `"none"` is black.
+ * `"marble"` is the contour bands of a slow noise field, like zebra
+ * marble. `"flow"` runs through the palette diagonally, bent by a slow
+ * noise field into wavering ribbons.
+ */
+export type BackdropPatternName =
+    | "none"
+    | "stripes"
+    | "grid"
+    | "marble"
+    | "flow";
+
+/** A preset for `backdropColors`, see {@link BACKDROP_PALETTES}. */
+export type BackdropPaletteName = "mono" | "pastel" | "redblue";
+
+/** The colours of each {@link BackdropPaletteName}, `#rrggbb`, in order. */
+export const BACKDROP_PALETTES: Readonly<
+    Record<BackdropPaletteName, readonly string[]>
+> = {
+    mono: ["#000000", "#ffffff"],
+    pastel: ["#ff9f9f", "#dfdf80", "#9fff9f", "#80dfdf", "#9f9fff", "#df80df"],
+    redblue: ["#e8102a", "#1a3fe0"],
+};
+
+/**
+ * An image for `backdrop`. Strings other than a
+ * {@link BackdropPatternName} are treated as URLs.
+ */
+export type BackdropImageSource =
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | HTMLVideoElement
+    | ImageBitmap
+    | string;
+
+export const PATTERN_MODES: Record<BackdropPatternName, number> = {
     none: 0,
     stripes: 1,
     grid: 2,
@@ -365,8 +397,16 @@ export function uploadFloatTexture(
     return tex;
 }
 
-export function hexToRgb(hex: string): [number, number, number] {
-    const [r, g, b] = parseHexColor(hex);
+const HEX_RE = /^#?(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/** RGB 0..1 of a `#rgb` / `#rrggbb` colour, or of `fallback` when it is not one. */
+export function hexToRgb(
+    hex: unknown,
+    fallback = "#000000",
+): [number, number, number] {
+    const [r, g, b] = parseHexColor(
+        typeof hex === "string" && HEX_RE.test(hex) ? hex : fallback,
+    );
     return [r, g, b];
 }
 
@@ -381,9 +421,19 @@ export function clampInt(
         : fallback;
 }
 
+/** `v` clamped to [lo, hi], or `fallback` when it is not a finite number. */
+export function num(
+    v: number,
+    lo: number,
+    hi: number,
+    fallback: number,
+): number {
+    return Number.isFinite(v) ? Math.min(Math.max(v, lo), hi) : fallback;
+}
+
 export function isPattern(
-    v: GlassPatternName | GlassImageSource,
-): v is GlassPatternName {
+    v: BackdropPatternName | BackdropImageSource,
+): v is BackdropPatternName {
     return typeof v === "string" && v in PATTERN_MODES;
 }
 
@@ -393,11 +443,13 @@ export function isPattern(
  * loads and shows as none, so the shader does not change when it is
  * ready.
  */
-export function backdropKind(v: GlassPatternName | GlassImageSource): number {
+export function backdropKind(
+    v: BackdropPatternName | BackdropImageSource,
+): number {
     return isPattern(v) ? PATTERN_MODES[v] : IMAGE_MODE;
 }
 
-type BackdropElement = Exclude<GlassImageSource, string>;
+type BackdropElement = Exclude<BackdropImageSource, string>;
 
 // Native size of a backdrop element; 0 while a video has no frame.
 function sourceSize(el: BackdropElement): [number, number] {
@@ -416,17 +468,41 @@ function sourceSize(el: BackdropElement): [number, number] {
     return [el.width, el.height];
 }
 
+// Whether the element has pixels to draw: an image that has loaded, a
+// video with its first frame.
+function sourceReady(el: BackdropElement): boolean {
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        el instanceof HTMLImageElement
+    ) {
+        return el.complete && el.naturalWidth > 0;
+    }
+    if (
+        typeof HTMLVideoElement !== "undefined" &&
+        el instanceof HTMLVideoElement
+    ) {
+        return el.readyState >= 2;
+    }
+    return el.width > 0 && el.height > 0;
+}
+
 // The colours of a `backdropColors` value, at least two: one colour is a
 // flat fill. Unknown names fall back to "mono".
 function resolvePalette(
-    v: GlassPaletteName | readonly string[],
-    presets: Readonly<Record<GlassPaletteName, readonly string[]>>,
+    v: BackdropPaletteName | readonly string[],
+    presets: Readonly<Record<BackdropPaletteName, readonly string[]>>,
 ): string[] {
     const list =
         typeof v === "string"
-            ? (presets[v as GlassPaletteName] ?? presets.mono)
+            ? (presets[v as BackdropPaletteName] ?? presets.mono)
             : v;
     const colors = list.length > 0 ? [...list] : [...presets.mono];
+    // A colour that is not `#rrggbb` takes the default palette's in its place.
+    for (let i = 0; i < colors.length; i++) {
+        if (typeof colors[i] !== "string" || !HEX_RE.test(colors[i])) {
+            colors[i] = presets.mono[i % presets.mono.length];
+        }
+    }
     return colors.length === 1 ? [colors[0], colors[0]] : colors;
 }
 
@@ -441,7 +517,7 @@ function resolvePalette(
  */
 function bakePalette(colors: readonly string[], ratio: number): Float32Array[] {
     const n = colors.length;
-    const rgb = colors.map(hexToRgb);
+    const rgb = colors.map((c) => hexToRgb(c));
     const w =
         n * 2 ** Math.max(0, Math.ceil(Math.log2(PALETTE_MIN_TEXELS / n)));
     // Prefix sums per channel, to average any range of texels.
@@ -493,12 +569,12 @@ function bakePalette(colors: readonly string[], ratio: number): Float32Array[] {
 
 /** The params of the backdrop and the lights, as in GlassParams. */
 export type SceneParams = {
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     backdropVisible: boolean;
     backdropScale: number;
     backdropDistance: number;
     backdropSpeed: number;
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     backdropRatio: number;
     backdropSoftness: number;
     lightIntensity: number;
@@ -511,7 +587,9 @@ export type SceneParams = {
  * `uniforms`.
  */
 export class SceneBackdrop {
-    readonly #presets: Readonly<Record<GlassPaletteName, readonly string[]>>;
+    readonly #presets: Readonly<Record<BackdropPaletteName, readonly string[]>>;
+    // Used in place of params that are not finite numbers.
+    readonly #defaults: SceneParams;
     // The palette twice: repeating, and clamped for the grid.
     #paletteRaw: WebGLTexture[] = [];
     #paletteTex: EffectTexture | null = null;
@@ -531,16 +609,24 @@ export class SceneBackdrop {
     // the footprint of a pixel on it.
     #backdropMip: EffectRenderTarget | null = null;
     #backdropDirty = false;
+    // The image was wrapped before it had loaded: upload it again once it has.
+    #imageWaiting = false;
+    // Counts loads, so a stale URL load does not wrap its image.
+    #loadId = 0;
     #disposed = false;
 
     constructor(
-        presets: Readonly<Record<GlassPaletteName, readonly string[]>>,
+        presets: Readonly<Record<BackdropPaletteName, readonly string[]>>,
+        defaults: SceneParams,
     ) {
         this.#presets = presets;
+        this.#defaults = defaults;
     }
 
     /** The raw textures are gone with the context: rebuild them. */
     contextRestored(): void {
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         this.#paletteRaw = [];
         this.#paletteTex = null;
         this.#paletteClampTex = null;
@@ -572,14 +658,21 @@ export class SceneBackdrop {
             : image
               ? IMAGE_MODE
               : 0;
+        const d = this.#defaults;
         return {
             backdropMode: mode,
             backdropTex: image ?? fallback,
             backdropAspect: this.#imageAspect,
             backdropVisible: p.backdropVisible ? 1 : 0,
-            backdropScale: p.backdropScale,
-            backdropDistance: Math.max(p.backdropDistance, minDistance),
-            backdropOffset: time * p.backdropSpeed,
+            backdropScale: num(p.backdropScale, 1e-3, 1e3, d.backdropScale),
+            backdropDistance: num(
+                p.backdropDistance,
+                minDistance,
+                1e3,
+                Math.max(d.backdropDistance, minDistance),
+            ),
+            backdropOffset:
+                time * num(p.backdropSpeed, -1e3, 1e3, d.backdropSpeed),
             paletteTex:
                 (mode === PATTERN_MODES.grid
                     ? this.#paletteClampTex
@@ -587,11 +680,11 @@ export class SceneBackdrop {
             paletteSize: this.#paletteSize,
             paletteShift:
                 this.#paletteSize === 2
-                    ? 0.5 - Math.min(Math.max(p.backdropRatio, 0), 1) / 2
+                    ? 0.5 - num(p.backdropRatio, 0, 1, d.backdropRatio) / 2
                     : 0,
-            backdropSoftness: Math.min(Math.max(p.backdropSoftness, 0), 1),
-            lightIntensity: Math.max(p.lightIntensity, 0),
-            lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
+            backdropSoftness: num(p.backdropSoftness, 0, 1, d.backdropSoftness),
+            lightIntensity: num(p.lightIntensity, 0, 1e3, d.lightIntensity),
+            lightSoftness: num(p.lightSoftness, 0, 1, d.lightSoftness),
         };
     }
 
@@ -611,6 +704,8 @@ export class SceneBackdrop {
         this.#paletteKey = key;
         this.#paletteSize = colors.length;
         const gl = ctx.gl;
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         for (const tex of this.#paletteRaw) {
             gl.deleteTexture(tex);
         }
@@ -682,16 +777,17 @@ export class SceneBackdrop {
         this.#imageEl = null;
         this.#backdropMip?.dispose();
         this.#backdropMip = null;
+        const loadId = ++this.#loadId;
         if (isPattern(src)) {
             return;
         }
         const wrap = (el: BackdropElement) => {
-            if (this.#disposed || this.#imageKey !== src) {
+            if (this.#disposed || loadId !== this.#loadId) {
                 return;
             }
-            const [w, h] = sourceSize(el);
-            this.#imageAspect = w > 0 && h > 0 ? w / h : 1;
+            this.#image?.dispose();
             this.#imageEl = el;
+            this.#imageWaiting = false;
             this.#imageLive =
                 (typeof HTMLCanvasElement !== "undefined" &&
                     el instanceof HTMLCanvasElement) ||
@@ -712,7 +808,13 @@ export class SceneBackdrop {
         img.src = src;
         img.decode().then(
             () => wrap(img),
-            () => {},
+            () => {
+                if (!this.#disposed && loadId === this.#loadId) {
+                    console.warn(
+                        `[VFX-JS] Could not load the backdrop image: ${src}`,
+                    );
+                }
+            },
         );
     }
 
@@ -724,7 +826,18 @@ export class SceneBackdrop {
         if (!image || !el || !(this.#backdropDirty || this.#imageLive)) {
             return;
         }
+        if (!sourceReady(el)) {
+            // Not loaded yet: try again next frame.
+            this.#imageWaiting = true;
+            this.#backdropDirty = true;
+            return;
+        }
+        if (this.#imageWaiting) {
+            this.#imageWaiting = false;
+            image.update();
+        }
         const [iw, ih] = sourceSize(el);
+        this.#imageAspect = iw / ih;
         const fit = Math.min(1, BACKDROP_MIP_LONG / Math.max(iw, ih, 1));
         const w = Math.max(1, Math.round(iw * fit));
         const h = Math.max(1, Math.round(ih * fit));
@@ -746,6 +859,8 @@ export class SceneBackdrop {
 
     dispose(gl: WebGL2RenderingContext | null): void {
         this.#disposed = true;
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         if (gl) {
             for (const tex of this.#paletteRaw) {
                 gl.deleteTexture(tex);
@@ -759,6 +874,8 @@ export class SceneBackdrop {
         this.#image = null;
         this.#imageEl = null;
         this.#imageKey = null;
+        this.#imageWaiting = false;
+        this.#loadId++;
         this.#backdropMip?.dispose();
         this.#backdropMip = null;
     }

@@ -27,61 +27,31 @@ import {
     type OrbitCameraParams,
     type OrbitCameraView,
 } from "./_orbit-camera.js";
-import { padOutputRect } from "./_pad.js";
+import { padOf, padOutputRect } from "./_pad.js";
 import {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
     backdropKind,
     clampInt,
     GLSL_HEAT,
     GLSL_SCENE,
     hexToRgb,
+    num,
     SceneBackdrop,
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
-import {
-    boxBlur1d,
-    buildShape,
-    GLSL_SD2,
-    type ShapeData,
-} from "./_silhouette.js";
+import { buildReliefAsync, buildShapeAsync } from "./_shape-worker.js";
+import { GLSL_SD2, reliefRadius, type ShapeData } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
     SourceCapture,
     type SourceChannel,
+    type SourceReadback,
     sourceChannelOf,
 } from "./_source.js";
-
-/**
- * A procedural {@link GlassParams.backdrop}, coloured through the
- * {@link GlassParams.backdropColors} palette. `"none"` is black.
- * `"marble"` is the contour bands of a slow noise field, like zebra
- * marble. `"flow"` runs through the palette diagonally, bent by a slow
- * noise field into wavering ribbons.
- */
-export type GlassPatternName = "none" | "stripes" | "grid" | "marble" | "flow";
-
-/** A preset for {@link GlassParams.backdropColors}, see {@link GLASS_PALETTES}. */
-export type GlassPaletteName = "mono" | "pastel" | "redblue";
-
-/** The colours of each {@link GlassPaletteName}, `#rrggbb`, in order. */
-export const GLASS_PALETTES: Readonly<
-    Record<GlassPaletteName, readonly string[]>
-> = {
-    mono: ["#000000", "#ffffff"],
-    pastel: ["#ff9f9f", "#dfdf80", "#9fff9f", "#80dfdf", "#9f9fff", "#df80df"],
-    redblue: ["#e8102a", "#1a3fe0"],
-};
-
-/**
- * An image for {@link GlassParams.backdrop}. Strings other than a
- * {@link GlassPatternName} are treated as URLs.
- */
-export type GlassImageSource =
-    | HTMLImageElement
-    | HTMLCanvasElement
-    | HTMLVideoElement
-    | ImageBitmap
-    | string;
 
 /**
  * A {@link GlassParams.debug} view: the SDF lookups spent per pixel on
@@ -138,7 +108,9 @@ export type GlassParams = OrbitCameraParams & {
      * negative the dark ones (by sinking the bright ones). It makes a
      * button's label or a photo's content show as shape. 0 is off. Read
      * back with the silhouette (see {@link GlassEffect.refresh | refresh()}),
-     * so a video gives a still relief.
+     * so a video gives a still relief. At 0 the relief is not built;
+     * moving it off 0 reads the element back again, so the relief shows
+     * a few frames later.
      */
     relief: number;
     /**
@@ -168,7 +140,7 @@ export type GlassParams = OrbitCameraParams & {
      * channels split into separate bands instead of a smooth rainbow.
      */
     samples: number;
-    /** Reflections inside the glass before the ray is forced out, 1 to 6. */
+    /** Reflections inside the glass before the ray is forced out, 0 to 5. */
     bounces: number;
     /**
      * Per-pixel offset of the wavelengths, 0 to 1. Trades the banding of
@@ -199,7 +171,7 @@ export type GlassParams = OrbitCameraParams & {
      * What is seen through the glass: a pattern name, or an image (an
      * element, an `ImageBitmap` or a URL).
      */
-    backdrop: GlassPatternName | GlassImageSource;
+    backdrop: BackdropPatternName | BackdropImageSource;
     /** Draw the backdrop around the glass too, not only through it. */
     backdropVisible: boolean;
     /**
@@ -215,13 +187,13 @@ export type GlassParams = OrbitCameraParams & {
      */
     backdropSpeed: number;
     /**
-     * The palette of a procedural pattern: a {@link GlassPaletteName} or
+     * The palette of a procedural pattern: a {@link BackdropPaletteName} or
      * two or more `#rrggbb` colours in order, each with an equal share of
      * the area. One colour is a flat fill. Stripes, marble bands and
      * the flow go round the colours, the last running into the first;
      * the grid nests them as concentric squares.
      */
-    backdropColors: GlassPaletteName | readonly string[];
+    backdropColors: BackdropPaletteName | readonly string[];
     /**
      * Share of the area that the second colour covers when the palette
      * has two colours, 0 to 1: the width of the stripes and marble bands,
@@ -269,7 +241,9 @@ export type GlassParams = OrbitCameraParams & {
     pointer: GlassPointer;
     /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
-     * the whole canvas.
+     * the whole canvas. Default 100. Use `"fullscreen"` with
+     * `cameraOrigin: "viewport"`, where an element off the centre leans out
+     * of its rect; it costs full-canvas passes per element.
      */
     pad: number | "fullscreen";
     /**
@@ -298,7 +272,7 @@ const DEFAULT_PARAMS: GlassParams = {
     dispersion: 0.12,
     paths: 2,
     samples: 8,
-    bounces: 3,
+    bounces: 2,
     jitter: 0,
     tint: "#ffffff",
     absorption: 0,
@@ -328,7 +302,7 @@ const DEFAULT_PARAMS: GlassParams = {
     pointerStrength: 1,
     resolution: 1,
     antialias: true,
-    pad: "fullscreen",
+    pad: 100,
     debug: "off",
 };
 
@@ -344,7 +318,7 @@ const BEVEL_SHAPES: Record<GlassBevelShape, number> = {
 };
 const MAX_PATHS = 4;
 const MAX_SAMPLES = 16;
-const MAX_BOUNCES = 6;
+const MAX_BOUNCES = 5;
 // Noise gradient to surface slope, before it saturates.
 const BUMP_SLOPE = "0.6";
 // Long side of the silhouette read back from the element, in px, and the
@@ -352,6 +326,9 @@ const BUMP_SLOPE = "0.6";
 // every bump of the normals, so the glass wants a finer and smoother
 // field than the pixel staircase of a small mask gives.
 const GLASS_MASK_LONG = 1024;
+// The mask follows the element's size in device px down to this, so a
+// small element costs less; a finer mask than its pixels adds nothing.
+const GLASS_MASK_MIN = 256;
 const SMOOTH_RADIUS = 4;
 const SMOOTH_PASSES = 3;
 // Box blurs of the relief's height map: glyph edges become a short
@@ -476,7 +453,7 @@ uniform float ior;
 uniform float dispersion;
 uniform int paths;
 uniform int samples;
-uniform int bounces;
+uniform int exits;
 uniform float jitter;
 uniform vec3 tint;
 uniform float absorption;
@@ -489,7 +466,8 @@ uniform int debugView;
 
 const int MAX_PATHS = ${MAX_PATHS};
 const int MAX_SAMPLES = ${MAX_SAMPLES};
-const int MAX_BOUNCES = ${MAX_BOUNCES};
+// Tries to leave the glass: one more than the reflections.
+const int MAX_EXITS = ${MAX_BOUNCES + 1};
 const int OUTER_STEPS = 72;
 const int INNER_STEPS = 40;
 const float HIT = 0.0012;
@@ -613,7 +591,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
     float exW[MAX_PATHS];
     int exN[MAX_PATHS];
     int nPaths = clamp(paths, 1, MAX_PATHS);
-    int nBounces = clamp(bounces, 1, MAX_BOUNCES);
+    int nExits = clamp(exits, 1, MAX_EXITS);
     for (int m = 0; m < MAX_PATHS; m++) {
         if (m >= nPaths) {
             break;
@@ -625,7 +603,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
         float w = 1.0 - fresnel(cos0, 1.0, n);
         float len = 0.0;
         int nb = 0;
-        for (int b = 0; b < MAX_BOUNCES; b++) {
+        for (int b = 0; b < MAX_EXITS; b++) {
             float ti = 0.0;
             vec4 si;
             for (int i = 0; i < INNER_STEPS; i++) {
@@ -645,7 +623,7 @@ vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
             vec3 ni = normalAt(p, d);
             float cosI = clamp(dot(d, ni), 0.0, 1.0);
             vec3 o = refract(d, -ni, n);
-            bool last = b >= nBounces - 1;
+            bool last = b >= nExits - 1;
             if (dot(o, o) > 0.0) {
                 w *= 1.0 - fresnel(cosI, n, 1.0);
                 d = o;
@@ -835,10 +813,14 @@ function fragGlassFor(kind: number): string {
     return frag;
 }
 
-// The SDF, plus the relief's height map on the same grid.
+// The SDF, plus the relief's height map on the same grid. The arrays
+// are emptied once uploaded (see dropArrays); the sizes stay.
 type GlassShape = ShapeData & {
-    /** Luminance 0..1 before the blur, kept to rebuild the relief. */
-    reliefLum: Float32Array;
+    /**
+     * Luminance 0..1 before the blur, kept to rebuild the relief. Null
+     * while `relief` is 0: no relief is built.
+     */
+    reliefLum: Float32Array | null;
     /** Box blur radius of `relief`, in grid px. */
     reliefRadius: number;
     /** RGBA: height 0..1, its gradient in world units, 0. */
@@ -847,83 +829,21 @@ type GlassShape = ShapeData & {
     reliefMaxGrad: number;
 };
 
-/**
- * Luminance of the captured RGBA pixels (bottom-up rows, premultiplied),
- * so 0 where alpha is 0, on the grid of `shape`'s SDF.
- */
-function reliefLuminance(
-    pixels: Uint8Array | Float32Array,
-    mw: number,
-    mh: number,
-    shape: ShapeData,
-): Float32Array {
-    const scale = pixels instanceof Float32Array ? 1 : 1 / 255;
-    const W = shape.sdfW;
-    const pad = Math.round((W - mw) / 2);
-    const h = new Float32Array(W * shape.sdfH);
-    for (let y = 0; y < mh; y++) {
-        for (let x = 0; x < mw; x++) {
-            const i = (y * mw + x) * 4;
-            const l =
-                0.2126 * pixels[i] +
-                0.7152 * pixels[i + 1] +
-                0.0722 * pixels[i + 2];
-            h[(y + pad) * W + x + pad] = Math.min(Math.max(l * scale, 0), 1);
-        }
-    }
-    return h;
+const EMPTY = new Float32Array(0);
+
+// Whether `relief` raises the cap. UI sliders leave remainders like
+// 5e-17; those count as 0, so the default path stays exact.
+function reliefOn(relief: number): boolean {
+    return Number.isFinite(relief) && Math.abs(relief) > 1e-6;
 }
 
-// Box blur radius in grid px for a `reliefBlur` in world units.
-function reliefRadius(blur: number, shape: ShapeData): number {
-    const px = shape.sdfRect[2] / shape.sdfW;
-    const r = Number.isFinite(blur) ? Math.round(Math.max(blur, 0) / px) : 0;
-    return Math.min(r, RELIEF_MAX_RADIUS);
-}
-
-/**
- * The relief's height map: the luminance `lum` blurred by `RELIEF_PASSES`
- * box blurs of `radius` grid px, and its gradient.
- */
-function buildRelief(
-    lum: Float32Array,
-    shape: ShapeData,
-    radius: number,
-): Pick<GlassShape, "relief" | "reliefMaxGrad"> {
-    const W = shape.sdfW;
-    const H = shape.sdfH;
-    const h = lum.slice();
-    const line = new Float32Array(Math.max(W, H));
-    for (let pass = 0; pass < RELIEF_PASSES; pass++) {
-        for (let y = 0; y < H; y++) {
-            boxBlur1d(h, y * W, 1, W, radius, line);
-        }
-        for (let x = 0; x < W; x++) {
-            boxBlur1d(h, x, W, H, radius, line);
-        }
-    }
-    // Central differences, in height per world unit.
-    const inv = 1 / (2 * (shape.sdfRect[2] / W));
-    const out = new Float32Array(W * H * 4);
-    let maxGrad = 0;
-    for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-            const i = y * W + x;
-            const gx =
-                (h[y * W + Math.min(x + 1, W - 1)] -
-                    h[y * W + Math.max(x - 1, 0)]) *
-                inv;
-            const gy =
-                (h[Math.min(y + 1, H - 1) * W + x] -
-                    h[Math.max(y - 1, 0) * W + x]) *
-                inv;
-            out[i * 4] = h[i];
-            out[i * 4 + 1] = gx;
-            out[i * 4 + 2] = gy;
-            maxGrad = Math.max(maxGrad, Math.hypot(gx, gy));
-        }
-    }
-    return { relief: out, reliefMaxGrad: maxGrad };
+// Free the big arrays once they are on the GPU. A restored context reads
+// the element back again instead. The luminance stays, to rebuild the
+// relief when `reliefBlur` changes.
+function dropArrays(shape: GlassShape): void {
+    shape.sdf = EMPTY;
+    shape.spawn = EMPTY;
+    shape.relief = EMPTY;
 }
 
 // Lipschitz constant of a field whose cap has slope up to k: the cap's
@@ -959,9 +879,9 @@ function capLipschitz(k: number): number {
  * and `pitch` 14, a faster orbit animation (`orbitSpeed` 3.3), and
  * `zoom` 0.7, so the glass is a little smaller than the element. Set `drag: true` to orbit it with
  * pointer drags that start on the element, and `pointer: "tilt"` to turn
- * it towards the pointer. The default
- * `pad: "fullscreen"` leaves room for an off-centre element to lean out
- * of its rect with `cameraOrigin: "viewport"`.
+ * it towards the pointer. With `cameraOrigin: "viewport"`, set
+ * `pad: "fullscreen"` to leave room for an off-centre element to lean out
+ * of its rect.
  *
  * All params are read every frame, so you can mutate `params` live.
  */
@@ -973,7 +893,8 @@ export class GlassEffect implements Effect {
     // and when the element's aspect ratio changes.
     readonly #source = new SourceCapture({
         longSide: GLASS_MASK_LONG,
-        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+        minLongSide: GLASS_MASK_MIN,
+        onRead: (r, isCurrent) => this.#onRead(r, isCurrent),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
     #channel: SourceChannel | null = null;
@@ -986,7 +907,16 @@ export class GlassEffect implements Effect {
     #sdfTex: EffectTexture | null = null;
     #reliefRaw: WebGLTexture | null = null;
     #reliefTex: EffectTexture | null = null;
-    readonly #backdrop = new SceneBackdrop(GLASS_PALETTES);
+    // A relief rebuilt in the worker for a new `reliefBlur`.
+    #reliefBusy = false;
+    #reliefToken = 0;
+    #reliefReady: {
+        shape: GlassShape;
+        radius: number;
+        map: Float32Array;
+        maxGrad: number;
+    } | null = null;
+    readonly #backdrop = new SceneBackdrop(BACKDROP_PALETTES, DEFAULT_PARAMS);
 
     #time = 0;
     // Drags, the "tilt", and the window listeners while `drag` is on or
@@ -1009,21 +939,28 @@ export class GlassEffect implements Effect {
     init(ctx: EffectContext): void {
         this.#gl = ctx.gl;
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // The raw SDF texture is gone; upload it again. A readback in
-            // flight was rejected; start it over.
+            // The raw SDF texture is gone, and its array was freed: read
+            // the element back again. A readback in flight was rejected;
+            // start it over. The glass shows again once it is read.
             this.#source.contextRestored();
+            this.#dropReliefJob();
+            if (!this.#pending) {
+                this.#source.refresh();
+            }
             this.#gl = ctx.gl;
+            this.#sdfTex?.dispose();
+            this.#reliefTex?.dispose();
             this.#sdfRaw = null;
             this.#sdfTex = null;
             this.#reliefRaw = null;
             this.#reliefTex = null;
             this.#backdrop.contextRestored();
-            this.#pending = this.#pending ?? this.#shape;
+            this.#shape = null;
         });
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return padOutputRect(this.params.pad, dims);
+        return padOutputRect(padOf(this.params.pad, DEFAULT_PARAMS.pad), dims);
     }
 
     render(ctx: EffectContext): void {
@@ -1038,6 +975,7 @@ export class GlassEffect implements Effect {
         // A new shape replaces the current one once it has been read back.
         if (this.#pending) {
             this.#upload(ctx, this.#pending);
+            dropArrays(this.#pending);
             this.#shape = this.#pending;
             this.#pending = null;
         }
@@ -1051,7 +989,10 @@ export class GlassEffect implements Effect {
             time: this.#time,
             dt: this.#still ? 0 : ctx.deltaTime,
             dims: ctx.dims,
-            outputRect: padOutputRect(this.params.pad, ctx.dims),
+            outputRect: padOutputRect(
+                padOf(this.params.pad, DEFAULT_PARAMS.pad),
+                ctx.dims,
+            ),
             mouse: ctx.mouse,
             mouseViewport: ctx.mouseViewport,
             pixelRatio: ctx.pixelRatio,
@@ -1060,7 +1001,7 @@ export class GlassEffect implements Effect {
         });
         const scene = this.#drawGlass(ctx, cam);
         this.#passes.output(ctx, scene, {
-            pad: this.params.pad,
+            pad: padOf(this.params.pad, DEFAULT_PARAMS.pad),
             antialias: this.params.antialias,
             raw: this.#debugView() !== 0,
         });
@@ -1080,21 +1021,28 @@ export class GlassEffect implements Effect {
             return null;
         }
         const p = this.params;
-        const scene = this.#passes.scene(ctx, p.pad, p.resolution);
-        const [, , ow, oh] = padOutputRect(p.pad, ctx.dims);
+        const scene = this.#passes.scene(
+            ctx,
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            p.resolution,
+        );
+        const [, , ow, oh] = padOutputRect(
+            padOf(p.pad, DEFAULT_PARAMS.pad),
+            ctx.dims,
+        );
         if (!scene || ow <= 0 || oh <= 0) {
             return null;
         }
         const t = this.#time;
-        const halfDepth = Math.max(p.depth / 2, 0.005);
-        const bulge = Number.isFinite(p.bulge) ? Math.max(p.bulge, 0) : 0;
-        const bulgeWidth = Math.max(p.bulgeWidth, 1e-3);
+        const D = DEFAULT_PARAMS;
+        const halfDepth = num(p.depth, 0.01, 100, D.depth) / 2;
+        const bulge = num(p.bulge, 0, 100, 0);
+        const bulgeWidth = num(p.bulgeWidth, 1e-3, 100, D.bulgeWidth);
         const bulgeSlope = bulge > 0 ? (2 * bulge) / bulgeWidth : 0;
-        // A sunk relief must keep the front cap above the back one. UI
-        // sliders leave remainders like 5e-17; those count as 0, so the
-        // default path stays exact.
+        // A sunk relief must keep the front cap above the back one. Until
+        // the relief is built, the cap stays flat.
         const relief =
-            Number.isFinite(p.relief) && Math.abs(p.relief) > 1e-6
+            reliefOn(p.relief) && this.#reliefTex
                 ? Math.max(
                       p.relief,
                       -2 * halfDepth * (1 - RELIEF_MIN_THICKNESS),
@@ -1109,7 +1057,10 @@ export class GlassEffect implements Effect {
                 sdfRect: shape.sdfRect,
                 sdfSize: [shape.sdfW, shape.sdfH],
                 halfDepth,
-                rounding: Math.min(Math.max(p.bevel, 0), halfDepth),
+                rounding: Math.min(
+                    num(p.bevel, 0, halfDepth, D.bevel),
+                    halfDepth,
+                ),
                 bevelShape: BEVEL_SHAPES[p.bevelShape] ?? 0,
                 bulge,
                 bulgeWidth,
@@ -1127,22 +1078,18 @@ export class GlassEffect implements Effect {
                 principalPx: cam.principalPx,
                 bufferPx: [ow, oh],
                 pixelSize: ow / scene.width,
-                ior: Math.max(p.ior, 1.0001),
-                dispersion: p.dispersion,
+                ior: num(p.ior, 1.0001, 10, D.ior),
+                dispersion: num(p.dispersion, -10, 10, D.dispersion),
                 paths: clampInt(p.paths, 1, MAX_PATHS, 2),
                 samples: clampInt(p.samples, 1, MAX_SAMPLES, 8),
-                bounces: clampInt(p.bounces, 1, MAX_BOUNCES, 3),
-                jitter: Math.min(Math.max(p.jitter, 0), 1),
-                tint: hexToRgb(p.tint),
-                absorption: Math.max(p.absorption, 0),
-                reflection: Math.max(p.reflection, 0),
-                bump: Number.isFinite(p.bump)
-                    ? Math.min(Math.max(p.bump, 0), 1)
-                    : 0,
-                bumpScale: Math.max(p.bumpScale, 1e-3),
-                frost: Number.isFinite(p.frost)
-                    ? Math.min(Math.max(p.frost, 0), 1)
-                    : 0,
+                exits: clampInt(p.bounces, 0, MAX_BOUNCES, 2) + 1,
+                jitter: num(p.jitter, 0, 1, D.jitter),
+                tint: hexToRgb(p.tint, DEFAULT_PARAMS.tint),
+                absorption: num(p.absorption, 0, 1e3, D.absorption),
+                reflection: num(p.reflection, 0, 100, D.reflection),
+                bump: num(p.bump, 0, 1, D.bump),
+                bumpScale: num(p.bumpScale, 1e-3, 100, D.bumpScale),
+                frost: num(p.frost, 0, 1, D.frost),
                 ...this.#backdrop.uniforms(
                     p,
                     t,
@@ -1173,35 +1120,45 @@ export class GlassEffect implements Effect {
         this.#source.refresh();
     }
 
-    // Build the shape and the relief's luminance from the element read
-    // back. False when the silhouette is empty, to try again later.
-    #onRead(
-        px: Uint8Array | Float32Array,
-        mw: number,
-        mh: number,
-        aspect: number,
-    ): boolean {
+    // Build the shape, and the relief when it is on, from the element
+    // read back, in the worker. False when the silhouette is empty, to
+    // try again later.
+    async #onRead(
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ): Promise<boolean> {
         const channel = sourceChannelOf(this.params.sourceChannel);
-        const shape = buildShape(
-            px,
-            mw,
-            mh,
+        const withRelief = reliefOn(this.params.relief);
+        const built = await buildShapeAsync({
+            pixels: r.pixels,
+            mw: r.width,
+            mh: r.height,
             channel,
-            this.params.depth / 2,
-            aspect,
-            SMOOTH_RADIUS,
-            SMOOTH_PASSES,
-        );
-        if (!shape) {
+            aspect: r.aspect,
+            smoothRadius: SMOOTH_RADIUS,
+            smoothPasses: SMOOTH_PASSES,
+            spawn: false,
+            relief: withRelief
+                ? {
+                      blur: this.params.reliefBlur,
+                      passes: RELIEF_PASSES,
+                      maxRadius: RELIEF_MAX_RADIUS,
+                  }
+                : undefined,
+        });
+        if (!built) {
             return false;
         }
-        const lum = reliefLuminance(px, mw, mh, shape);
-        const radius = reliefRadius(this.params.reliefBlur, shape);
+        if (!isCurrent()) {
+            return true; // dropped by the capture anyway
+        }
+        const { relief, ...shape } = built;
         this.#pending = {
             ...shape,
-            reliefLum: lum,
-            reliefRadius: radius,
-            ...buildRelief(lum, shape, radius),
+            reliefLum: relief?.lum ?? null,
+            reliefRadius: relief?.radius ?? -1,
+            relief: relief?.map ?? EMPTY,
+            reliefMaxGrad: relief?.maxGrad ?? 0,
         };
         this.#channel = channel;
         return true;
@@ -1209,6 +1166,7 @@ export class GlassEffect implements Effect {
 
     #upload(ctx: EffectContext, shape: GlassShape): void {
         const gl = ctx.gl;
+        this.#sdfTex?.dispose();
         if (this.#sdfRaw) {
             gl.deleteTexture(this.#sdfRaw);
         }
@@ -1228,28 +1186,101 @@ export class GlassEffect implements Effect {
     }
 
     // Rebuild the relief when `reliefBlur` changes, from the luminance
-    // kept from the readback: no new capture, and the SDF stays.
+    // kept from the readback: no new capture, and the SDF stays. Free it
+    // when `relief` goes to 0; when it leaves 0, read the element again
+    // for its luminance.
     #updateRelief(ctx: EffectContext): void {
         const shape = this.#shape;
         if (!shape) {
             return;
         }
-        const radius = reliefRadius(this.params.reliefBlur, shape);
-        if (radius === shape.reliefRadius) {
+        if (!reliefOn(this.params.relief)) {
+            if (shape.reliefLum) {
+                shape.reliefLum = null;
+                shape.reliefRadius = -1;
+                shape.reliefMaxGrad = 0;
+                this.#freeRelief(ctx.gl);
+            }
             return;
         }
-        Object.assign(shape, buildRelief(shape.reliefLum, shape, radius));
-        shape.reliefRadius = radius;
-        this.#uploadRelief(ctx, shape);
+        if (!shape.reliefLum) {
+            if (this.#source.phase === "idle" && !this.#pending) {
+                this.#source.refresh();
+            }
+            return;
+        }
+        // A relief built in the worker: take it if it is for this shape.
+        const ready = this.#reliefReady;
+        if (ready) {
+            this.#reliefReady = null;
+            if (ready.shape === shape) {
+                shape.relief = ready.map;
+                shape.reliefMaxGrad = ready.maxGrad;
+                shape.reliefRadius = ready.radius;
+                this.#uploadRelief(ctx, shape);
+                shape.relief = EMPTY;
+            }
+        }
+        const radius = reliefRadius(
+            this.params.reliefBlur,
+            shape,
+            RELIEF_MAX_RADIUS,
+        );
+        if (radius === shape.reliefRadius || this.#reliefBusy) {
+            return;
+        }
+        // One job at a time; the radius is checked again when it is back.
+        this.#reliefBusy = true;
+        const token = this.#reliefToken;
+        buildReliefAsync({
+            lum: shape.reliefLum,
+            sdfRect: shape.sdfRect,
+            sdfW: shape.sdfW,
+            sdfH: shape.sdfH,
+            radius,
+            passes: RELIEF_PASSES,
+        }).then(
+            (r) => {
+                if (token === this.#reliefToken) {
+                    this.#reliefBusy = false;
+                    this.#reliefReady = { shape, radius, ...r };
+                }
+            },
+            (e) => {
+                if (token === this.#reliefToken) {
+                    this.#reliefBusy = false;
+                    shape.reliefRadius = radius; // not asked again
+                    console.warn(
+                        "[VFX-JS] GlassEffect could not build the relief:",
+                        e,
+                    );
+                }
+            },
+        );
     }
 
-    #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
-        const gl = ctx.gl;
+    // Drop a relief job in flight (dispose, restore).
+    #dropReliefJob(): void {
+        this.#reliefToken++;
+        this.#reliefBusy = false;
+        this.#reliefReady = null;
+    }
+
+    #freeRelief(gl: WebGL2RenderingContext): void {
+        this.#reliefTex?.dispose();
         if (this.#reliefRaw) {
             gl.deleteTexture(this.#reliefRaw);
         }
         this.#reliefRaw = null;
         this.#reliefTex = null;
+    }
+
+    #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
+        const gl = ctx.gl;
+        this.#freeRelief(gl);
+        if (!shape.reliefLum) {
+            return;
+        }
         const rel = uploadFloatTexture(
             gl,
             shape.sdfW,
@@ -1272,6 +1303,8 @@ export class GlassEffect implements Effect {
         this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
+        this.#sdfTex?.dispose();
+        this.#reliefTex?.dispose();
         if (this.#gl && this.#sdfRaw) {
             this.#gl.deleteTexture(this.#sdfRaw);
         }
@@ -1289,6 +1322,7 @@ export class GlassEffect implements Effect {
         this.#pending = null;
         // Start over like a new instance if it is added again.
         this.#source.reset();
+        this.#dropReliefJob();
         this.#channel = null;
     }
 }

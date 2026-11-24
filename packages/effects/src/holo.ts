@@ -328,6 +328,21 @@ const DEFAULT_PARAMS: HoloParams = {
 };
 
 const COMPOSED_KEYS = new Set(["material", "quality", "structureScale"]);
+
+// Keys that are not params, e.g. `pointer` given as in the other effects:
+// it goes in `holo`.
+function warnUnknownParams(p: object): void {
+    for (const k of Object.keys(p)) {
+        if (Object.hasOwn(DEFAULT_PARAMS, k)) {
+            continue;
+        }
+        warnOnce(
+            COMPOSED_KEYS.has(k) || SCENE_KEYS.has(k) || k === "settings"
+                ? `HoloEffect: "${k}" goes in \`holo\`: { holo: { ${k} } }; ignored.`
+                : `HoloEffect: unknown param "${k}"; ignored.`,
+        );
+    }
+}
 const SCENE_KEYS = new Set<string>([
     "exposure",
     "tone",
@@ -507,7 +522,11 @@ function applyInput(st: Composed, input: HoloSettingsInput): void {
         Object.assign(writes, sceneWrites(rest));
         for (const [k, v] of Object.entries(rest)) {
             if (COMPOSED_KEYS.has(k)) {
-                if (v !== undefined) {
+                if (k === "material" && v !== undefined && !isMaterialName(v)) {
+                    warnOnce(
+                        `HoloEffect: unknown material "${String(v)}" (one of ${MATERIAL_NAMES.join(", ")}); keeping "${st.material}".`,
+                    );
+                } else if (v !== undefined) {
                     (st as Record<string, unknown>)[k] = v;
                 }
             } else if (!SCENE_KEYS.has(k)) {
@@ -933,12 +952,14 @@ export class HoloEffect implements Effect {
      * ```
      */
     constructor(initial: Partial<HoloParams> = {}) {
+        warnUnknownParams(initial);
         this.params = { ...DEFAULT_PARAMS, ...initial };
         this.#sync(); // check holo now, so its warnings point here
     }
 
     /** Assigns params, as other effects do. A new `holo` replaces the whole holo.spot side. */
     setParams(updates: Partial<HoloParams>): void {
+        warnUnknownParams(updates);
         Object.assign(this.params, updates);
         this.#sync();
     }
@@ -957,6 +978,7 @@ export class HoloEffect implements Effect {
             this.#p = compose(holo);
             this.#dirty = true;
             this.#defFailed = null; // a material that failed to load is tried again
+            this.#defError = null;
             this.#capGen++; // the element as the logo is read again (it may have changed)
         }
         if (this.params.sourceChannel !== this.#channelSeen) {
@@ -990,7 +1012,14 @@ export class HoloEffect implements Effect {
 
     #readyWaiters: (() => void)[] = [];
     #drawnOnce = false;
+    #disposed = false;
     #readyNow(): boolean {
+        if (this.#disposed) {
+            return true;
+        }
+        if (this.#defFailed === this.#p.material && !this.#renderDef) {
+            return true; // nothing to draw: the first material failed to load
+        }
         return (
             this.#drawnOnce &&
             !this.#dirty &&
@@ -1131,6 +1160,7 @@ export class HoloEffect implements Effect {
 
     async init(ctx: EffectContext): Promise<void> {
         const life = ++this.#life;
+        this.#disposed = false;
         this.#sync();
         // the material's code, before the first frame
         await this.#requestDef(this.#p.material);
@@ -1280,6 +1310,7 @@ export class HoloEffect implements Effect {
                     this.#defPending = null;
                 }
                 this.#dirty = true; // resolve again: with the new material, or settle on the failure
+                this.#settleReady();
             });
         this.#defPending = { m, p };
         return p;
@@ -1484,6 +1515,8 @@ export class HoloEffect implements Effect {
                 );
             }
             this.#emboss.setPaper(embossDef.paperKey(r.values));
+        } else if (this.#emboss || this.#printTex || this.#capRt) {
+            this.#releaseEmboss(); // switched away from emboss
         }
         this.#eta = etaFrame(
             (this.#renderDef as MaterialDef).gratingSummary(r.values),
@@ -2035,6 +2068,7 @@ export class HoloEffect implements Effect {
         this.#release();
         // a pending ready resolves: nothing more is drawn until the next init
         this.#drawnOnce = false;
+        this.#disposed = true;
         const w = this.#readyWaiters;
         this.#readyWaiters = [];
         for (const f of w) {
@@ -2053,21 +2087,13 @@ export class HoloEffect implements Effect {
             this.#env,
             this.#ltc1,
             this.#ltc2,
-            this.#capRt,
         ]) {
             rt?.dispose();
         }
         this.#bytesTex?.dispose();
         this.#ltcTex?.dispose();
         this.#glare.dispose();
-        this.#emboss?.dispose();
-        this.#emboss = null;
-        this.#logoRt?.dispose();
-        this.#logoRt = null;
-        this.#paperRt?.mom.dispose();
-        this.#paperRt?.aux.dispose();
-        this.#paperRt = null;
-        this.#logoUp = this.#paperUp = -1;
+        this.#releaseEmboss();
         this.#conv = this.#cum = this.#hdr = this.#black = this.#env = null;
         this.#base = null;
         this.#ltc1 = this.#ltc2 = null;
@@ -2076,7 +2102,19 @@ export class HoloEffect implements Effect {
         this.#ltcReady = false;
         this.#blackReady = false;
         this.#envDrawn = null;
-        // the element read back as the logo, and emboss.print: start over on the next init
+    }
+
+    /** Frees what only `emboss` uses: its workers, logo and paper maps, the element read back as the logo, and `emboss.print`. */
+    #releaseEmboss(): void {
+        this.#emboss?.dispose();
+        this.#emboss = null;
+        this.#logoRt?.dispose();
+        this.#logoRt = null;
+        this.#paperRt?.mom.dispose();
+        this.#paperRt?.aux.dispose();
+        this.#paperRt = null;
+        this.#logoUp = this.#paperUp = -1;
+        this.#capRt?.dispose();
         this.#capRt = null;
         this.#capKey = "";
         this.#capHash = "";
@@ -2090,6 +2128,7 @@ export class HoloEffect implements Effect {
         this.#printWant = "";
         this.#printToken++;
         this.#printBusy = false;
+        this.#printError = null;
     }
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {

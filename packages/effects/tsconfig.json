@@ -19,5 +19,6 @@
         "allowJs": true
     },
     "include": ["src"],
-    "exclude": ["src/**/*.test.ts"]
+    // _sphere-foam.ts is the shader's maths in TypeScript, for the tests only.
+    "exclude": ["src/**/*.test.ts", "src/_sphere-foam.ts"]
 }

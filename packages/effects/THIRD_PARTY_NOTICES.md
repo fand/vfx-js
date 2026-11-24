@@ -1,10 +1,12 @@
 # Third-party notices
 
-`HoloEffect` (`src/holo.ts`, `src/_holo/`) is ported from holospot, and includes code and data from three.js.
+`HoloEffect` (exported from `@vfx-js/effects` and `@vfx-js/effects/holo/static`) is ported from holospot, and includes code and data from three.js. In this package, that is `lib/esm/` and `lib/cjs/`: `holo.js`, `holo-static.js` and `_holo/`.
+
+The worker runner `_kernel-worker.js`, which `HoloEffect`, `BubbleEffect`, `GlassEffect` and `SwirlParticleEffect` use, is ported from holospot too.
 
 ## holospot
 
-https://github.com/dmitrykurash/holospot, ported from commit `7ca9873f7834c4952df628fb26b85c78d9639c1d` (2026-11-17). The generated files under `src/_holo/glsl/` and `src/_holo/data/` name the commit in their headers.
+https://github.com/dmitrykurash/holospot, ported from commit `7ca9873f7834c4952df628fb26b85c78d9639c1d` (2026-11-17). The generated files under `_holo/glsl/` and `_holo/data/` name the commit in their headers.
 
 ```
 MIT License

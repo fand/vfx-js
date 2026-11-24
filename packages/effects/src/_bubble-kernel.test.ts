@@ -28,7 +28,7 @@ test("the worker's kernel places the same foam as the module's", () => {
             px[(y * W + x) * 4 + 3] = inside ? 255 : 0;
         }
     }
-    const shape = buildShape(px, W, H, "alpha", 0.05, W / H, 1, 1);
+    const shape = buildShape(px, W, H, "alpha", W / H, 1, 1);
     if (!shape) {
         throw new Error("empty shape");
     }

@@ -101,7 +101,11 @@ type Shape2D = Pick<ShapeData, "sdf" | "sdfW" | "sdfH" | "sdfRect">;
 
 /** What {@link buildFoam} takes. */
 export type FoamInput = {
-    shape: Shape2D;
+    /**
+     * Left out when the last call had the same `shapeKey` and `fill`: the
+     * placement is reused. Without it and no such placement, it throws.
+     */
+    shape?: Shape2D;
     /** Names the shape: with the same key and `fill`, the last placement is reused. */
     shapeKey?: number;
     fill: FillOptions;
@@ -1303,6 +1307,9 @@ export function bubbleKernel() {
         // The placement does not depend on wobble or containment.
         const key = JSON.stringify([a.shapeKey, a.fill]);
         if (a.shapeKey === undefined || placed?.key !== key) {
+            if (!a.shape) {
+                throw new Error("buildFoam: no shape to place in");
+            }
             placed = { key, fill: placeBubbles(a.shape, a.fill) };
         }
         // A copy: a worker gives the result's buffers away.

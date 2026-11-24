@@ -1,6 +1,12 @@
 export type { HoloSettingId } from "./_holo/data/params.js";
 export type { HoloStartingPointNames } from "./_holo/data/starting-points.js";
 export type { OrbitCameraParams } from "./_orbit-camera.js";
+export {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
+} from "./_scene3d.js";
 export type { SourceChannel } from "./_source.js";
 export {
     ASCII_PRESETS,
@@ -35,15 +41,11 @@ export { DitherEffect, type DitherParams, type DitherStyle } from "./dither.js";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone.js";
 export { FluidEffect, type FluidParams } from "./fluid.js";
 export {
-    GLASS_PALETTES,
     type GlassBevelShape,
     type GlassDebugView,
     GlassEffect,
     type GlassEffectOptions,
-    type GlassImageSource,
-    type GlassPaletteName,
     type GlassParams,
-    type GlassPatternName,
     type GlassPointer,
 } from "./glass.js";
 export { GlitchEffect, type GlitchParams } from "./glitch.js";
