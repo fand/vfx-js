@@ -1525,8 +1525,18 @@ type Foam = FoamData & {
     params: FoamParams;
     /** The spheres as drifted for the frame, and when it was. */
     moved: Float32Array;
-    movedKey: string;
+    movedTurns: number;
+    /** The largest radius. */
+    maxR: number;
 };
+
+function maxRadius(grid: { count: number; spheres: Float32Array }): number {
+    let maxR = 0;
+    for (let i = 0; i < grid.count; i++) {
+        maxR = Math.max(maxR, grid.spheres[i * 4 + 3]);
+    }
+    return maxR;
+}
 
 // The params the foam depends on, clamped.
 type FoamParams = {
@@ -1738,6 +1748,44 @@ export class BubbleEffect implements Effect {
 
     // The params, clamped to what the shader can take, and what follows
     // from them.
+    // The resolved params and their keys, made again only when an input
+    // changes, so a still frame allocates nothing.
+    readonly #keyIn = new Float64Array(10);
+    readonly #keyLast = new Float64Array(10).fill(Number.NaN);
+    #keys: { r: FoamParams; placeKey: string; key: string } | null = null;
+    #foamKeys(): { r: FoamParams; placeKey: string; key: string } {
+        const p = this.params;
+        const a = this.#keyIn;
+        a[0] = this.#shapeVersion;
+        a[1] = p.depth;
+        a[2] = p.bevel;
+        a[3] = p.cellSize;
+        a[4] = p.roundness;
+        a[5] = p.cellSizeRandomness;
+        a[6] = p.seed;
+        a[7] = p.minSize;
+        a[8] = p.wobble;
+        a[9] = p.containment;
+        const last = this.#keyLast;
+        let same = this.#keys !== null;
+        for (let i = 0; same && i < a.length; i++) {
+            same = Object.is(a[i], last[i]);
+        }
+        if (same && this.#keys) {
+            return this.#keys;
+        }
+        last.set(a);
+        const r = this.#resolved();
+        const f = r.fill;
+        const placeKey = `${this.#shapeVersion}|${f.halfDepth}|${f.bevel}|${f.cellSize}|${f.roundness}|${f.cellSizeRandomness}|${f.seed}|${f.minSize}`;
+        this.#keys = {
+            r,
+            placeKey,
+            key: `${placeKey}|${r.wobble}|${r.containment}`,
+        };
+        return this.#keys;
+    }
+
     #resolved(): FoamParams {
         const p = this.params;
         const d = DEFAULT_PARAMS;
@@ -1799,10 +1847,8 @@ export class BubbleEffect implements Effect {
         if (!shape) {
             return null;
         }
-        const r = this.#resolved();
+        const { r, placeKey, key } = this.#foamKeys();
         const version = this.#shapeVersion;
-        const placeKey = `${version}|${JSON.stringify(r.fill)}`;
-        const key = `${placeKey}|${r.wobble}|${r.containment}`;
         if (
             !this.#foamBusy &&
             this.#foamData?.key !== key &&
@@ -1955,7 +2001,8 @@ export class BubbleEffect implements Effect {
             edgeIndexTex: textures[edgeGrid === grid ? 2 : 4],
             params,
             moved: grid.sphereData.slice(),
-            movedKey: "",
+            movedTurns: Number.NaN,
+            maxR: maxRadius(grid),
         };
     }
 
@@ -1963,11 +2010,11 @@ export class BubbleEffect implements Effect {
     // times the radius, from a random phase per sphere.
     #move(ctx: EffectContext, foam: Foam): void {
         const wobble = foam.params.wobble;
-        const key = `${this.#driftTurns}`;
-        if (foam.movedKey === key) {
+        // Without wobble the spheres stay as uploaded.
+        if (wobble <= 0 || foam.movedTurns === this.#driftTurns) {
             return;
         }
-        foam.movedKey = key;
+        foam.movedTurns = this.#driftTurns;
         const src = foam.grid.sphereData;
         const out = foam.moved;
         const f = foam.drift;
@@ -2061,10 +2108,7 @@ export class BubbleEffect implements Effect {
         // The cells may be larger than asked, to fit the shape.
         const cellSize = foam.fill.cellSize;
         const grid = foam.grid;
-        let maxR = 0;
-        for (let i = 0; i < grid.count; i++) {
-            maxR = Math.max(maxR, grid.spheres[i * 4 + 3]);
-        }
+        const maxR = foam.maxR;
         // How far any sphere reaches out of the shape, drift included,
         // with a margin for the field's filtering.
         const reach =
