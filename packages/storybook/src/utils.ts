@@ -1287,9 +1287,6 @@ export function attachBubblePane(
     const light = pane.addFolder({ title: "Lights" });
     bind(light, "lightIntensity", range(0, 8, 0.05));
     bind(light, "lightSoftness", range(0, 1, 0.01));
-    bind(light, "lighting", {
-        options: { studio: "studio", noise: "noise" },
-    });
 
     const view = pane.addFolder({ title: "View" });
     bind(view, "yaw", range(-180, 180, 0.5));
