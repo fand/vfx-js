@@ -141,8 +141,8 @@ export type SwirlParticleParams = OrbitCameraParams & {
     /**
      * Number of particles, at most 1,048,576 (2^20), and less on a GPU
      * whose textures are small (262,144 where they are 2048 px; a warning
-     * says so). Each particle takes up to about 190 bytes of GPU
-     * memory, so 2^20 takes about 200 MB. Live: lowering it
+     * says so). Each particle takes up to about 180 bytes of GPU
+     * memory, so 2^20 takes about 190 MB. Live: lowering it
      * draws fewer particles without freeing memory; raising it past what
      * is allocated reallocates the particle state (the trails regrow, and
      * the new particles grow in over {@link intro}).
@@ -745,9 +745,10 @@ void main() {
 }
 `;
 
-// Per particle, once a frame: the colour the body and every segment of
-// its trail share. A = base colour + how far the particle is off the
-// surface (0..1), B = highlight colour.
+// Per particle, once a frame: the lit colour the body and every segment
+// of its trail share, and how far the particle is off the surface (0..1).
+// Lighting here, not per vertex, saves the SDF lookups of every corner of
+// every segment.
 const FRAG_ATTR = `#version 300 es
 precision highp float;
 precision highp int;
@@ -764,9 +765,16 @@ uniform float time;
 uniform float speed;
 uniform int stateWidth;
 uniform int count;
+uniform mat3 viewRot;
+uniform vec3 lightDir;
+uniform vec3 lightColor;
+uniform float lightIntensity;
+uniform float ambient;
+uniform float occlusion;
+uniform float glintAmount;
 
-layout(location = 0) out vec4 outA;
-layout(location = 1) out vec4 outB;
+// rgb = the lit colour, a = how far the particle is off the surface.
+out vec4 outA;
 
 ${GLSL_HASH}
 ${GLSL_NOISE}
@@ -794,14 +802,14 @@ void main() {
     int i = texel.y * stateWidth + texel.x;
     if (i >= count) {
         outA = vec4(0.0);
-        outB = vec4(0.0);
         return;
     }
     uint id = uint(i);
     vec4 P = texelFetch(posTex, texel, 0);
     vec4 V = texelFetch(velTex, texel, 0);
     vec3 p = P.xyz;
-    float off = clamp(sdf3(p).x / 0.08, 0.0, 1.0);
+    vec4 s = sdf3(p);
+    float off = clamp(s.x / 0.08, 0.0, 1.0);
     float r = rnd(id * 2246822519u + 13u);
 
     // Colour attribute: slow noise over the surface + speed + per particle.
@@ -818,8 +826,22 @@ void main() {
         base = mix(base, sc * mix(0.85, 1.15, clamp(t, 0.0, 1.0)), sourceColor);
         highlight = mix(highlight, mix(sc, vec3(1.0), 0.5), sourceColor);
     }
-    outA = vec4(base, off);
-    outB = vec4(highlight, 0.0);
+
+    // Lit once per particle, from the SDF normal at its head, in view
+    // space; every segment of its trail takes this colour.
+    vec3 nv = viewRot * s.yzw;
+    float ndl = dot(nv, lightDir);
+    float wrap = 0.5 + 0.5 * ndl;
+    // Cheap occlusion: how far the field is clear along the normal.
+    float aoDist = sdf3(p + s.yzw * 0.07).x;
+    float ao = mix(1.0 - occlusion, 1.0, clamp(aoDist / 0.07, 0.0, 1.0));
+    vec3 col = base * (ambient + 0.9 * lightIntensity * wrap * lightColor) * ao;
+    // Some fibres catch the light.
+    float glint = pow(max(ndl, 0.0), 3.0) * step(0.65, fract(r * 7.13));
+    col += highlight * lightColor * glint * glintAmount * ao;
+    // Peeled-off wisps get lighter.
+    col = mix(col, highlight * 0.85, off * 0.5);
+    outA = vec4(col, off);
 }
 `;
 
@@ -860,13 +882,6 @@ uniform sampler2D attrA;
 #endif
 #ifdef BODY
 in float seg;
-uniform sampler2D attrB;
-uniform vec3 lightDir;
-uniform vec3 lightColor;
-uniform float lightIntensity;
-uniform float ambient;
-uniform float occlusion;
-uniform float glintAmount;
 #endif
 #ifdef SHADOW
 // Towards the light, z > 0; the page is at view z = -shadowDepth
@@ -894,7 +909,6 @@ out vec2 vLocal;
 out vec2 vShape;
 
 ${GLSL_HASH}
-${pass === "body" ? GLSL_SDF : ""}
 
 void cull() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -1045,23 +1059,7 @@ void main() {
     vShape = vec2(len * 0.5, ws * 0.5);
 
 #ifdef BODY
-    // Shade from the SDF normal at the segment's start, in view space.
-    vec3 base = A.rgb;
-    vec3 highlight = texelFetch(attrB, texel, 0).rgb;
-    vec4 s = sdf3(pa);
-    vec3 nv = viewRot * s.yzw;
-    float ndl = dot(nv, lightDir);
-    float wrap = 0.5 + 0.5 * ndl;
-    // Cheap occlusion: how far the field is clear along the normal.
-    float aoDist = sdf3(pa + s.yzw * 0.07).x;
-    float ao = mix(1.0 - occlusion, 1.0, clamp(aoDist / 0.07, 0.0, 1.0));
-    vec3 col = base * (ambient + 0.9 * lightIntensity * wrap * lightColor) * ao;
-    // Some fibres catch the light.
-    float glint = pow(max(ndl, 0.0), 3.0) * step(0.65, fract(r * 7.13));
-    col += highlight * lightColor * glint * glintAmount * ao;
-    // Peeled-off wisps get lighter.
-    col = mix(col, highlight * 0.85, off * 0.5);
-    vColor = col;
+    vColor = A.rgb;
 #else
     vColor = vec3(1.0);
 #endif
@@ -1476,12 +1474,17 @@ function instanceBucket(n: number): number {
     return Math.ceil(n / step) * step;
 }
 
-function trailGeometry(instanceCount: number): EffectGeometry {
+// `segments` quads per instance, one per segment of the trail from the
+// head; 1 draws only the head, for `streak` 0.
+function trailGeometry(
+    instanceCount: number,
+    segments = TRAIL_SAMPLES,
+): EffectGeometry {
     const corners = [-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5];
-    const position = new Float32Array(TRAIL_SAMPLES * 8);
-    const seg = new Float32Array(TRAIL_SAMPLES * 4);
-    const indices = new Uint16Array(TRAIL_SAMPLES * 6);
-    for (let s = 0; s < TRAIL_SAMPLES; s++) {
+    const position = new Float32Array(segments * 8);
+    const seg = new Float32Array(segments * 4);
+    const indices = new Uint16Array(segments * 6);
+    for (let s = 0; s < segments; s++) {
         position.set(corners, s * 8);
         seg.fill(s, s * 4, s * 4 + 4);
         const v = s * 4;
@@ -1621,7 +1624,6 @@ export class SwirlParticleEffect implements Effect {
     #cam: OrbitCameraView | null = null;
     // Per particle colour, written once a frame (see FRAG_ATTR).
     #attrA: EffectRenderTarget | null = null;
-    #attrB: EffectRenderTarget | null = null;
 
     // Trail history: TRAIL_SAMPLES copies of the position texture, tiled in
     // one atlas, written round-robin. #histTime holds the sim time each
@@ -1648,6 +1650,8 @@ export class SwirlParticleEffect implements Effect {
     // the first ids), rebuilt when it changes.
     #trails: EffectGeometry | null = null;
     #heads: EffectGeometry | null = null;
+    // The body with only its head segment, for `streak` 0.
+    #dots: EffectGeometry | null = null;
     #fireflies: EffectGeometry | null = null;
     #nBody = -1;
     #nFire = -1;
@@ -1774,13 +1778,11 @@ export class SwirlParticleEffect implements Effect {
         oldPos?.dispose();
         oldVel?.dispose();
         this.#attrA?.dispose();
-        this.#attrB?.dispose();
         this.#hist?.dispose();
         this.#pos = pos;
         this.#vel = vel;
         const attrOpts = { ...stateOpts, persistent: false };
         this.#attrA = ctx.createRenderTarget(attrOpts);
-        this.#attrB = ctx.createRenderTarget(attrOpts);
         this.#hist = ctx.createRenderTarget({
             ...attrOpts,
             size: [width * HIST_COLS, width * HIST_ROWS],
@@ -2172,10 +2174,14 @@ export class SwirlParticleEffect implements Effect {
             if (this.#trails) {
                 ctx.releaseGeometry(this.#trails);
             }
+            if (this.#dots) {
+                ctx.releaseGeometry(this.#dots);
+            }
             if (this.#heads) {
                 ctx.releaseGeometry(this.#heads);
             }
             this.#trails = trailGeometry(bodyCap);
+            this.#dots = trailGeometry(bodyCap, 1);
             this.#heads = {
                 attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
                 instanceCount: bodyCap,
@@ -2457,7 +2463,6 @@ export class SwirlParticleEffect implements Effect {
         const vel = this.#vel;
         const shape = this.#shape;
         const attrA = this.#attrA;
-        const attrB = this.#attrB;
         const hist = this.#hist;
         const trails = this.#trails;
         const heads = this.#heads;
@@ -2468,7 +2473,6 @@ export class SwirlParticleEffect implements Effect {
             !shape ||
             !this.#paletteTex ||
             !attrA ||
-            !attrB ||
             !hist ||
             !trails ||
             !heads ||
@@ -2507,8 +2511,14 @@ export class SwirlParticleEffect implements Effect {
                     src: ctx.src,
                     shapeHalf: shape.shapeHalf,
                     sourceColor: r.sourceColor,
+                    lightDir: r.light,
+                    lightColor: r.lightColor,
+                    lightIntensity: r.lightIntensity,
+                    ambient: r.ambient,
+                    occlusion: r.occlusion,
+                    glintAmount: r.glint,
                 },
-                target: [attrA, attrB],
+                target: attrA,
             });
         }
         const trail = {
@@ -2525,17 +2535,9 @@ export class SwirlParticleEffect implements Effect {
             ctx.draw({
                 vert: VERT_BODY,
                 frag: FRAG_BODY,
-                geometry: trails,
-                uniforms: {
-                    ...trail,
-                    attrB,
-                    lightDir: r.light,
-                    lightColor: r.lightColor,
-                    lightIntensity: r.lightIntensity,
-                    ambient: r.ambient,
-                    occlusion: r.occlusion,
-                    glintAmount: r.glint,
-                },
+                // Without a streak only the head segment draws.
+                geometry: r.streak > 0 ? trails : (this.#dots ?? trails),
+                uniforms: trail,
                 target: scene,
                 depthTest: true,
                 blend: "none",
@@ -2784,7 +2786,6 @@ export class SwirlParticleEffect implements Effect {
         this.#pos?.dispose();
         this.#vel?.dispose();
         this.#attrA?.dispose();
-        this.#attrB?.dispose();
         this.#hist?.dispose();
         this.#scene?.dispose();
         this.#disposeShadow();
@@ -2792,12 +2793,12 @@ export class SwirlParticleEffect implements Effect {
         this.#pos = null;
         this.#vel = null;
         this.#attrA = null;
-        this.#attrB = null;
         this.#hist = null;
         this.#scene = null;
         this.#stateWidth = 0;
         // The core frees the compiled geometry with the chain.
         this.#trails = null;
+        this.#dots = null;
         this.#heads = null;
         this.#fireflies = null;
         this.#nBody = -1;
