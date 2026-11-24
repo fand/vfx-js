@@ -1507,6 +1507,7 @@ function uploadDataTexture(
 type Foam = FoamData & {
     key: string;
     raw: WebGLTexture[];
+    textures: EffectTexture[];
     sphereTex: EffectTexture;
     cellTex: EffectTexture;
     indexTex: EffectTexture;
@@ -1638,6 +1639,11 @@ export class BubbleEffect implements Effect {
             // flight was rejected; start it over.
             this.#source.contextRestored();
             this.#gl = ctx.gl;
+            this.#sdfTex?.dispose();
+            this.#lutTex?.dispose();
+            for (const tex of this.#foamData?.textures ?? []) {
+                tex.dispose();
+            }
             this.#sdfRaw = null;
             this.#lutRaw = null;
             this.#sdfTex = null;
@@ -1836,6 +1842,7 @@ export class BubbleEffect implements Effect {
         this.#freeFoam();
         this.#foamData = foam;
         if (next && sdf) {
+            this.#sdfTex?.dispose();
             gl.deleteTexture(this.#sdfRaw);
             this.#sdfRaw = sdf;
             this.#sdfTex = ctx.wrapTexture(sdf, {
@@ -1887,6 +1894,9 @@ export class BubbleEffect implements Effect {
         }
         ctx.resetState();
         if (textures.length < layers.length) {
+            for (const tex of textures) {
+                tex.dispose();
+            }
             for (const tex of raw) {
                 gl.deleteTexture(tex);
             }
@@ -1896,6 +1906,7 @@ export class BubbleEffect implements Effect {
             ...data,
             key,
             raw,
+            textures,
             sphereTex: textures[0],
             cellTex: textures[1],
             indexTex: textures[2],
@@ -1971,6 +1982,9 @@ export class BubbleEffect implements Effect {
 
     #freeFoam(): void {
         const f = this.#foamData;
+        for (const tex of f?.textures ?? []) {
+            tex.dispose();
+        }
         if (f && this.#gl) {
             for (const tex of f.raw) {
                 this.#gl.deleteTexture(tex);
@@ -2129,6 +2143,8 @@ export class BubbleEffect implements Effect {
         this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
+        this.#sdfTex?.dispose();
+        this.#lutTex?.dispose();
         this.#gl?.deleteTexture(this.#sdfRaw);
         this.#gl?.deleteTexture(this.#lutRaw);
         this.#sdfRaw = null;

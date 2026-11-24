@@ -575,6 +575,8 @@ export class SceneBackdrop {
 
     /** The raw textures are gone with the context: rebuild them. */
     contextRestored(): void {
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         this.#paletteRaw = [];
         this.#paletteTex = null;
         this.#paletteClampTex = null;
@@ -645,6 +647,8 @@ export class SceneBackdrop {
         this.#paletteKey = key;
         this.#paletteSize = colors.length;
         const gl = ctx.gl;
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         for (const tex of this.#paletteRaw) {
             gl.deleteTexture(tex);
         }
@@ -780,6 +784,8 @@ export class SceneBackdrop {
 
     dispose(gl: WebGL2RenderingContext | null): void {
         this.#disposed = true;
+        this.#paletteTex?.dispose();
+        this.#paletteClampTex?.dispose();
         if (gl) {
             for (const tex of this.#paletteRaw) {
                 gl.deleteTexture(tex);

@@ -985,6 +985,8 @@ export class GlassEffect implements Effect {
             // flight was rejected; start it over.
             this.#source.contextRestored();
             this.#gl = ctx.gl;
+            this.#sdfTex?.dispose();
+            this.#reliefTex?.dispose();
             this.#sdfRaw = null;
             this.#sdfTex = null;
             this.#reliefRaw = null;
@@ -1181,6 +1183,7 @@ export class GlassEffect implements Effect {
 
     #upload(ctx: EffectContext, shape: GlassShape): void {
         const gl = ctx.gl;
+        this.#sdfTex?.dispose();
         if (this.#sdfRaw) {
             gl.deleteTexture(this.#sdfRaw);
         }
@@ -1217,6 +1220,7 @@ export class GlassEffect implements Effect {
 
     #uploadRelief(ctx: EffectContext, shape: GlassShape): void {
         const gl = ctx.gl;
+        this.#reliefTex?.dispose();
         if (this.#reliefRaw) {
             gl.deleteTexture(this.#reliefRaw);
         }
@@ -1244,6 +1248,8 @@ export class GlassEffect implements Effect {
         this.#camera.dispose();
         this.#unsubRestored?.();
         this.#unsubRestored = null;
+        this.#sdfTex?.dispose();
+        this.#reliefTex?.dispose();
         if (this.#gl && this.#sdfRaw) {
             this.#gl.deleteTexture(this.#sdfRaw);
         }
