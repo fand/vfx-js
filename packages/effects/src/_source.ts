@@ -25,6 +25,9 @@ export const CAPTURE_RETRY_MAX = 120;
 // RESIZE_SETTLE frames.
 export const ASPECT_TOLERANCE = 0.01;
 export const RESIZE_SETTLE = 5;
+// With `minLongSide`, recapture when the element's long side grows this
+// many times past the mask's.
+export const GROW_TOLERANCE = 1.25;
 
 /** The pixels of one capture. */
 export type SourceReadback = {
@@ -39,6 +42,12 @@ export type SourceReadback = {
 export type SourceCaptureOptions = {
     /** Long side of the read-back mask, in px. The short side follows the element's aspect. */
     longSide: number;
+    /**
+     * When set, the long side follows the element's long side in device
+     * px, between this and `longSide`, so a small element reads a small
+     * mask. The element is read again when it grows well past it.
+     */
+    minLongSide?: number;
     /** Options for `ctx.readPixels`. */
     read?: EffectReadPixelsOpts;
     /**
@@ -75,8 +84,9 @@ export class SourceCapture {
     #srcFrames = 0;
     // Frames to wait before the next capture; doubles while it's empty.
     #gap = CAPTURE_DELAY;
-    // Aspect of the last capture used.
+    // Aspect and long side of the last capture used.
     #aspect = 0;
+    #long = 0;
     // Element size last frame, and frames it has held still.
     #lastSize: [number, number] = [0, 0];
     #settled = 0;
@@ -131,6 +141,7 @@ export class SourceCapture {
         this.#srcFrames = 0;
         this.#gap = CAPTURE_DELAY;
         this.#aspect = 0;
+        this.#long = 0;
         this.#lastSize[0] = 0;
         this.#lastSize[1] = 0;
         this.#settled = 0;
@@ -148,12 +159,26 @@ export class SourceCapture {
         this.#lastSize[0] = ew;
         this.#lastSize[1] = eh;
         this.#settled = moved ? 0 : this.#settled + 1;
+        if (this.#settled < RESIZE_SETTLE) {
+            return;
+        }
         if (
-            this.#settled >= RESIZE_SETTLE &&
-            Math.abs(ew / eh / this.#aspect - 1) > ASPECT_TOLERANCE
+            Math.abs(ew / eh / this.#aspect - 1) > ASPECT_TOLERANCE ||
+            this.#longSide(ew, eh) > this.#long * GROW_TOLERANCE
         ) {
             this.refresh();
         }
+    }
+
+    // The mask's long side for an element of ew × eh device px.
+    #longSide(ew: number, eh: number): number {
+        const { longSide, minLongSide } = this.#opts;
+        if (minLongSide === undefined) {
+            return longSide;
+        }
+        return Math.round(
+            Math.min(Math.max(Math.max(ew, eh), minLongSide), longSide),
+        );
     }
 
     #capture(ctx: EffectContext): void {
@@ -169,7 +194,7 @@ export class SourceCapture {
         if (++this.#srcFrames < this.#gap) {
             return;
         }
-        const long = this.#opts.longSide;
+        const long = this.#longSide(ew, eh);
         const aspect = ew / eh;
         const width = Math.max(
             1,
@@ -202,6 +227,7 @@ export class SourceCapture {
                 }
                 if (this.#opts.onRead({ pixels, width, height, aspect })) {
                     this.#aspect = aspect;
+                    this.#long = long;
                     this.#phase = "idle";
                 } else {
                     // Nothing drawn yet: try again later, less often, in

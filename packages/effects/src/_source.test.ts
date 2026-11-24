@@ -242,6 +242,40 @@ describe("SourceCapture", () => {
         expect(framesToRead(cap, ctx, reads)).toBe(CAPTURE_DELAY);
     });
 
+    test("with minLongSide, the mask follows the element's size and is read again when it grows", async () => {
+        const { ctx, reads, targets, resize } = makeCtx(200, 100);
+        const cap = new SourceCapture({
+            longSide: 1024,
+            minLongSide: 64,
+            onRead: () => true,
+        });
+        framesToRead(cap, ctx, reads);
+        expect([targets[0].width, targets[0].height]).toEqual([200, 100]);
+        reads[0].resolve(pixels(200, 100));
+        await tick();
+
+        // Grown, but within the tolerance: kept.
+        resize(240, 120);
+        expect(framesToRead(cap, ctx, reads, 50)).toBe(-1);
+        // Grown past it: read again at the new size.
+        resize(400, 200);
+        expect(framesToRead(cap, ctx, reads)).toBeGreaterThan(0);
+        expect([targets[1].width, targets[1].height]).toEqual([400, 200]);
+        reads[1].resolve(pixels(400, 200));
+        await tick();
+
+        // Clamped to longSide and minLongSide.
+        resize(4000, 2000);
+        framesToRead(cap, ctx, reads);
+        expect(targets[2].width).toBe(1024);
+        reads[2].resolve(pixels(1024, 512));
+        await tick();
+        cap.refresh();
+        resize(20, 10);
+        framesToRead(cap, ctx, reads);
+        expect(targets[3].width).toBe(64);
+    });
+
     test("recaptures once a changed aspect ratio has settled, not on a change of size alone", async () => {
         const { ctx, reads, resize } = makeCtx(200, 100);
         const got: number[] = [];

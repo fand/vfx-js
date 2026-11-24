@@ -327,6 +327,9 @@ const BUMP_SLOPE = "0.6";
 // every bump of the normals, so the glass wants a finer and smoother
 // field than the pixel staircase of a small mask gives.
 const GLASS_MASK_LONG = 1024;
+// The mask follows the element's size in device px down to this, so a
+// small element costs less; a finer mask than its pixels adds nothing.
+const GLASS_MASK_MIN = 256;
 const SMOOTH_RADIUS = 4;
 const SMOOTH_PASSES = 3;
 // Box blurs of the relief's height map: glyph edges become a short
@@ -970,6 +973,7 @@ export class GlassEffect implements Effect {
     // and when the element's aspect ratio changes.
     readonly #source = new SourceCapture({
         longSide: GLASS_MASK_LONG,
+        minLongSide: GLASS_MASK_MIN,
         onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
