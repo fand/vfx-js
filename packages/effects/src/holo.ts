@@ -978,6 +978,7 @@ export class HoloEffect implements Effect {
             this.#p = compose(holo);
             this.#dirty = true;
             this.#defFailed = null; // a material that failed to load is tried again
+            this.#defError = null;
             this.#capGen++; // the element as the logo is read again (it may have changed)
         }
         if (this.params.sourceChannel !== this.#channelSeen) {
