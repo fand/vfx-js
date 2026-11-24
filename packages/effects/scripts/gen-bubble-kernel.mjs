@@ -10,10 +10,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const path = fileURLToPath(new URL("../src/_bubble-fill.ts", import.meta.url));
-
-/** bubbleKernel as plain JavaScript: `function bubbleKernel() { ... }`. */
-export function bubbleKernelSource() {
+/** Function `name` of `src/<file>` as plain JavaScript: `function name() { ... }`. */
+export function functionSource(file, name) {
+    const path = fileURLToPath(new URL(`../src/${file}`, import.meta.url));
     const sf = ts.createSourceFile(
         path,
         readFileSync(path, "utf8"),
@@ -21,10 +20,10 @@ export function bubbleKernelSource() {
         true,
     );
     const fn = sf.statements.find(
-        (s) => ts.isFunctionDeclaration(s) && s.name?.text === "bubbleKernel",
+        (s) => ts.isFunctionDeclaration(s) && s.name?.text === name,
     );
     if (!fn) {
-        throw new Error("_bubble-fill.ts: no function bubbleKernel");
+        throw new Error(`${file}: no function ${name}`);
     }
     const text = fn.getText(sf).replace(/^export\s+/, "");
     return ts
@@ -37,6 +36,11 @@ export function bubbleKernelSource() {
         })
         .outputText.replace(/^"use strict";\s*/, "")
         .trim();
+}
+
+/** bubbleKernel as plain JavaScript: `function bubbleKernel() { ... }`. */
+export function bubbleKernelSource() {
+    return functionSource("_bubble-fill.ts", "bubbleKernel");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

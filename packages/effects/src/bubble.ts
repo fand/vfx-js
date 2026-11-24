@@ -60,11 +60,13 @@ import {
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
-import { buildShape, GLSL_SDF, type ShapeData } from "./_silhouette.js";
+import { buildShapeAsync } from "./_shape-worker.js";
+import { GLSL_SDF, type ShapeData } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
     SourceCapture,
     type SourceChannel,
+    type SourceReadback,
     sourceChannelOf,
 } from "./_source.js";
 import {
@@ -1576,7 +1578,7 @@ export class BubbleEffect implements Effect {
     // and when the element's aspect ratio changes.
     readonly #source = new SourceCapture({
         longSide: BUBBLE_MASK_LONG,
-        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+        onRead: (r, isCurrent) => this.#onRead(r, isCurrent),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
     #channel: SourceChannel | null = null;
@@ -2158,27 +2160,31 @@ export class BubbleEffect implements Effect {
 
     // Build the shape from the element read back. False when the
     // silhouette is empty, to try again later.
-    #onRead(
-        px: Uint8Array | Float32Array,
-        mw: number,
-        mh: number,
-        aspect: number,
-    ): boolean {
+    // Build the shape from the element read back, in the worker. False
+    // when the silhouette is empty, to try again later.
+    async #onRead(
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ): Promise<boolean> {
         const channel = sourceChannelOf(this.params.sourceChannel);
-        const shape = buildShape(
-            px,
-            mw,
-            mh,
+        const built = await buildShapeAsync({
+            pixels: r.pixels,
+            mw: r.width,
+            mh: r.height,
             channel,
-            this.params.depth / 2,
-            aspect,
-            SMOOTH_RADIUS,
-            SMOOTH_PASSES,
-        );
-        if (!shape) {
+            halfDepthHint: this.params.depth / 2,
+            aspect: r.aspect,
+            smoothRadius: SMOOTH_RADIUS,
+            smoothPasses: SMOOTH_PASSES,
+            spawn: false,
+        });
+        if (!built) {
             return false;
         }
-        this.#pending = shape;
+        if (!isCurrent()) {
+            return true; // dropped by the capture anyway
+        }
+        this.#pending = built;
         this.#channel = channel;
         return true;
     }

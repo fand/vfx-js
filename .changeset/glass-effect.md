@@ -16,3 +16,4 @@ Add `GlassEffect`: the element's silhouette, extruded into 3D, as a block of ray
 - `pointer: "tilt"` turns the glass to face the pointer, up to 20° × `pointerStrength` (default 1, capped at 90°) when the pointer is half a viewport from the element's centre, as in `SwirlParticleEffect`. Off (`"none"`) by default, with no window listeners. New type `GlassPointer`.
 - `antialias` (on by default) smooths the edges with FXAA on the final image; `resolution` (0.25 to 2) sets the render scale, and 2 supersamples.
 - New type `SourceChannel` (`"alpha" | "luminance" | "none"`), shared with `SwirlParticleEffect`; `HoloSourceChannel` is the same type.
+- The silhouette's distance field is built in a worker, shared by `GlassEffect`, `BubbleEffect` and `SwirlParticleEffect`, so reading the shape back does not stall the page. Without workers (e.g. a CSP that blocks `blob:` URLs) it runs on the page.

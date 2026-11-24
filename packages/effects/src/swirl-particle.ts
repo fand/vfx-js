@@ -42,8 +42,8 @@ import {
 } from "./_orbit-camera.js";
 import { padOf, padOutputRect } from "./_pad.js";
 import { clampDt, QUAD_VERTS, stateSizeFromCount } from "./_particle-common.js";
+import { buildShapeAsync } from "./_shape-worker.js";
 import {
-    buildShape,
     GLSL_SDF,
     MASK_LONG,
     type ShapeData,
@@ -52,6 +52,7 @@ import {
 import {
     SourceCapture,
     type SourceChannel,
+    type SourceReadback,
     sourceChannelOf,
 } from "./_source.js";
 
@@ -1520,7 +1521,7 @@ export class SwirlParticleEffect implements Effect {
     // and when the element's aspect ratio changes.
     readonly #source = new SourceCapture({
         longSide: MASK_LONG,
-        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+        onRead: (r, isCurrent) => this.#onRead(r, isCurrent),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
     #channel: SourceChannel | null = null;
@@ -1884,25 +1885,31 @@ export class SwirlParticleEffect implements Effect {
 
     // Build the shape from the element read back. False when the
     // silhouette is empty, to try again later.
-    #onRead(
-        px: Uint8Array | Float32Array,
-        mw: number,
-        mh: number,
-        aspect: number,
-    ): boolean {
+    // Build the shape from the element read back, in the worker. False
+    // when the silhouette is empty, to try again later.
+    async #onRead(
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ): Promise<boolean> {
         const channel = sourceChannelOf(this.params.sourceChannel);
-        const shape = buildShape(
-            px,
-            mw,
-            mh,
+        const built = await buildShapeAsync({
+            pixels: r.pixels,
+            mw: r.width,
+            mh: r.height,
             channel,
-            this.#r.depth / 2,
-            aspect,
-        );
-        if (!shape) {
+            halfDepthHint: this.#r.depth / 2,
+            aspect: r.aspect,
+            smoothRadius: 1,
+            smoothPasses: 1,
+            spawn: true,
+        });
+        if (!built) {
             return false;
         }
-        this.#pending = shape;
+        if (!isCurrent()) {
+            return true; // dropped by the capture anyway
+        }
+        this.#pending = built;
         this.#channel = channel;
         return true;
     }

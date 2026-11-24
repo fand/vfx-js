@@ -43,16 +43,18 @@ import {
     ScenePasses,
     uploadFloatTexture,
 } from "./_scene3d.js";
+import { buildShapeAsync } from "./_shape-worker.js";
 import {
-    boxBlur1d,
-    buildShape,
+    buildRelief,
     GLSL_SD2,
+    reliefRadius,
     type ShapeData,
 } from "./_silhouette.js";
 import { GLSL_SIMPLEX3, GLSL_SIMPLEX3_GRAD } from "./_simplex3.js";
 import {
     SourceCapture,
     type SourceChannel,
+    type SourceReadback,
     sourceChannelOf,
 } from "./_source.js";
 
@@ -847,85 +849,6 @@ function dropArrays(shape: GlassShape): void {
     shape.relief = EMPTY;
 }
 
-/**
- * Luminance of the captured RGBA pixels (bottom-up rows, premultiplied),
- * so 0 where alpha is 0, on the grid of `shape`'s SDF.
- */
-function reliefLuminance(
-    pixels: Uint8Array | Float32Array,
-    mw: number,
-    mh: number,
-    shape: ShapeData,
-): Float32Array {
-    const scale = pixels instanceof Float32Array ? 1 : 1 / 255;
-    const W = shape.sdfW;
-    const pad = Math.round((W - mw) / 2);
-    const h = new Float32Array(W * shape.sdfH);
-    for (let y = 0; y < mh; y++) {
-        for (let x = 0; x < mw; x++) {
-            const i = (y * mw + x) * 4;
-            const l =
-                0.2126 * pixels[i] +
-                0.7152 * pixels[i + 1] +
-                0.0722 * pixels[i + 2];
-            h[(y + pad) * W + x + pad] = Math.min(Math.max(l * scale, 0), 1);
-        }
-    }
-    return h;
-}
-
-// Box blur radius in grid px for a `reliefBlur` in world units.
-function reliefRadius(blur: number, shape: ShapeData): number {
-    const px = shape.sdfRect[2] / shape.sdfW;
-    const r = Number.isFinite(blur) ? Math.round(Math.max(blur, 0) / px) : 0;
-    return Math.min(r, RELIEF_MAX_RADIUS);
-}
-
-/**
- * The relief's height map: the luminance `lum` blurred by `RELIEF_PASSES`
- * box blurs of `radius` grid px, and its gradient.
- */
-function buildRelief(
-    lum: Float32Array,
-    shape: ShapeData,
-    radius: number,
-): Pick<GlassShape, "relief" | "reliefMaxGrad"> {
-    const W = shape.sdfW;
-    const H = shape.sdfH;
-    const h = lum.slice();
-    const line = new Float32Array(Math.max(W, H));
-    for (let pass = 0; pass < RELIEF_PASSES; pass++) {
-        for (let y = 0; y < H; y++) {
-            boxBlur1d(h, y * W, 1, W, radius, line);
-        }
-        for (let x = 0; x < W; x++) {
-            boxBlur1d(h, x, W, H, radius, line);
-        }
-    }
-    // Central differences, in height per world unit.
-    const inv = 1 / (2 * (shape.sdfRect[2] / W));
-    const out = new Float32Array(W * H * 4);
-    let maxGrad = 0;
-    for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-            const i = y * W + x;
-            const gx =
-                (h[y * W + Math.min(x + 1, W - 1)] -
-                    h[y * W + Math.max(x - 1, 0)]) *
-                inv;
-            const gy =
-                (h[Math.min(y + 1, H - 1) * W + x] -
-                    h[Math.max(y - 1, 0) * W + x]) *
-                inv;
-            out[i * 4] = h[i];
-            out[i * 4 + 1] = gx;
-            out[i * 4 + 2] = gy;
-            maxGrad = Math.max(maxGrad, Math.hypot(gx, gy));
-        }
-    }
-    return { relief: out, reliefMaxGrad: maxGrad };
-}
-
 // Lipschitz constant of a field whose cap has slope up to k: the cap's
 // gradient is (k * grad2, 1), k = 2 * bulge / bulgeWidth plus the
 // relief's slope, and the bevel mixes it with the side's (grad2, 0). The
@@ -974,7 +897,7 @@ export class GlassEffect implements Effect {
     readonly #source = new SourceCapture({
         longSide: GLASS_MASK_LONG,
         minLongSide: GLASS_MASK_MIN,
-        onRead: (r) => this.#onRead(r.pixels, r.width, r.height, r.aspect),
+        onRead: (r, isCurrent) => this.#onRead(r, isCurrent),
     });
     // `sourceChannel` of the last shape read; a change reads it again.
     #channel: SourceChannel | null = null;
@@ -1190,46 +1113,47 @@ export class GlassEffect implements Effect {
         this.#source.refresh();
     }
 
-    // Build the shape and the relief's luminance from the element read
-    // back. False when the silhouette is empty, to try again later.
-    #onRead(
-        px: Uint8Array | Float32Array,
-        mw: number,
-        mh: number,
-        aspect: number,
-    ): boolean {
+    // Build the shape, and the relief when it is on, from the element
+    // read back, in the worker. False when the silhouette is empty, to
+    // try again later.
+    async #onRead(
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ): Promise<boolean> {
         const channel = sourceChannelOf(this.params.sourceChannel);
-        const shape = buildShape(
-            px,
-            mw,
-            mh,
+        const withRelief = reliefOn(this.params.relief);
+        const built = await buildShapeAsync({
+            pixels: r.pixels,
+            mw: r.width,
+            mh: r.height,
             channel,
-            this.params.depth / 2,
-            aspect,
-            SMOOTH_RADIUS,
-            SMOOTH_PASSES,
-        );
-        if (!shape) {
+            halfDepthHint: this.params.depth / 2,
+            aspect: r.aspect,
+            smoothRadius: SMOOTH_RADIUS,
+            smoothPasses: SMOOTH_PASSES,
+            spawn: false,
+            relief: withRelief
+                ? {
+                      blur: this.params.reliefBlur,
+                      passes: RELIEF_PASSES,
+                      maxRadius: RELIEF_MAX_RADIUS,
+                  }
+                : undefined,
+        });
+        if (!built) {
             return false;
         }
-        if (reliefOn(this.params.relief)) {
-            const lum = reliefLuminance(px, mw, mh, shape);
-            const radius = reliefRadius(this.params.reliefBlur, shape);
-            this.#pending = {
-                ...shape,
-                reliefLum: lum,
-                reliefRadius: radius,
-                ...buildRelief(lum, shape, radius),
-            };
-        } else {
-            this.#pending = {
-                ...shape,
-                reliefLum: null,
-                reliefRadius: -1,
-                relief: EMPTY,
-                reliefMaxGrad: 0,
-            };
+        if (!isCurrent()) {
+            return true; // dropped by the capture anyway
         }
+        const { relief, ...shape } = built;
+        this.#pending = {
+            ...shape,
+            reliefLum: relief?.lum ?? null,
+            reliefRadius: relief?.radius ?? -1,
+            relief: relief?.map ?? EMPTY,
+            reliefMaxGrad: relief?.maxGrad ?? 0,
+        };
         this.#channel = channel;
         return true;
     }
@@ -1279,11 +1203,22 @@ export class GlassEffect implements Effect {
             }
             return;
         }
-        const radius = reliefRadius(this.params.reliefBlur, shape);
+        const radius = reliefRadius(
+            this.params.reliefBlur,
+            shape,
+            RELIEF_MAX_RADIUS,
+        );
         if (radius === shape.reliefRadius) {
             return;
         }
-        Object.assign(shape, buildRelief(shape.reliefLum, shape, radius));
+        const { map, maxGrad } = buildRelief(
+            shape.reliefLum,
+            shape,
+            radius,
+            RELIEF_PASSES,
+        );
+        shape.relief = map;
+        shape.reliefMaxGrad = maxGrad;
         shape.reliefRadius = radius;
         this.#uploadRelief(ctx, shape);
         shape.relief = EMPTY;

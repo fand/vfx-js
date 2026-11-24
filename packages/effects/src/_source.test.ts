@@ -208,6 +208,37 @@ describe("SourceCapture", () => {
         expect(framesToRead(cap, ctx, reads)).toBe(CAPTURE_DELAY);
     });
 
+    test("an async onRead keeps the phase reading until it resolves, and a refresh drops it", async () => {
+        const { ctx, reads } = makeCtx(200, 100);
+        const results: ((ok: boolean) => void)[] = [];
+        const current: (() => boolean)[] = [];
+        const cap = new SourceCapture({
+            longSide: 16,
+            onRead: (_r, isCurrent) => {
+                current.push(isCurrent);
+                return new Promise<boolean>((resolve) => results.push(resolve));
+            },
+        });
+        framesToRead(cap, ctx, reads);
+        reads[0].resolve(pixels(16, 8));
+        await tick();
+        expect(cap.phase).toBe("reading");
+        results[0](true);
+        await tick();
+        expect(cap.phase).toBe("idle");
+
+        // A refresh while the build runs: its result is not current, and dropped.
+        cap.refresh();
+        framesToRead(cap, ctx, reads);
+        reads[1].resolve(pixels(16, 8));
+        await tick();
+        cap.refresh();
+        expect(current[1]()).toBe(false);
+        results[1](true);
+        await tick();
+        expect(cap.phase).toBe("capture");
+    });
+
     test("a restored context drops the read in flight and reads again", async () => {
         const { ctx, reads } = makeCtx();
         const onRead = vi.fn(() => true);

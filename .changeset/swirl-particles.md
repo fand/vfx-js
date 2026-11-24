@@ -20,3 +20,4 @@ Add `SwirlParticleEffect`: particles flow over the element's silhouette, extrude
 - `antialias: true` smooths the fibres' edges with 4× MSAA, at about 5× the memory of the particle buffer (10× with its depth). Off by default.
 - `new SwirlParticleEffect(params, { still: true })` renders one still frame, drawn again only when params or the element's size change (or, with `cameraOrigin: "viewport"`, its position in the viewport).
 - New types: `SwirlParticleParams`, `SwirlParticleColorStop`, `SwirlParticlePaletteName`, `SwirlParticleEffectOptions`, `SwirlParticlePointer`.
+- The silhouette's distance field is built in a worker, shared by `GlassEffect`, `BubbleEffect` and `SwirlParticleEffect`, so reading the shape back does not stall the page. Without workers (e.g. a CSP that blocks `blob:` URLs) it runs on the page.

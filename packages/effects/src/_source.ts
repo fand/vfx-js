@@ -52,10 +52,17 @@ export type SourceCaptureOptions = {
     read?: EffectReadPixelsOpts;
     /**
      * Called with the pixels of a capture that is still current. Return
-     * false when they hold nothing usable yet: the capture is tried again
-     * later, less often each time.
+     * (or resolve to) false when they hold nothing usable yet: the
+     * capture is tried again later, less often each time. While a
+     * returned promise is pending the phase stays `"reading"`; a
+     * refresh, restore or reset in the meantime drops its result.
+     * `isCurrent` tells, once it resolves, whether the result is still
+     * wanted.
      */
-    onRead: (r: SourceReadback) => boolean;
+    onRead: (
+        r: SourceReadback,
+        isCurrent: () => boolean,
+    ) => boolean | Promise<boolean>;
 };
 
 /**
@@ -220,24 +227,39 @@ export class SourceCapture {
             }
             this.#phase = "capture";
         };
+        const isCurrent = () => token === this.#token;
         read.then(
             (pixels) => {
-                if (token !== this.#token) {
+                if (!isCurrent()) {
                     return;
                 }
-                if (this.#opts.onRead({ pixels, width, height, aspect })) {
-                    this.#aspect = aspect;
-                    this.#long = long;
-                    this.#phase = "idle";
+                const done = (ok: boolean) => {
+                    if (!isCurrent()) {
+                        return;
+                    }
+                    if (ok) {
+                        this.#aspect = aspect;
+                        this.#long = long;
+                        this.#phase = "idle";
+                    } else {
+                        // Nothing drawn yet: try again later, less often,
+                        // in case it's a late-loading image.
+                        retry(true);
+                    }
+                };
+                const ok = this.#opts.onRead(
+                    { pixels, width, height, aspect },
+                    isCurrent,
+                );
+                if (typeof ok === "boolean") {
+                    done(ok);
                 } else {
-                    // Nothing drawn yet: try again later, less often, in
-                    // case it's a late-loading image.
-                    retry(true);
+                    ok.then(done, () => done(false));
                 }
             },
             () => {
                 // Disposed or context lost.
-                if (token === this.#token) {
+                if (isCurrent()) {
                     retry(false);
                 }
             },
