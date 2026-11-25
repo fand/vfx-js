@@ -415,6 +415,9 @@
 .BGDim .BGCanvas {
     opacity: 0.35;
 }
+.BGCanvas.BGOff {
+    opacity: 0;
+}
 
 #BG {
     position: fixed;

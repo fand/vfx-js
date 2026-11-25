@@ -1,0 +1,432 @@
+---
+import "../../styles/api.css";
+import CodeBlock from "../../components/CodeBlock.astro";
+import Layout from "../../layouts/Layout.astro";
+import { effectParams } from "../../api/effect-params";
+import { hrefOf, isInterfaceCopy, loadApi, membersOf } from "../../api/model";
+import {
+    highlight,
+    inlineMarkdownHtml,
+    propertyHtml,
+    signatureHtml,
+} from "../../api/render";
+import { Kind, type Reflection } from "../../api/types";
+import { argsHtml, argsPlaceholder, usageCode } from "../../effect-code";
+import {
+    type DemoMedia,
+    type EffectDemo,
+    effectDemos,
+    effectSlug,
+} from "../../effects-list";
+import { url } from "../../site";
+
+export function getStaticPaths() {
+    return effectDemos.map((demo, i) => ({
+        params: { slug: effectSlug(demo.name) },
+        props: {
+            demo,
+            prev: effectDemos[i - 1],
+            next: effectDemos[i + 1],
+        },
+    }));
+}
+
+type Props = { demo: EffectDemo; prev?: EffectDemo; next?: EffectDemo };
+
+const { demo, prev, next } = Astro.props;
+
+const media: Record<DemoMedia, string> = {
+    logo: url("vfx-js-logo-no-padding.svg"),
+    pigeon: url("images/pigeon.webp"),
+    jellyfish: url("images/jellyfish.webp"),
+};
+
+const api = loadApi();
+const page = api.pages.find(
+    (p) => p.pkg.slug === "effects" && p.decl.name === demo.name,
+);
+if (!page) {
+    throw new Error(`No API page for ${demo.name}`);
+}
+const decl = page.decl;
+const params = effectParams(api, demo, decl);
+
+// Code: the args show the params that differ from the defaults.
+const initialValues = { ...params.defaults, ...demo.params };
+const codeHtml = highlight(usageCode(demo).trim()).replace(
+    argsPlaceholder,
+    `<span class="EffectArgs">${argsHtml(demo, initialValues, params.defaults, params.formats)}</span>`,
+);
+
+const aboutHtml = inlineMarkdownHtml(api, [{ kind: "text", text: demo.about }]);
+
+/** JS value as short code for the table. */
+function defaultCode(value: unknown): string {
+    if (value === undefined) {
+        return "";
+    }
+    const text = JSON.stringify(value) ?? String(value);
+    return text.length > 40 ? `${text.slice(0, 37)}...` : text;
+}
+
+// API: one line per member. Hooks, params and their fields are documented elsewhere.
+const members = membersOf(decl);
+const ctor = members.find((m) => m.kind === Kind.Constructor);
+const ctorSignature = ctor?.signatures?.[0];
+const paramNames = new Set(params.docs.map((p) => p.name));
+const apiMembers = members.filter(
+    (m) =>
+        m !== ctor &&
+        m.name !== "params" &&
+        !paramNames.has(m.name) &&
+        !isInterfaceCopy(api, m),
+);
+
+function memberHtml(m: Reflection): string {
+    const s = m.signatures?.[0];
+    const code = s ? signatureHtml(api, s) : propertyHtml(api, m);
+    return m.flags.isStatic ? `<span class="tk">static </span>${code}` : code;
+}
+
+function memberSummary(m: Reflection): string {
+    const comment = m.comment ?? m.signatures?.[0]?.comment;
+    const parts = comment?.summary ?? [];
+    const text = parts.map((p) => p.text).join("");
+    // First sentence only.
+    const end = text.search(/\.(\s|$)/);
+    const first = end < 0 ? text : text.slice(0, end + 1);
+    return inlineMarkdownHtml(api, [{ kind: "text", text: first }]);
+}
+
+const paramsHref = params.decl && hrefOf(api, params.decl.id);
+
+const clientData = {
+    name: demo.name,
+    specs: params.specs,
+    defaults: params.defaults,
+    formats: params.formats,
+};
+---
+
+<Layout
+    page="effects"
+    title={`${demo.name} - Effects - VFX-JS`}
+    description={demo.text}
+    class="ApiPage"
+    background="off"
+>
+    <nav class="ApiCrumbs" aria-label="Breadcrumb">
+        <a href={url("effects/")}>Effects</a>
+        <span aria-hidden="true">/</span>
+        <a href={url("effects/#gallery")}>@vfx-js/effects</a>
+    </nav>
+
+    <h1>{demo.name}</h1>
+    <p class="EffectLead">{demo.text}</p>
+
+    <section id="example" class="EffectExample">
+        <div class="EffectDemo" data-clickable={!!demo.onClick}>
+            <img src={media[demo.media]} alt="" data-effect-demo={demo.name} />
+        </div>
+        <div class="EffectPane"></div>
+        {demo.hint && <p class="EffectHint">{demo.hint}</p>}
+    </section>
+
+    <section id="usage">
+        <CodeBlock html={codeHtml} label="main.ts" />
+    </section>
+
+    <section id="overview">
+        <h2>Overview</h2>
+        <p set:html={aboutHtml} />
+    </section>
+
+    {
+        params.docs.length > 0 && (
+            <section id="params">
+                <h2>Params</h2>
+                <p>
+                    Pass them to the constructor. All of them are optional.
+                    {paramsHref && (
+                        <>
+                            Type: <a href={paramsHref}><code>{params.decl?.name}</code></a>
+                        </>
+                    )}
+                </p>
+                <div class="ParamTableWrap">
+                    <table class="ParamTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {params.docs.map((p, i) => (
+                                <>
+                                {p.group && p.group !== params.docs[i - 1]?.group && (
+                                    <tr class="ParamGroup">
+                                        <th colspan="3">{p.group}</th>
+                                    </tr>
+                                )}
+                                <tr>
+                                    <td>
+                                        <code>{p.name}</code>
+                                        <code class="ParamType" set:html={p.typeHtml} />
+                                    </td>
+                                    <td>
+                                        <code>{defaultCode(p.defaultValue)}</code>
+                                    </td>
+                                    <td set:html={p.descriptionHtml} />
+                                </tr>
+                                </>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        )
+    }
+
+    <section id="api">
+        <h2>API</h2>
+        <ul class="ApiList">
+            {
+                ctorSignature && (
+                    <li>
+                        <code set:html={signatureHtml(api, ctorSignature, { name: demo.name })} />
+                    </li>
+                )
+            }
+            {
+                apiMembers.map((m) => (
+                    <li>
+                        <code set:html={memberHtml(m)} />
+                        <span set:html={memberSummary(m)} />
+                    </li>
+                ))
+            }
+        </ul>
+        <p>
+            Full reference: <a href={url(page.path)}><code>{demo.name}</code></a>
+        </p>
+    </section>
+
+    <nav class="EffectPager" aria-label="Effects">
+        {
+            prev ? (
+                <a href={url(`effects/${effectSlug(prev.name)}/`)}>
+                    &larr; {prev.name}
+                </a>
+            ) : (
+                <span />
+            )
+        }
+        {
+            next && (
+                <a href={url(`effects/${effectSlug(next.name)}/`)}>
+                    {next.name} &rarr;
+                </a>
+            )
+        }
+    </nav>
+
+    <script
+        type="application/json"
+        id="EffectData"
+        set:html={JSON.stringify(clientData).replace(/</g, "\\u003c")}
+    />
+</Layout>
+
+<script>
+    import type { Effect } from "@vfx-js/core";
+    import type { ParamFormat } from "../../effect-code";
+    import type { ParamSpec } from "../../api/effect-params";
+    import { applyParams, mountParamPane } from "../../demos/effect-pane";
+    import { lazyDemo } from "../../demos/lazy";
+    import { argsHtml } from "../../effect-code";
+    import { effectDemos } from "../../effects-list";
+    import { onPage } from "../../lifecycle";
+
+    type Data = {
+        name: string;
+        specs: ParamSpec[];
+        defaults: Record<string, unknown>;
+        formats: Record<string, ParamFormat>;
+    };
+
+    onPage(() => {
+        const dataEl = document.getElementById("EffectData");
+        const img = document.querySelector<HTMLElement>(
+            ".EffectDemo [data-effect-demo]",
+        );
+        if (!dataEl || !img) {
+            return;
+        }
+        const data = JSON.parse(dataEl.textContent ?? "{}") as Data;
+        const demo = effectDemos.find((d) => d.name === data.name);
+        if (!demo) {
+            return;
+        }
+
+        const values: Record<string, unknown> = {
+            ...structuredClone(data.defaults),
+            ...demo.params,
+        };
+        // Only the params the pane changed. The demo params are in `create`.
+        const changed: Record<string, unknown> = {};
+
+        let current: Effect | undefined;
+        const { rebuild } = lazyDemo(img, () => {
+            current = demo.create(changed);
+            return { effect: current, zIndex: demo.zIndex };
+        });
+
+        const onClick = demo.onClick;
+        if (onClick) {
+            img.addEventListener("click", () => {
+                if (current) {
+                    onClick(current);
+                }
+            });
+        }
+
+        const args = document.querySelector(".EffectArgs");
+        const specs = new Map(data.specs.map((s) => [s.name, s]));
+        let timer: number | undefined;
+
+        const container = document.querySelector<HTMLElement>(".EffectPane");
+        const pane =
+            container && data.specs.length > 0
+                ? mountParamPane(container, data.specs, values, demo, (name) => {
+                      changed[name] = values[name];
+                      if (specs.get(name)?.rebuild) {
+                          clearTimeout(timer);
+                          timer = window.setTimeout(rebuild, 200);
+                      } else if (current) {
+                          applyParams(current, { [name]: values[name] });
+                      }
+                      if (args) {
+                          args.innerHTML = argsHtml(
+                              demo,
+                              values,
+                              data.defaults,
+                              data.formats,
+                          );
+                      }
+                  })
+                : undefined;
+
+        return () => {
+            clearTimeout(timer);
+            pane?.dispose();
+        };
+    });
+</script>
+
+<style>
+    .EffectLead {
+        font-size: 1.125rem;
+    }
+    .EffectExample {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 16px;
+        align-items: start;
+    }
+    .EffectDemo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 3 / 2;
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .EffectDemo[data-clickable="true"] {
+        cursor: pointer;
+    }
+    .EffectDemo img {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    .EffectPane {
+        max-height: 480px;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+    .EffectPane:empty {
+        display: none;
+    }
+    .EffectHint {
+        grid-column: 1 / -1;
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 14px;
+    }
+    @media (max-width: 800px) {
+        .EffectExample {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+    .ParamTableWrap {
+        overflow-x: auto;
+    }
+    .ParamTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+        line-height: 1.5;
+    }
+    .ParamTable th,
+    .ParamTable td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+    .ParamTable th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .ParamGroup th {
+        padding-top: 24px;
+        color: white;
+    }
+    .ParamTable td:first-child {
+        white-space: nowrap;
+    }
+    .ParamType {
+        display: block;
+        font-size: 12px;
+        white-space: normal;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .ApiList {
+        padding: 0;
+        list-style: none;
+    }
+    .ApiList li {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .ApiList code {
+        font-size: 14px;
+        white-space: pre-wrap;
+    }
+    .EffectPager {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        font-family: var(--mono);
+    }
+</style>

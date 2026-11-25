@@ -68,12 +68,12 @@ export const nav: NavItem[] = [
     {
         slug: "effects",
         label: "Effects",
-        blurb: "Shader presets and the @vfx-js/effects gallery.",
+        blurb: "The @vfx-js/effects gallery and shader presets.",
         sections: [
-            { id: "presets", label: "Shader presets" },
-            { id: "parameters", label: "Preset uniforms" },
             { id: "gallery", label: "@vfx-js/effects" },
             { id: "chaining", label: "Chaining" },
+            { id: "presets", label: "Shader presets" },
+            { id: "parameters", label: "Preset uniforms" },
             { id: "storybook", label: "Storybook" },
         ],
     },

@@ -46,19 +46,37 @@ function onChange(changes: IntersectionObserverEntry[]) {
  * so effects get fresh instances.
  * Demos are removed before the next page swaps in.
  */
-export function lazyDemo(element: HTMLElement, makeProps: () => VFXProps) {
+export function lazyDemo(
+    element: HTMLElement,
+    makeProps: () => VFXProps,
+): { rebuild: () => void } {
     // The page scrolls inside its own box, so watch that box.
     observer ??= new IntersectionObserver(onChange, {
         root: scrollRoot(),
         rootMargin: "50% 0px",
     });
-    entries.set(element, {
+    const entry: Entry = {
         makeProps,
         queue: Promise.resolve(),
         added: false,
         dropped: false,
-    });
+    };
+    entries.set(element, entry);
     observer.observe(element);
+
+    return {
+        /** Swap in new effects from `makeProps`, if the demo is shown. */
+        rebuild: () => {
+            entry.queue = entry.queue
+                .then(async () => {
+                    const effect = makeProps().effect;
+                    if (entry.added && !entry.dropped && effect) {
+                        await getPageVFX().updateEffects(element, effect);
+                    }
+                })
+                .catch((e) => console.warn(e));
+        },
+    };
 }
 
 function dropAll() {

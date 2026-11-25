@@ -30,7 +30,8 @@
     "@vfx-js/transitions": "workspace:*",
     "astro": "^7.4.2",
     "markdown-it": "14.3.3",
-    "shiki": "4.5.0"
+    "shiki": "4.5.0",
+    "tweakpane": "4.0.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",

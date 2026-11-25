@@ -85,6 +85,9 @@ importers:
       shiki:
         specifier: 4.5.0
         version: 4.5.0
+      tweakpane:
+        specifier: 4.0.5
+        version: 4.0.5
     devDependencies:
       '@astrojs/check':
         specifier: 0.9.12

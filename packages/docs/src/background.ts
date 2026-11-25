@@ -53,5 +53,21 @@ async function start() {
     };
     loop();
 
+    applyMode();
+    document.addEventListener("astro:page-load", applyMode);
+
     await bgVFX.add(bg, { effect: [bgSpheres] });
+}
+
+/** Show what the page asks for in `data-background` (see Layout.astro). */
+function applyMode() {
+    const mode = document.body.dataset.background ?? "noise";
+    bgSpheres.showSpheres = mode === "full";
+    // Effect pages draw heavy demos. Stop the BG there to free the GPU.
+    bgVFX.canvas.classList.toggle("BGOff", mode === "off");
+    if (mode === "off") {
+        bgVFX.stop();
+    } else {
+        bgVFX.play();
+    }
 }
