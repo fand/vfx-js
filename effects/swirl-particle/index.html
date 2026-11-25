@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01. -->
+        <meta http-equiv="origin-trial" content="Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==">
+
+        <title>SwirlParticleEffect - Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Particles curling over the extruded silhouette.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/effects/swirl-particle/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/effects/swirl-particle/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="SwirlParticleEffect - Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Particles curling over the extruded silhouette.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/swirl-particle/">
+        <meta name="twitter:title" content="SwirlParticleEffect - Effects - VFX-JS">
+        <meta name="twitter:description" content="Particles curling over the extruded silhouette.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/render.B6oLkqIe.css">
+<link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.3mLNd3Z5.css">
+<link rel="stylesheet" href="/vfx-js/_astro/_slug_.B4BO3JCD.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage" data-background="off">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.SkJDwNS3.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/" aria-current="page">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/docs/">
+                    API Reference
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.C5i2OvA2.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        <span class="DocSidebarLabel">Getting Started</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        <span class="DocSidebarLabel">How it Works</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        <span class="DocSidebarLabel">Use with AI</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/" aria-current="page">
+                        <span class="DocSidebarLabel">Effects</span>
+                    </a>
+                    
+                    <ul>
+                            <li>
+                                    <a href="/vfx-js/effects/#gallery">
+                                        <span class="DocSidebarLabel">@vfx-js/effects</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#chaining">
+                                        <span class="DocSidebarLabel">Chaining</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#presets">
+                                        <span class="DocSidebarLabel">Shader presets</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#parameters">
+                                        <span class="DocSidebarLabel">Preset uniforms</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#storybook">
+                                        <span class="DocSidebarLabel">Storybook</span>
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        <span class="DocSidebarLabel">Custom Shaders</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        <span class="DocSidebarLabel">Custom Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/docs/">
+                        <span class="DocSidebarLabel">API Reference</span>
+                    </a>
+                    
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain ApiPage">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <nav class="ApiCrumbs" aria-label="Breadcrumb" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/" data-astro-cid-f2arvc5g>Effects</a>
+        <span aria-hidden="true" data-astro-cid-f2arvc5g>/</span>
+        <a href="/vfx-js/effects/#gallery" data-astro-cid-f2arvc5g>@vfx-js/effects</a>
+    </nav>
+
+    <h1 data-astro-cid-f2arvc5g>SwirlParticleEffect</h1>
+    <p class="EffectLead" data-astro-cid-f2arvc5g>Particles curling over the extruded silhouette.</p>
+
+    <section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
+        <div class="EffectDemo" data-clickable="false" data-astro-cid-f2arvc5g>
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-effect-demo="SwirlParticleEffect" data-astro-cid-f2arvc5g>
+        </div>
+        <div class="EffectPane" data-astro-cid-f2arvc5g></div>
+        
+    </section>
+
+    <section id="usage" data-astro-cid-f2arvc5g>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { SwirlParticleEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> effect</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> SwirlParticleEffect</span><span style="color:#E1E4E8">(<span class="EffectArgs">{ yaw: <span style="color:#79B8FF">11.5</span>, pad: <span style="color:#79B8FF">40</span> }</span>);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect });</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+    </section>
+
+    <section id="overview" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>Overview</h2>
+        <p data-astro-cid-f2arvc5g>Particles flow over the shape of the element and peel off in curling wisps. The shape comes from the alpha, so use it on logos or text with a transparent background.</p>
+    </section>
+
+    <section id="params" data-astro-cid-f2arvc5g>
+                <h2 data-astro-cid-f2arvc5g>Params</h2>
+                <p data-astro-cid-f2arvc5g>
+                    Pass them to the constructor. All of them are optional.
+                    
+                            Type: <a href="/vfx-js/docs/effects/SwirlParticleParams/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>SwirlParticleParams</code></a>
+                        
+                </p>
+                <div class="ParamTableWrap" data-astro-cid-f2arvc5g>
+                    <table class="ParamTable" data-astro-cid-f2arvc5g>
+                        <thead data-astro-cid-f2arvc5g>
+                            <tr data-astro-cid-f2arvc5g>
+                                <th data-astro-cid-f2arvc5g>Name</th>
+                                <th data-astro-cid-f2arvc5g>Default</th>
+                                <th data-astro-cid-f2arvc5g>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody data-astro-cid-f2arvc5g>
+                            
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Particles</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>count</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>65536</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Number of particles, at most 1,048,576 (2^20), and less on a GPU whose textures are small (262,144 where they are 2048 px; a warning says so). Each particle takes up to about 180 bytes of GPU memory, so 2^20 takes about 190 MB. Live: lowering it draws fewer particles without freeing memory; raising it past what is allocated reallocates the particle state (the trails regrow, and the new particles grow in over <code>intro</code>).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>life</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>4</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Mean particle lifetime in seconds (randomised ±40%).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>intro</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1.5</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Seconds over which the particles are born when the effect starts. Each one appears at a random moment in that window, more of them towards its end, and grows in, so the coat sprouts and the flow builds up instead of popping in whole. The first lives are shortened at random, so the particles born together don't die together.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointSize</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1.4</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Particle width in CSS px at the z = 0 plane.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>streak</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.3</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Trail length, in seconds of travel. Each particle draws a curved fibre through its recent positions, tapering towards the tail. 0 draws dots. Fast particles are capped on screen at 14 particle widths per 0.3 s of streak.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Shape</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>sourceChannel</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/SourceChannel/">SourceChannel</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;alpha&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Which channel of the element is read as the silhouette: <code>&quot;alpha&quot;</code> (where it is opaque; default), <code>&quot;luminance&quot;</code> (where it is bright, so the text or the light parts of an opaque image) or <code>&quot;none&quot;</code> (the whole element rect). A change reads the element back again, like <a href="/vfx-js/docs/effects/SwirlParticleEffect/#refresh"><code>refresh()</code></a>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>depth</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.22</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Extrusion depth, relative to the long side of the element (= 2).</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Flow</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>speed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.14</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Overall flow speed, in world units per second (the long side is 2).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>swirl</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the flow tangent to the surface.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>curl</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.8</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the curl noise that makes the wisps.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>curlScale</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>2.2</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Spatial frequency of the curl noise.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>attract</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>10</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How strongly particles are pulled back onto the surface.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>peel</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.8</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How much the pull fades with age, in [0, 1]. Old particles peel off.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Color</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>palette</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/SwirlParticlePaletteName/">SwirlParticlePaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <a class="tr" href="/vfx-js/docs/effects/SwirlParticleColorStop/">SwirlParticleColorStop</a><span class="tp">[]</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;nebula&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Particle colour gradient: a preset name or your own stops. Stops are sorted by offset, the ends clamp, and colours blend linearly. Read every frame; edits to the stops in place are picked up too.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>sourceColor</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Mix from the palette colour (0) to the source element's colour at each particle's spawn point (1). Lighting still applies on top.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Fireflies &amp; Bloom</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>fireflyRatio</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.01</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Fraction of particles drawn as bright sparkles, in [0, 1].</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>fireflyIntensity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>6</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>HDR intensity of the sparkles.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>fireflyColor</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#ffd2ec&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Sparkle colour, CSS hex.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bloom</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.9</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Bloom intensity. 0 turns the bloom passes off.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Light</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lightDirection</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">readonly</span> <span class="tp">[</span><span class="tk">number</span><span class="tp">, </span><span class="tk">number</span><span class="tp">, </span><span class="tk">number</span><span class="tp">]</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>[-0.45,0.75,0.55]</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Direction towards the light, in view space: +x right, +y up, +z towards the viewer. It stays fixed to the screen while the camera orbits. Normalised internally.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lightColor</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#ffffff&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Light colour, CSS hex. Tints the diffuse light and the glints.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lightIntensity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the diffuse light. 1 is the default look.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>ambient</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.25</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Light on the side facing away from the light, in [0, 1].</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>occlusion</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.7</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How much the creases of the shape darken, in [0, 1]. At 0.7 (the default) a fibre deep in a crease keeps 30% of its light; 0 turns the darkening off.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>glint</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.7</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the glints on the fibres that face the light.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Shadow</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>shadow</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Cast a soft shadow onto the page behind the shape. The page is a plane parallel to the screen, <code>shadowDistance</code> behind the shape's front face, lit by <code>lightDirection</code>. A light from behind (z ≤ 0) casts no shadow. The shadow is clipped to the output rect (see <code>pad</code>). Fireflies cast none.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>shadowOpacity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.35</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Opacity of the shadow, in [0, 1].</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>shadowSoftness</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>14</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Blur radius of the shadow (gaussian sigma), in CSS px.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>shadowDistance</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.26</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Distance from the shape's front face to the page behind it, in world units (the long side of the element is 2). The front face is where the front cap is when the shape is seen front-on, <code>depth / 2</code> in front of its centre; the page does not turn with the shape. At 0 the page touches the front face, so only the particles that peel off towards the viewer cast a shadow; at <code>depth</code> it touches the back. Further means a larger offset.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>shadowColor</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#1c2233&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Shadow colour, CSS hex.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Camera</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>yaw</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera yaw in degrees. 0 looks straight at the front cap; positive turns the front cap to the right.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pitch</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera pitch in degrees. 0 looks straight at the front cap; positive turns the front cap down, showing the top.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>orbitAnimation</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>23</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Amplitude of the orbit animation, a slow back-and-forth swing of the camera, in degrees of yaw (the pitch swings 0.3 times as far). 0 keeps the camera still (pointer drags still orbit it when <a href="/vfx-js/docs/effects/OrbitCameraParams/#drag"><code>drag</code></a> is on).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>orbitSpeed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Speed of the <a href="/vfx-js/docs/effects/OrbitCameraParams/#orbitAnimation"><code>orbitAnimation</code></a>, as a multiple of the base speed: at 1, a yaw swing takes about 48 seconds. 0 holds the animation where it is. A change while it runs carries on from there.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>fov</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>35</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Field of view in degrees, measured across the element's long side. The camera moves so the z = 0 plane keeps the element's size, so this only changes the strength of the perspective (like a dolly zoom).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>zoom</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera zoom. 1 = the z = 0 plane matches the element size.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>drag</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Orbit the camera by dragging the pointer. A drag starts on the element's box and can then leave it. While on, it listens for pointer events on <code>window</code>, and a drag that orbits keeps the browser from dragging the element (an image, a link) or selecting its text; UI on top of the element that should not orbit can stop <code>pointerdown</code> propagation.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>cameraOrigin</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="ts">&quot;element&quot;</span><span class="tp"> | </span><span class="ts">&quot;viewport&quot;</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;element&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Where the camera stands:</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Pointer</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointer</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/SwirlParticlePointer/">SwirlParticlePointer</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;none&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How the particles react to the pointer hovering over the page:</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointerRadius</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>120</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Radius of the <code>pointer: &quot;repel&quot;</code> hole, in CSS px on screen.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointerStrength</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the pointer interaction, 0 to 100 (default 1). With the effect's <code>pointer</code> at <code>&quot;tilt&quot;</code>, the shape turns to face the pointer by up to 20° × <code>pointerStrength</code> (capped at 90°), reached when the pointer is half a viewport away from the element's centre, and eases back to the rest pose once the pointer leaves the page; 0 turns it off. The tilt adds to <a href="/vfx-js/docs/effects/OrbitCameraParams/#yaw"><code>yaw</code></a> / <a href="/vfx-js/docs/effects/OrbitCameraParams/#pitch"><code>pitch</code></a>, the <a href="/vfx-js/docs/effects/OrbitCameraParams/#orbitAnimation"><code>orbitAnimation</code></a> and drags. Other <code>pointer</code> modes say what it does for them.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Output</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pad</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="ts">&quot;fullscreen&quot;</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>200</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Extra pad around the element in CSS px for the particles, bloom and shadow to draw into, or <code>&quot;fullscreen&quot;</code> to draw over the whole canvas. The default, 200, holds the wisps and the drop shadow of the default look on elements up to about 1000 px wide. A smaller pad, a larger element, <code>zoom</code>, a large tilt, a long <code>shadowDistance</code> or <code>cameraOrigin: &quot;viewport&quot;</code> on an element away from the viewport's centre clip them.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>antialias</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Smooth the edges of the fibres with 4× multisampling (MSAA). Off by default: the particle buffer then takes about 5 times the memory, 10 times with its depth buffer, which adds up fast with a large pad or <code>&quot;fullscreen&quot;</code> on a high-DPR screen. Falls back to no multisampling, with a warning, on GPUs that can't do it.</td>
+                                </tr>
+                                
+                        </tbody>
+                    </table>
+                </div>
+            </section><section id="api" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>API</h2>
+        <ul class="ApiList" data-astro-cid-f2arvc5g>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tk">new </span><span class="tf">SwirlParticleEffect</span><span class="tp">(</span>
+    <span class="tm">initial</span><span class="tp">?: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/SwirlParticleParams/">SwirlParticleParams</a><span class="tp">&gt;</span><span class="tp"> = {}</span><span class="tp">,</span>
+    <span class="tm">opts</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/effects/SwirlParticleEffectOptions/">SwirlParticleEffectOptions</a><span class="tp"> = {}</span><span class="tp">,</span>
+<span class="tp">)</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/SwirlParticleEffect/">SwirlParticleEffect</a></code>
+                    </li>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">refresh</span><span class="tp">(</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g>Capture the element's silhouette again, for when its content changed: an image's <code>src</code> swapped, a text edit.</span>
+                    </li><li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">setParams</span><span class="tp">(</span><span class="tm">updates</span><span class="tp">: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/SwirlParticleParams/">SwirlParticleParams</a><span class="tp">&gt;</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g></span>
+                    </li>
+        </ul>
+        <p data-astro-cid-f2arvc5g>
+            Full reference: <a href="/vfx-js/docs/effects/SwirlParticleEffect/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>SwirlParticleEffect</code></a>
+        </p>
+    </section>
+
+    <nav class="EffectPager" aria-label="Effects" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/slice-shift/" data-astro-cid-f2arvc5g>
+                    &larr; SliceShiftEffect
+                </a>
+        <a href="/vfx-js/effects/tile-pixelate/" data-astro-cid-f2arvc5g>
+                    TilePixelateEffect &rarr;
+                </a>
+    </nav>
+
+    <script type="application/json" id="EffectData">{"name":"SwirlParticleEffect","specs":[{"name":"count","group":"Particles","control":{"type":"number","min":1,"max":200000,"step":1},"rebuild":false},{"name":"life","group":"Particles","control":{"type":"number","min":0,"max":20,"step":0.1},"rebuild":false},{"name":"intro","group":"Particles","control":{"type":"number","min":0,"max":10,"step":0.1},"rebuild":false},{"name":"pointSize","group":"Particles","control":{"type":"number","min":0,"max":10,"step":0.1},"rebuild":false},{"name":"streak","group":"Particles","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"sourceChannel","group":"Shape","control":{"type":"list","options":["alpha","luminance","none"]},"rebuild":false},{"name":"depth","group":"Shape","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"speed","group":"Flow","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"swirl","group":"Flow","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"curl","group":"Flow","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"curlScale","group":"Flow","control":{"type":"number","min":0,"max":10,"step":0.1},"rebuild":false},{"name":"attract","group":"Flow","control":{"type":"number","min":1,"max":50,"step":1},"rebuild":false},{"name":"peel","group":"Flow","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"palette","group":"Color","control":{"type":"list","options":["nebula","ember","aurora","mono","sakura","ocean"]},"rebuild":false},{"name":"sourceColor","group":"Color","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"fireflyRatio","group":"Fireflies & Bloom","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"fireflyIntensity","group":"Fireflies & Bloom","control":{"type":"number","min":0,"max":50,"step":0.1},"rebuild":false},{"name":"fireflyColor","group":"Fireflies & Bloom","control":{"type":"color"},"rebuild":false},{"name":"bloom","group":"Fireflies & Bloom","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"lightDirection","group":"Light","control":{"type":"vector","labels":["x","y","z"],"items":[{"type":"number","min":-1,"max":1,"step":0.01},{"type":"number","min":-1,"max":1,"step":0.01},{"type":"number","min":-1,"max":1,"step":0.01}]},"rebuild":false},{"name":"lightColor","group":"Light","control":{"type":"color"},"rebuild":false},{"name":"lightIntensity","group":"Light","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"ambient","group":"Light","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"occlusion","group":"Light","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"glint","group":"Light","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"shadow","group":"Shadow","control":{"type":"boolean"},"rebuild":false},{"name":"shadowOpacity","group":"Shadow","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"shadowSoftness","group":"Shadow","control":{"type":"number","min":1,"max":100,"step":1},"rebuild":false},{"name":"shadowDistance","group":"Shadow","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"shadowColor","group":"Shadow","control":{"type":"color"},"rebuild":false},{"name":"yaw","group":"Camera","control":{"type":"number","min":-180,"max":180,"step":1},"rebuild":false},{"name":"pitch","group":"Camera","control":{"type":"number","min":-180,"max":180,"step":1},"rebuild":false},{"name":"orbitAnimation","group":"Camera","control":{"type":"number","min":1,"max":100,"step":1},"rebuild":false},{"name":"orbitSpeed","group":"Camera","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"fov","group":"Camera","control":{"type":"number","min":10,"max":120,"step":1},"rebuild":false},{"name":"zoom","group":"Camera","control":{"type":"number","min":0,"max":2,"step":0.01},"rebuild":false},{"name":"drag","group":"Camera","control":{"type":"boolean"},"rebuild":false},{"name":"cameraOrigin","group":"Camera","control":{"type":"list","options":["element","viewport"]},"rebuild":false},{"name":"pointer","group":"Pointer","control":{"type":"list","options":["none","repel","tilt"]},"rebuild":false},{"name":"pointerRadius","group":"Pointer","control":{"type":"number","min":1,"max":500,"step":1},"rebuild":false},{"name":"pointerStrength","group":"Pointer","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"pad","group":"Output","control":{"type":"number","min":1,"max":1000,"step":1},"rebuild":false},{"name":"antialias","group":"Output","control":{"type":"boolean"},"rebuild":false}],"defaults":{"count":65536,"life":4,"intro":1.5,"pointSize":1.4,"streak":0.3,"sourceChannel":"alpha","depth":0.22,"speed":0.14,"swirl":1,"curl":0.8,"curlScale":2.2,"attract":10,"peel":0.8,"palette":"nebula","sourceColor":0,"fireflyRatio":0.01,"fireflyIntensity":6,"fireflyColor":"#ffd2ec","bloom":0.9,"lightDirection":[-0.45,0.75,0.55],"lightColor":"#ffffff","lightIntensity":1,"ambient":0.25,"occlusion":0.7,"glint":0.7,"shadow":false,"shadowOpacity":0.35,"shadowSoftness":14,"shadowDistance":0.26,"shadowColor":"#1c2233","yaw":0,"pitch":0,"orbitAnimation":23,"orbitSpeed":1,"fov":35,"zoom":1,"drag":false,"cameraOrigin":"element","pointer":"none","pointerRadius":120,"pointerStrength":1,"pad":200,"antialias":false},"formats":{}}</script>
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">Getting Started</a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">How it Works</a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">Use with AI</a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">Custom Shaders</a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">Custom Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/docs/">API Reference</a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.rweuQyz_.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.CmvZgXGT.js"></script>

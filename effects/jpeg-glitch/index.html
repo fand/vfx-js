@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01. -->
+        <meta http-equiv="origin-trial" content="Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==">
+
+        <title>JPEGGlitchEffect - Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Real JPEG glitch: breaks the encoded bytes.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/effects/jpeg-glitch/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/effects/jpeg-glitch/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="JPEGGlitchEffect - Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Real JPEG glitch: breaks the encoded bytes.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/jpeg-glitch/">
+        <meta name="twitter:title" content="JPEGGlitchEffect - Effects - VFX-JS">
+        <meta name="twitter:description" content="Real JPEG glitch: breaks the encoded bytes.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/render.B6oLkqIe.css">
+<link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.3mLNd3Z5.css">
+<link rel="stylesheet" href="/vfx-js/_astro/_slug_.B4BO3JCD.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage" data-background="off">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.SkJDwNS3.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/" aria-current="page">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/docs/">
+                    API Reference
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.C5i2OvA2.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        <span class="DocSidebarLabel">Getting Started</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        <span class="DocSidebarLabel">How it Works</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        <span class="DocSidebarLabel">Use with AI</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/" aria-current="page">
+                        <span class="DocSidebarLabel">Effects</span>
+                    </a>
+                    
+                    <ul>
+                            <li>
+                                    <a href="/vfx-js/effects/#gallery">
+                                        <span class="DocSidebarLabel">@vfx-js/effects</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#chaining">
+                                        <span class="DocSidebarLabel">Chaining</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#presets">
+                                        <span class="DocSidebarLabel">Shader presets</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#parameters">
+                                        <span class="DocSidebarLabel">Preset uniforms</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#storybook">
+                                        <span class="DocSidebarLabel">Storybook</span>
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        <span class="DocSidebarLabel">Custom Shaders</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        <span class="DocSidebarLabel">Custom Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/docs/">
+                        <span class="DocSidebarLabel">API Reference</span>
+                    </a>
+                    
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain ApiPage">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <nav class="ApiCrumbs" aria-label="Breadcrumb" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/" data-astro-cid-f2arvc5g>Effects</a>
+        <span aria-hidden="true" data-astro-cid-f2arvc5g>/</span>
+        <a href="/vfx-js/effects/#gallery" data-astro-cid-f2arvc5g>@vfx-js/effects</a>
+    </nav>
+
+    <h1 data-astro-cid-f2arvc5g>JPEGGlitchEffect</h1>
+    <p class="EffectLead" data-astro-cid-f2arvc5g>Real JPEG glitch: breaks the encoded bytes.</p>
+
+    <section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
+        <div class="EffectDemo" data-clickable="false" data-astro-cid-f2arvc5g>
+            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect-demo="JPEGGlitchEffect" data-astro-cid-f2arvc5g>
+        </div>
+        <div class="EffectPane" data-astro-cid-f2arvc5g></div>
+        
+    </section>
+
+    <section id="usage" data-astro-cid-f2arvc5g>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { JPEGGlitchEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> effect</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> JPEGGlitchEffect</span><span style="color:#E1E4E8">(<span class="EffectArgs"></span>);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect });</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+    </section>
+
+    <section id="overview" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>Overview</h2>
+        <p data-astro-cid-f2arvc5g>Encodes the element as a real JPEG, breaks random bytes, and shows what the browser decodes. With <code>speed</code> above 0 it keeps glitching.</p>
+    </section>
+
+    <section id="params" data-astro-cid-f2arvc5g>
+                <h2 data-astro-cid-f2arvc5g>Params</h2>
+                <p data-astro-cid-f2arvc5g>
+                    Pass them to the constructor. All of them are optional.
+                    
+                            Type: <a href="/vfx-js/docs/effects/JPEGGlitchParams/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>JPEGGlitchParams</code></a>
+                        
+                </p>
+                <div class="ParamTableWrap" data-astro-cid-f2arvc5g>
+                    <table class="ParamTable" data-astro-cid-f2arvc5g>
+                        <thead data-astro-cid-f2arvc5g>
+                            <tr data-astro-cid-f2arvc5g>
+                                <th data-astro-cid-f2arvc5g>Name</th>
+                                <th data-astro-cid-f2arvc5g>Default</th>
+                                <th data-astro-cid-f2arvc5g>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody data-astro-cid-f2arvc5g>
+                            
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Glitch</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>quality</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.4</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>JPEG encode quality (0–1). Lower values bake in more blockiness before any corruption is applied. (Default: <code>0.4</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>seed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.25</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Random seed for the corruption pattern. Drives both the byte values written into the scan stream and where they land. The same seed (with the same other params) always produces the same glitch, so a static frame is reproducible. (Default: <code>0.25</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>iterations</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>24</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Number of bytes corrupted across the scan data. More iterations = more, smaller tears spread through the image. (Default: <code>24</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>resolutionScale</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Fraction of the element resolution to process at (0–1). <code>1</code> is full resolution; <code>0.5</code> reads back / encodes / decodes at half size (much cheaper, chunkier blocks) and the result is scaled back up to fit. <code>0</code> clamps to a single pixel. (Default: <code>1</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>randomFlip</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>true</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Randomly render half the glitches upside-down. Tears propagate downward (top stays cleaner), so rotating the source 180° before corrupting — then rotating the output back — flips the bias upward and balances the glitch over both directions. <code>false</code> disables it so tears always trail downward. (Default: <code>true</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>vertical</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Rotate the image a quarter turn (-90°) before corrupting, then rotate the decoded output back. Tears run top-to-bottom, so this turns them sideways. Composes with <code>randomFlip</code>. (Default: <code>false</code>)</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Playback</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>speed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Re-glitches per second. <code>0</code> glitches once and holds a stable frame (re-runs when params change); <code>&gt; 0</code> keeps re-corrupting for a live, moving glitch. (Default: <code>0</code>)</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bypass</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Disable the effect: pass the source straight through at its original resolution with no encode/decode round trip. Toggling this is the cheap way to switch the glitch on and off — the instance stays attached, so it keeps its buffers and pays no re-init cost. (Default: <code>false</code>)</td>
+                                </tr>
+                                
+                        </tbody>
+                    </table>
+                </div>
+            </section><section id="api" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>API</h2>
+        <ul class="ApiList" data-astro-cid-f2arvc5g>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tk">new </span><span class="tf">JPEGGlitchEffect</span><span class="tp">(</span><span class="tm">initial</span><span class="tp">?: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/JPEGGlitchParams/">JPEGGlitchParams</a><span class="tp">&gt;</span><span class="tp"> = {}</span><span class="tp">)</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/JPEGGlitchEffect/">JPEGGlitchEffect</a></code>
+                    </li>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tm">producedFrames</span><span class="tp">: </span><span class="tk">any</span></code>
+                        <span data-astro-cid-f2arvc5g></span>
+                    </li><li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">setParams</span><span class="tp">(</span><span class="tm">updates</span><span class="tp">: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/JPEGGlitchParams/">JPEGGlitchParams</a><span class="tp">&gt;</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g></span>
+                    </li>
+        </ul>
+        <p data-astro-cid-f2arvc5g>
+            Full reference: <a href="/vfx-js/docs/effects/JPEGGlitchEffect/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>JPEGGlitchEffect</code></a>
+        </p>
+    </section>
+
+    <nav class="EffectPager" aria-label="Effects" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/hue-shift/" data-astro-cid-f2arvc5g>
+                    &larr; HueShiftEffect
+                </a>
+        <a href="/vfx-js/effects/light-streak/" data-astro-cid-f2arvc5g>
+                    LightStreakEffect &rarr;
+                </a>
+    </nav>
+
+    <script type="application/json" id="EffectData">{"name":"JPEGGlitchEffect","specs":[{"name":"quality","group":"Glitch","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"seed","group":"Glitch","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"iterations","group":"Glitch","control":{"type":"number","min":1,"max":100,"step":1},"rebuild":false},{"name":"resolutionScale","group":"Glitch","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"randomFlip","group":"Glitch","control":{"type":"boolean"},"rebuild":false},{"name":"vertical","group":"Glitch","control":{"type":"boolean"},"rebuild":false},{"name":"speed","group":"Playback","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"bypass","group":"Playback","control":{"type":"boolean"},"rebuild":false}],"defaults":{"quality":0.4,"seed":0.25,"iterations":24,"resolutionScale":1,"randomFlip":true,"vertical":false,"speed":0,"bypass":false},"formats":{}}</script>
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">Getting Started</a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">How it Works</a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">Use with AI</a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">Custom Shaders</a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">Custom Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/docs/">API Reference</a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.rweuQyz_.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.CmvZgXGT.js"></script>

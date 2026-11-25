@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01. -->
+        <meta http-equiv="origin-trial" content="Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==">
+
+        <title>ColoredEdgesEffect - Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Edge detection with two edge colors.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/effects/colored-edges/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/effects/colored-edges/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="ColoredEdgesEffect - Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Edge detection with two edge colors.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/colored-edges/">
+        <meta name="twitter:title" content="ColoredEdgesEffect - Effects - VFX-JS">
+        <meta name="twitter:description" content="Edge detection with two edge colors.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/render.B6oLkqIe.css">
+<link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.3mLNd3Z5.css">
+<link rel="stylesheet" href="/vfx-js/_astro/_slug_.B4BO3JCD.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage" data-background="off">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.SkJDwNS3.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/" aria-current="page">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/docs/">
+                    API Reference
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.C5i2OvA2.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        <span class="DocSidebarLabel">Getting Started</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        <span class="DocSidebarLabel">How it Works</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        <span class="DocSidebarLabel">Use with AI</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/" aria-current="page">
+                        <span class="DocSidebarLabel">Effects</span>
+                    </a>
+                    
+                    <ul>
+                            <li>
+                                    <a href="/vfx-js/effects/#gallery">
+                                        <span class="DocSidebarLabel">@vfx-js/effects</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#chaining">
+                                        <span class="DocSidebarLabel">Chaining</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#presets">
+                                        <span class="DocSidebarLabel">Shader presets</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#parameters">
+                                        <span class="DocSidebarLabel">Preset uniforms</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#storybook">
+                                        <span class="DocSidebarLabel">Storybook</span>
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        <span class="DocSidebarLabel">Custom Shaders</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        <span class="DocSidebarLabel">Custom Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/docs/">
+                        <span class="DocSidebarLabel">API Reference</span>
+                    </a>
+                    
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain ApiPage">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <nav class="ApiCrumbs" aria-label="Breadcrumb" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/" data-astro-cid-f2arvc5g>Effects</a>
+        <span aria-hidden="true" data-astro-cid-f2arvc5g>/</span>
+        <a href="/vfx-js/effects/#gallery" data-astro-cid-f2arvc5g>@vfx-js/effects</a>
+    </nav>
+
+    <h1 data-astro-cid-f2arvc5g>ColoredEdgesEffect</h1>
+    <p class="EffectLead" data-astro-cid-f2arvc5g>Edge detection with two edge colors.</p>
+
+    <section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
+        <div class="EffectDemo" data-clickable="false" data-astro-cid-f2arvc5g>
+            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect-demo="ColoredEdgesEffect" data-astro-cid-f2arvc5g>
+        </div>
+        <div class="EffectPane" data-astro-cid-f2arvc5g></div>
+        
+    </section>
+
+    <section id="usage" data-astro-cid-f2arvc5g>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { ColoredEdgesEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> effect</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> ColoredEdgesEffect</span><span style="color:#E1E4E8">(<span class="EffectArgs"></span>);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect });</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+    </section>
+
+    <section id="overview" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>Overview</h2>
+        <p data-astro-cid-f2arvc5g>Finds the edges in the element and draws them in two colors over a solid background.</p>
+    </section>
+
+    <section id="params" data-astro-cid-f2arvc5g>
+                <h2 data-astro-cid-f2arvc5g>Params</h2>
+                <p data-astro-cid-f2arvc5g>
+                    Pass them to the constructor. All of them are optional.
+                    
+                            Type: <a href="/vfx-js/docs/effects/ColoredEdgesParams/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>ColoredEdgesParams</code></a>
+                        
+                </p>
+                <div class="ParamTableWrap" data-astro-cid-f2arvc5g>
+                    <table class="ParamTable" data-astro-cid-f2arvc5g>
+                        <thead data-astro-cid-f2arvc5g>
+                            <tr data-astro-cid-f2arvc5g>
+                                <th data-astro-cid-f2arvc5g>Name</th>
+                                <th data-astro-cid-f2arvc5g>Default</th>
+                                <th data-astro-cid-f2arvc5g>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody data-astro-cid-f2arvc5g>
+                            
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Edges</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>threshold</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.2</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Edge detection threshold, in [0, 1].</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>thickness</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>3</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Sampling radius for the Sobel kernel, in px.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>intensity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>4</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Edge contrast multiplier.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Color</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>color1</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#ff0000&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Gradient start color. Accepts a hex string.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>color2</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#0000ff&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Gradient end color. Accepts a hex string.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>background</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#000000&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Background color for non-edge areas. Accepts a hex string.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>opacity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Blend the source back in over the edges, in [0, 1].</td>
+                                </tr>
+                                
+                        </tbody>
+                    </table>
+                </div>
+            </section><section id="api" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>API</h2>
+        <ul class="ApiList" data-astro-cid-f2arvc5g>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tk">new </span><span class="tf">ColoredEdgesEffect</span><span class="tp">(</span><span class="tm">initial</span><span class="tp">?: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/ColoredEdgesParams/">ColoredEdgesParams</a><span class="tp">&gt;</span><span class="tp"> = {}</span><span class="tp">)</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/ColoredEdgesEffect/">ColoredEdgesEffect</a></code>
+                    </li>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">setParams</span><span class="tp">(</span><span class="tm">updates</span><span class="tp">: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/ColoredEdgesParams/">ColoredEdgesParams</a><span class="tp">&gt;</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g></span>
+                    </li>
+        </ul>
+        <p data-astro-cid-f2arvc5g>
+            Full reference: <a href="/vfx-js/docs/effects/ColoredEdgesEffect/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>ColoredEdgesEffect</code></a>
+        </p>
+    </section>
+
+    <nav class="EffectPager" aria-label="Effects" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/chromatic/" data-astro-cid-f2arvc5g>
+                    &larr; ChromaticEffect
+                </a>
+        <a href="/vfx-js/effects/datamosh/" data-astro-cid-f2arvc5g>
+                    DatamoshEffect &rarr;
+                </a>
+    </nav>
+
+    <script type="application/json" id="EffectData">{"name":"ColoredEdgesEffect","specs":[{"name":"threshold","group":"Edges","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"thickness","group":"Edges","control":{"type":"number","min":1,"max":20,"step":1},"rebuild":false},{"name":"intensity","group":"Edges","control":{"type":"number","min":0,"max":20,"step":0.1},"rebuild":false},{"name":"color1","group":"Color","control":{"type":"color"},"rebuild":false},{"name":"color2","group":"Color","control":{"type":"color"},"rebuild":false},{"name":"background","group":"Color","control":{"type":"color"},"rebuild":false},{"name":"opacity","group":"Color","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false}],"defaults":{"threshold":0.2,"thickness":3,"intensity":4,"color1":"#ff0000","color2":"#0000ff","background":"#000000","opacity":0},"formats":{}}</script>
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">Getting Started</a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">How it Works</a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">Use with AI</a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">Custom Shaders</a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">Custom Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/docs/">API Reference</a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.rweuQyz_.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.CmvZgXGT.js"></script>

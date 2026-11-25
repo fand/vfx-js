@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01. -->
+        <meta http-equiv="origin-trial" content="Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==">
+
+        <title>GlassEffect - Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Dispersive glass in the shape of the silhouette.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/effects/glass/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/effects/glass/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="GlassEffect - Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Dispersive glass in the shape of the silhouette.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/glass/">
+        <meta name="twitter:title" content="GlassEffect - Effects - VFX-JS">
+        <meta name="twitter:description" content="Dispersive glass in the shape of the silhouette.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/render.B6oLkqIe.css">
+<link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.3mLNd3Z5.css">
+<link rel="stylesheet" href="/vfx-js/_astro/_slug_.B4BO3JCD.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage" data-background="off">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.SkJDwNS3.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/" aria-current="page">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/docs/">
+                    API Reference
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.C5i2OvA2.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        <span class="DocSidebarLabel">Getting Started</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        <span class="DocSidebarLabel">How it Works</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        <span class="DocSidebarLabel">Use with AI</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/" aria-current="page">
+                        <span class="DocSidebarLabel">Effects</span>
+                    </a>
+                    
+                    <ul>
+                            <li>
+                                    <a href="/vfx-js/effects/#gallery">
+                                        <span class="DocSidebarLabel">@vfx-js/effects</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#chaining">
+                                        <span class="DocSidebarLabel">Chaining</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#presets">
+                                        <span class="DocSidebarLabel">Shader presets</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#parameters">
+                                        <span class="DocSidebarLabel">Preset uniforms</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/#storybook">
+                                        <span class="DocSidebarLabel">Storybook</span>
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        <span class="DocSidebarLabel">Custom Shaders</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        <span class="DocSidebarLabel">Custom Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/docs/">
+                        <span class="DocSidebarLabel">API Reference</span>
+                    </a>
+                    
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain ApiPage">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <nav class="ApiCrumbs" aria-label="Breadcrumb" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/" data-astro-cid-f2arvc5g>Effects</a>
+        <span aria-hidden="true" data-astro-cid-f2arvc5g>/</span>
+        <a href="/vfx-js/effects/#gallery" data-astro-cid-f2arvc5g>@vfx-js/effects</a>
+    </nav>
+
+    <h1 data-astro-cid-f2arvc5g>GlassEffect</h1>
+    <p class="EffectLead" data-astro-cid-f2arvc5g>Dispersive glass in the shape of the silhouette.</p>
+
+    <section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
+        <div class="EffectDemo" data-clickable="false" data-astro-cid-f2arvc5g>
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-effect-demo="GlassEffect" data-astro-cid-f2arvc5g>
+        </div>
+        <div class="EffectPane" data-astro-cid-f2arvc5g></div>
+        
+    </section>
+
+    <section id="usage" data-astro-cid-f2arvc5g>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { GlassEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> effect</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> GlassEffect</span><span style="color:#E1E4E8">(<span class="EffectArgs">{ zoom: <span style="color:#79B8FF">0.9</span>, pad: <span style="color:#79B8FF">40</span> }</span>);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect });</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+    </section>
+
+    <section id="overview" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>Overview</h2>
+        <p data-astro-cid-f2arvc5g>Turns the shape of the element into a block of glass. Light bends through it and splits into rainbow colors. A pattern or an image shows through from behind.</p>
+    </section>
+
+    <section id="params" data-astro-cid-f2arvc5g>
+                <h2 data-astro-cid-f2arvc5g>Params</h2>
+                <p data-astro-cid-f2arvc5g>
+                    Pass them to the constructor. All of them are optional.
+                    
+                            Type: <a href="/vfx-js/docs/effects/GlassParams/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>GlassParams</code></a>
+                        
+                </p>
+                <div class="ParamTableWrap" data-astro-cid-f2arvc5g>
+                    <table class="ParamTable" data-astro-cid-f2arvc5g>
+                        <thead data-astro-cid-f2arvc5g>
+                            <tr data-astro-cid-f2arvc5g>
+                                <th data-astro-cid-f2arvc5g>Name</th>
+                                <th data-astro-cid-f2arvc5g>Default</th>
+                                <th data-astro-cid-f2arvc5g>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody data-astro-cid-f2arvc5g>
+                            
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Shape</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>sourceChannel</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/SourceChannel/">SourceChannel</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;alpha&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Which channel of the element is read as the silhouette: <code>&quot;alpha&quot;</code> (where it is opaque; default), <code>&quot;luminance&quot;</code> (where it is bright, so the text or the light parts of an opaque image) or <code>&quot;none&quot;</code> (the whole element rect). A change reads the element back again, like <a href="/vfx-js/docs/effects/GlassEffect/#refresh"><code>refresh()</code></a>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>depth</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.2</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Extrusion depth, relative to the long side of the element (= 2).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bevel</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.03</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Size of the bevel on the edges, in the same units as <code>depth</code>. Most of the dispersion shows on it, where the surface turns.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bevelShape</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/GlassBevelShape/">GlassBevelShape</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;round&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Profile of the bevel.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bulge</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How far the caps rise in the middle, in the same units as <code>depth</code>. 0 keeps them flat; more makes a lens or a gem.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bulgeWidth</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.15</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Distance from the silhouette's edge over which the caps rise to the full <code>bulge</code>. Where the shape is narrower than twice this, the bulge has a crease along its middle.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>relief</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Height of a relief on the front cap, in the same units as <code>depth</code>, from the element's luminance: positive raises the bright parts, negative the dark ones (by sinking the bright ones). It makes a button's label or a photo's content show as shape. 0 is off. Read back with the silhouette (see <a href="/vfx-js/docs/effects/GlassEffect/#refresh"><code>refresh()</code></a>), so a video gives a still relief. At 0 the relief is not built; moving it off 0 reads the element back again, so the relief shows a few frames later.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>reliefBlur</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.006</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How much the relief's height map is blurred, in the same units as <code>depth</code>. More calms a busy photo and rounds a label's edges. Changing it rebuilds the height map on the CPU.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Glass</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>ior</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1.5</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Index of refraction at the middle of the spectrum.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>dispersion</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.12</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Spread of the index of refraction over the spectrum: red is <code>ior - dispersion / 2</code>, violet <code>ior + dispersion / 2</code>. Real glass is around 0.02; 0.1 to 0.2 gives the exaggerated rainbow look.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>paths</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>2</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Rays traced through the glass per pixel, 1 to 4, spread over the spectrum. The cost grows linearly. 2 is enough for a small <code>dispersion</code>; use more when the rainbow breaks up.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>samples</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>8</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Wavelengths in the spectrum, 1 to 16. They are interpolated between the traced <code>paths</code>, so they are cheap. Equal to <code>paths</code>, the channels split into separate bands instead of a smooth rainbow.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bounces</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>2</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Reflections inside the glass before the ray is forced out, 0 to 5.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>jitter</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Per-pixel offset of the wavelengths, 0 to 1. Trades the banding of a low <code>samples</code> for fine noise.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>tint</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#ffffff&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Colour of the glass, <code>#rrggbb</code>. Thicker glass is more saturated.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>absorption</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How fast the glass takes its <code>tint</code> with thickness. 0 is clear.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>reflection</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the reflection on the outer surface.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bump</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Ripples on the surface, 0 to 1, like hammered or old glass. Only the normals are bent; the outline stays the same.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bumpScale</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.15</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Size of the ripples, in the same units as <code>depth</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>frost</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Roughness of the surface, 0 to 1: what is seen through the glass, and reflected on it, blurs with its distance from the surface.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Backdrop</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdrop</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/BackdropPatternName/">BackdropPatternName</a><span class="tp"> | </span><a class="tr" href="/vfx-js/docs/effects/BackdropImageSource/">BackdropImageSource</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;stripes&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>What is seen through the glass: a pattern name, or an image (an element, an <code>ImageBitmap</code> or a URL).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropColors</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/BackdropPaletteName/">BackdropPaletteName</a><span class="tp"> | </span><span class="tk">readonly</span> <span class="tk">string</span><span class="tp">[]</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;mono&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>The palette of a procedural pattern: a <a href="/vfx-js/docs/effects/BackdropPaletteName/"><code>BackdropPaletteName</code></a> or two or more <code>#rrggbb</code> colours in order, each with an equal share of the area. One colour is a flat fill. Stripes, marble bands and the flow go round the colours, the last running into the first; the grid nests them as concentric squares.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropVisible</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Draw the backdrop around the glass too, not only through it.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropScale</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.25</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Size of the pattern's features, or of the image, in the same units as <code>depth</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropDistance</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.6</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Distance of the backdrop plane behind the shape's centre.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropSpeed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.15</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Speed of the pattern, in pattern periods per second. The patterns scroll, except <code>&quot;marble&quot;</code> and <code>&quot;flow&quot;</code>, which morph in place.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropRatio</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.5</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Share of the area that the second colour covers when the palette has two colours, 0 to 1: the width of the stripes and marble bands, of the grid's lines. Ignored for three or more colours.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>backdropSoftness</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.03</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Softness of the edges between the palette's colours, 0 to 1. 0 is hard bands; near 1 the pattern is a continuous gradient through the colours.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Lights</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lightIntensity</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1.5</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Brightness of the soft box lights around the shape. 0 turns them off.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lightSoftness</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.15</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Softness of the lights' edges, 0 to 1.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>View</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>yaw</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>29</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera yaw in degrees. 0 looks straight at the front cap; positive turns the front cap to the right.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pitch</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>14</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera pitch in degrees. 0 looks straight at the front cap; positive turns the front cap down, showing the top.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>orbitAnimation</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>20</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Amplitude of the orbit animation, a slow back-and-forth swing of the camera, in degrees of yaw (the pitch swings 0.3 times as far). 0 keeps the camera still (pointer drags still orbit it when <a href="/vfx-js/docs/effects/OrbitCameraParams/#drag"><code>drag</code></a> is on).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>orbitSpeed</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>3.3</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Speed of the <a href="/vfx-js/docs/effects/OrbitCameraParams/#orbitAnimation"><code>orbitAnimation</code></a>, as a multiple of the base speed: at 1, a yaw swing takes about 48 seconds. 0 holds the animation where it is. A change while it runs carries on from there.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>fov</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>30</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Field of view in degrees, measured across the element's long side. The camera moves so the z = 0 plane keeps the element's size, so this only changes the strength of the perspective (like a dolly zoom).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>zoom</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.7</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Camera zoom. 1 = the z = 0 plane matches the element size.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>drag</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>false</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Orbit the camera by dragging the pointer. A drag starts on the element's box and can then leave it. While on, it listens for pointer events on <code>window</code>, and a drag that orbits keeps the browser from dragging the element (an image, a link) or selecting its text; UI on top of the element that should not orbit can stop <code>pointerdown</code> propagation.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>cameraOrigin</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="ts">&quot;element&quot;</span><span class="tp"> | </span><span class="ts">&quot;viewport&quot;</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;element&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Where the camera stands:</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointer</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/GlassPointer/">GlassPointer</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;none&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How the glass reacts to the pointer hovering over the page:</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointerStrength</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Strength of the pointer interaction, 0 to 100 (default 1). With the effect's <code>pointer</code> at <code>&quot;tilt&quot;</code>, the shape turns to face the pointer by up to 20° × <code>pointerStrength</code> (capped at 90°), reached when the pointer is half a viewport away from the element's centre, and eases back to the rest pose once the pointer leaves the page; 0 turns it off. The tilt adds to <a href="/vfx-js/docs/effects/OrbitCameraParams/#yaw"><code>yaw</code></a> / <a href="/vfx-js/docs/effects/OrbitCameraParams/#pitch"><code>pitch</code></a>, the <a href="/vfx-js/docs/effects/OrbitCameraParams/#orbitAnimation"><code>orbitAnimation</code></a> and drags. Other <code>pointer</code> modes say what it does for them.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>Output</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>resolution</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Render scale, 0.25 to 2. Below 1 is cheaper and softer; 2 supersamples the silhouette's edge.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>antialias</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>true</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Smooth the edges with FXAA, a cheap pass over the final image. The glass is ray-marched in one pass, so multisampling would not help; the march already blends the silhouette by coverage, and FXAA smooths what is left, mostly the refraction on a narrow bevel, which changes faster than the pixels can follow. <code>resolution: 2</code> is the thorough (and costly) fix.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pad</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="ts">&quot;fullscreen&quot;</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>100</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Padding around the element, in CSS px, or <code>&quot;fullscreen&quot;</code> to draw on the whole canvas. Default 100. Use <code>&quot;fullscreen&quot;</code> with <code>cameraOrigin: &quot;viewport&quot;</code>, where an element off the centre leans out of its rect; it costs full-canvas passes per element.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>debug</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/GlassDebugView/">GlassDebugView</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;off&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Show the cost of each pixel instead of the glass, as a heat map of SDF lookups: black 0, blue 64, green 128, yellow 192, red 256, white 320 or more.</td>
+                                </tr>
+                                
+                        </tbody>
+                    </table>
+                </div>
+            </section><section id="api" data-astro-cid-f2arvc5g>
+        <h2 data-astro-cid-f2arvc5g>API</h2>
+        <ul class="ApiList" data-astro-cid-f2arvc5g>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tk">new </span><span class="tf">GlassEffect</span><span class="tp">(</span>
+    <span class="tm">initial</span><span class="tp">?: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/GlassParams/">GlassParams</a><span class="tp">&gt;</span><span class="tp"> = {}</span><span class="tp">,</span>
+    <span class="tm">opts</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/effects/GlassEffectOptions/">GlassEffectOptions</a><span class="tp"> = {}</span><span class="tp">,</span>
+<span class="tp">)</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/effects/GlassEffect/">GlassEffect</a></code>
+                    </li>
+            <li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">refresh</span><span class="tp">(</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g>Capture the element's silhouette again, for when its content changed: an image's <code>src</code> swapped, a text edit.</span>
+                    </li><li data-astro-cid-f2arvc5g>
+                        <code data-astro-cid-f2arvc5g><span class="tf">setParams</span><span class="tp">(</span><span class="tm">updates</span><span class="tp">: </span><span class="tr">Partial</span><span class="tp">&lt;</span><a class="tr" href="/vfx-js/docs/effects/GlassParams/">GlassParams</a><span class="tp">&gt;</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code>
+                        <span data-astro-cid-f2arvc5g></span>
+                    </li>
+        </ul>
+        <p data-astro-cid-f2arvc5g>
+            Full reference: <a href="/vfx-js/docs/effects/GlassEffect/" data-astro-cid-f2arvc5g><code data-astro-cid-f2arvc5g>GlassEffect</code></a>
+        </p>
+    </section>
+
+    <nav class="EffectPager" aria-label="Effects" data-astro-cid-f2arvc5g>
+        <a href="/vfx-js/effects/fluid/" data-astro-cid-f2arvc5g>
+                    &larr; FluidEffect
+                </a>
+        <a href="/vfx-js/effects/glitch/" data-astro-cid-f2arvc5g>
+                    GlitchEffect &rarr;
+                </a>
+    </nav>
+
+    <script type="application/json" id="EffectData">{"name":"GlassEffect","specs":[{"name":"sourceChannel","group":"Shape","control":{"type":"list","options":["alpha","luminance","none"]},"rebuild":false},{"name":"depth","group":"Shape","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"bevel","group":"Shape","control":{"type":"number","min":0,"max":0.5,"step":0.001},"rebuild":false},{"name":"bevelShape","group":"Shape","control":{"type":"list","options":["round","chamfer"]},"rebuild":false},{"name":"bulge","group":"Shape","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"bulgeWidth","group":"Shape","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"relief","group":"Shape","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"reliefBlur","group":"Shape","control":{"type":"number","min":0,"max":0.1,"step":0.001},"rebuild":false},{"name":"ior","group":"Glass","control":{"type":"number","min":0,"max":10,"step":0.1},"rebuild":false},{"name":"dispersion","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"paths","group":"Glass","control":{"type":"number","min":1,"max":10,"step":1},"rebuild":false},{"name":"samples","group":"Glass","control":{"type":"number","min":1,"max":50,"step":1},"rebuild":false},{"name":"bounces","group":"Glass","control":{"type":"number","min":1,"max":10,"step":1},"rebuild":false},{"name":"jitter","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"tint","group":"Glass","control":{"type":"color"},"rebuild":false},{"name":"absorption","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"reflection","group":"Glass","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"bump","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"bumpScale","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"frost","group":"Glass","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"backdrop","group":"Backdrop","control":{"type":"list","options":["none","stripes","grid","marble","flow"]},"rebuild":false},{"name":"backdropColors","group":"Backdrop","control":{"type":"list","options":["mono","pastel","redblue"]},"rebuild":false},{"name":"backdropVisible","group":"Backdrop","control":{"type":"boolean"},"rebuild":false},{"name":"backdropScale","group":"Backdrop","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"backdropDistance","group":"Backdrop","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"backdropSpeed","group":"Backdrop","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"backdropRatio","group":"Backdrop","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"backdropSoftness","group":"Backdrop","control":{"type":"number","min":0,"max":0.5,"step":0.001},"rebuild":false},{"name":"lightIntensity","group":"Lights","control":{"type":"number","min":0,"max":10,"step":0.1},"rebuild":false},{"name":"lightSoftness","group":"Lights","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"yaw","group":"View","control":{"type":"number","min":-180,"max":180,"step":1},"rebuild":false},{"name":"pitch","group":"View","control":{"type":"number","min":-180,"max":180,"step":1},"rebuild":false},{"name":"orbitAnimation","group":"View","control":{"type":"number","min":1,"max":100,"step":1},"rebuild":false},{"name":"orbitSpeed","group":"View","control":{"type":"number","min":0,"max":20,"step":0.1},"rebuild":false},{"name":"fov","group":"View","control":{"type":"number","min":10,"max":120,"step":1},"rebuild":false},{"name":"zoom","group":"View","control":{"type":"number","min":0,"max":2,"step":0.01},"rebuild":false},{"name":"drag","group":"View","control":{"type":"boolean"},"rebuild":false},{"name":"cameraOrigin","group":"View","control":{"type":"list","options":["element","viewport"]},"rebuild":false},{"name":"pointer","group":"View","control":{"type":"list","options":["none","tilt"]},"rebuild":false},{"name":"pointerStrength","group":"View","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"resolution","group":"Output","control":{"type":"number","min":0,"max":5,"step":0.01},"rebuild":false},{"name":"antialias","group":"Output","control":{"type":"boolean"},"rebuild":false},{"name":"pad","group":"Output","control":{"type":"number","min":1,"max":500,"step":1},"rebuild":false},{"name":"debug","group":"Output","control":{"type":"list","options":["off","outer","inner","total"]},"rebuild":false}],"defaults":{"sourceChannel":"alpha","depth":0.2,"bevel":0.03,"bevelShape":"round","bulge":0,"bulgeWidth":0.15,"relief":0,"reliefBlur":0.006,"ior":1.5,"dispersion":0.12,"paths":2,"samples":8,"bounces":2,"jitter":0,"tint":"#ffffff","absorption":0,"reflection":1,"bump":0,"bumpScale":0.15,"frost":0,"backdrop":"stripes","backdropColors":"mono","backdropVisible":false,"backdropScale":0.25,"backdropDistance":0.6,"backdropSpeed":0.15,"backdropRatio":0.5,"backdropSoftness":0.03,"lightIntensity":1.5,"lightSoftness":0.15,"yaw":29,"pitch":14,"orbitAnimation":20,"orbitSpeed":3.3,"fov":30,"zoom":0.7,"drag":false,"cameraOrigin":"element","pointer":"none","pointerStrength":1,"resolution":1,"antialias":true,"pad":100,"debug":"off"},"formats":{}}</script>
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">Getting Started</a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">How it Works</a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">Use with AI</a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">Custom Shaders</a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">Custom Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/docs/">API Reference</a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.rweuQyz_.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.CmvZgXGT.js"></script>
