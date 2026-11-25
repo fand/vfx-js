@@ -10,14 +10,14 @@
         <title>HoloEffect - Effects - VFX-JS</title>
 
         <meta name="theme-color" content="#000000">
-        <meta name="description" content="Holographic foil from holo.spot. Move the pointer over it to tilt.">
+        <meta name="description" content="Holographic foil from holo.spot.">
         <link rel="canonical" href="https://amagi.dev/vfx-js/effects/holo/">
 
         <meta property="og:url" content="https://amagi.dev/vfx-js/effects/holo/">
         <meta property="og:type" content="website">
         <meta property="og:title" content="HoloEffect - Effects - VFX-JS">
         <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
-        <meta property="og:description" content="Holographic foil from holo.spot. Move the pointer over it to tilt.">
+        <meta property="og:description" content="Holographic foil from holo.spot.">
         <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
         <meta property="og:locale" content="en_US">
 
@@ -26,7 +26,7 @@
         <meta name="twitter:creator" content="@amagitakayosi">
         <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/holo/">
         <meta name="twitter:title" content="HoloEffect - Effects - VFX-JS">
-        <meta name="twitter:description" content="Holographic foil from holo.spot. Move the pointer over it to tilt.">
+        <meta name="twitter:description" content="Holographic foil from holo.spot.">
         <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
 
         <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
@@ -182,9 +182,8 @@
     </nav>
 
     <h1 data-astro-cid-f2arvc5g>HoloEffect</h1>
-    <p class="EffectLead" data-astro-cid-f2arvc5g>Holographic foil from holo.spot. Move the pointer over it to tilt.</p>
-
-    <section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
+    <p class="EffectLead" data-astro-cid-f2arvc5g>Holographic foil from holo.spot.</p>
+    <p data-astro-cid-f2arvc5g>This is a port of the <a href="https://www.holo.spot">holo.spot</a> shaders (<a href="https://github.com/dmitrykurash/holospot">holospot</a>, MIT). Huge thanks to <a href="https://github.com/dmitrykurash">Dmitry Kurash</a>!</p><section id="example" class="EffectExample" data-astro-cid-f2arvc5g>
         <div class="EffectDemo" data-clickable="false" data-astro-cid-f2arvc5g>
             <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-effect-demo="HoloEffect" data-astro-cid-f2arvc5g>
         </div>
@@ -305,6 +304,204 @@
                                     <td data-astro-cid-f2arvc5g>Smooth the edges of the card with 4× multisampling (MSAA) of the card target (half float), as holospot renders; the outline shows once the card turns. Default <code>true</code>; <code>false</code> saves memory (about 5× the card target's).</td>
                                 </tr>
                                 
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>holo: Material</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>material</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloMaterial/">HoloMaterial</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;prism&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Foil material.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>quality</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloQuality/">HoloQuality</a></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;medium&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Quality tier (holospot's <code>quality</code> option). Default <code>&quot;medium&quot;</code>, what holospot ships without a look; the looks set their own (<code>object</code> is <code>&quot;low&quot;</code>).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>structureScale</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Scale of the foil's structure, 0.25–4 (holo.spot <code>object.structureScale</code>; 1 = as designed): shards (<code>shatter</code>), flakes (<code>nebula</code>), dots (<code>sparkle</code>), the paper's tooth and the logo's relief (<code>emboss</code>), the relief waves. Above 1 they get smaller, below 1 larger. The gratings keep their pitch: the colours do not change, and the emboss logo keeps its size and place (<code>emboss.x</code> / <code>emboss.y</code> / <code>emboss.width</code>, in px).</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>holo: Scene</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>exposure</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.5</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Exposure in stops (EV), −3 to 3: <code>display.ev</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>tone</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloTone/">HoloTone</a><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;neutral&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Tone curve: <code>display.tone</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>glare</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.03</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Glow around bright points: the share of the light spread into it, 0–0.1: <code>display.glare</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>grain</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>0.07</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Film grain amplitude in display code values, 0–0.6; 0 turns it off: <code>grain.amount</code> and <code>grain.on</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>studio</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloStudio/">HoloStudio</a><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;studio&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Light rig: <code>studio.preset</code>. Its lights go over the earlier ones; single lights given later win.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>background</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">string</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;#ffffff&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>The page behind the element, which the lighting adapts to: <code>&quot;black&quot;</code>, <code>&quot;white&quot;</code> or a <code>#rgb</code> / <code>#rrggbb</code> colour: <code>scene.background</code>, <code>scene.bgColor</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>bow</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>1.6</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>The card's bow in mm, 0–2 (the sheet sags, so the light sweeps across it): <code>card.bow</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>lens</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>62</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>holospot's camera lens: focal length in mm on a 36 × 24 mm sensor, 24–200: <code>dof.lens</code>. It sets the field of view (62 mm is the 22° camera; shorter is wider with stronger perspective); there is no blur.</td>
+                                </tr>
+                                
+                                <tr class="ParamGroup" data-astro-cid-f2arvc5g>
+                                        <th colspan="3" data-astro-cid-f2arvc5g>holo: Motion</th>
+                                    </tr>
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pointer</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloPointer/">HoloPointer</a><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>&quot;tilt&quot;</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>What the pointer does over the element: <code>&quot;tilt&quot;</code> tilts the card, <code>&quot;light&quot;</code> moves a flashlight over it, <code>&quot;flash&quot;</code> puts the flashlight at the camera, <code>&quot;none&quot;</code> (the port's) ignores the pointer: <code>motion.pointer</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>tiltRange</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>25</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>How far the pointer tilts the card, in degrees, 5–35: <code>motion.tiltRange</code>. It is reached at the element's edge and applies only while the pointer is over the element, unlike the tilt of <code>GlassEffect</code> and <code>SwirlParticleEffect</code> (<code>pointer: &quot;tilt&quot;</code>: 20° × <code>pointerStrength</code>, reached half a viewport from the element's centre, wherever the pointer is on the page).</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>wobble</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">boolean</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>true</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Slow automatic tilt while the pointer is away: <code>motion.wobble</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>wobbleAmp</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><span class="tk">number</span><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>14</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>The wobble's amplitude in degrees, 0–25: <code>motion.wobbleAmp</code>.</td>
+                                </tr>
+                                
+                                
+                                <tr data-astro-cid-f2arvc5g>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>pose</code>
+                                        <code class="ParamType" data-astro-cid-f2arvc5g><a class="tr" href="/vfx-js/docs/effects/HoloVec2/">HoloVec2</a><span class="tp"> | </span><span class="tk">null</span></code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>
+                                        <code data-astro-cid-f2arvc5g>{&quot;x&quot;:-25,&quot;y&quot;:-20.5}</code>
+                                    </td>
+                                    <td data-astro-cid-f2arvc5g>Rest pose in degrees, −35 to 35: <code>x</code> turns the face to the right, <code>y</code> tips the top edge toward the viewer: <code>motion.pose</code>.</td>
+                                </tr>
+                                
                         </tbody>
                     </table>
                 </div>
@@ -330,9 +527,6 @@
                         <span data-astro-cid-f2arvc5g>The &quot;Starting points&quot; of holospot's material docs, as inputs (<code>material</code> and <code>settings</code>).</span>
                     </li><li data-astro-cid-f2arvc5g>
                         <code data-astro-cid-f2arvc5g><span class="tm">errors</span><span class="tp">: </span><span class="tk">any</span></code>
-                        <span data-astro-cid-f2arvc5g></span>
-                    </li><li data-astro-cid-f2arvc5g>
-                        <code data-astro-cid-f2arvc5g><span class="tm">material</span><span class="tp">: </span><span class="tk">any</span></code>
                         <span data-astro-cid-f2arvc5g></span>
                     </li><li data-astro-cid-f2arvc5g>
                         <code data-astro-cid-f2arvc5g><span class="tm">ready</span><span class="tp">: </span><span class="tk">any</span></code>
@@ -368,7 +562,7 @@
                 </a>
     </nav>
 
-    <script type="application/json" id="EffectData">{"name":"HoloEffect","specs":[{"name":"holo","control":{"type":"choice","options":["card","object","image"]},"rebuild":false},{"name":"sourceChannel","control":{"type":"list","options":["alpha","luminance","none"]},"rebuild":false},{"name":"ink","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"flat","control":{"type":"boolean"},"rebuild":false},{"name":"antialias","control":{"type":"boolean"},"rebuild":false}],"defaults":{"holo":[],"sourceChannel":"alpha","ink":0,"flat":false,"antialias":true},"formats":{}}</script>
+    <script type="application/json" id="EffectData">{"name":"HoloEffect","specs":[{"name":"holo","control":{"type":"choice","options":["card","object","image"]},"rebuild":false},{"name":"sourceChannel","control":{"type":"list","options":["alpha","luminance","none"]},"rebuild":false},{"name":"ink","control":{"type":"number","min":0,"max":1,"step":0.01},"rebuild":false},{"name":"flat","control":{"type":"boolean"},"rebuild":false},{"name":"antialias","control":{"type":"boolean"},"rebuild":false},{"name":"material","group":"holo: Material","control":{"type":"list","options":["prism","shatter","nebula","sparkle","vortex","emboss"]},"rebuild":false,"parent":"holo"},{"name":"quality","group":"holo: Material","control":{"type":"list","options":["auto","low","medium","high"]},"rebuild":false,"parent":"holo"},{"name":"structureScale","group":"holo: Material","control":{"type":"number","min":0.25,"max":4,"step":0.01},"rebuild":false,"parent":"holo"},{"name":"exposure","group":"holo: Scene","control":{"type":"number","min":-3,"max":3,"step":0.1},"rebuild":false,"parent":"holo"},{"name":"tone","group":"holo: Scene","control":{"type":"list","options":["neutral","agx","clamp"]},"rebuild":false,"parent":"holo"},{"name":"glare","group":"holo: Scene","control":{"type":"number","min":0,"max":0.1,"step":0.005},"rebuild":false,"parent":"holo"},{"name":"grain","group":"holo: Scene","control":{"type":"number","min":0,"max":0.6,"step":0.005},"rebuild":false,"parent":"holo"},{"name":"studio","group":"holo: Scene","control":{"type":"list","options":["studio","spot","softbox","strip","dark","desk","office","raking"]},"rebuild":false,"parent":"holo"},{"name":"background","group":"holo: Scene","control":{"type":"color"},"rebuild":false,"parent":"holo"},{"name":"bow","group":"holo: Scene","control":{"type":"number","min":0,"max":2,"step":0.05},"rebuild":false,"parent":"holo"},{"name":"lens","group":"holo: Scene","control":{"type":"number","min":24,"max":200,"step":1},"rebuild":false,"parent":"holo"},{"name":"pointer","group":"holo: Motion","control":{"type":"list","options":["tilt","light","flash","none"]},"rebuild":false,"parent":"holo"},{"name":"tiltRange","group":"holo: Motion","control":{"type":"number","min":5,"max":35,"step":1},"rebuild":false,"parent":"holo"},{"name":"wobble","group":"holo: Motion","control":{"type":"boolean"},"rebuild":false,"parent":"holo"},{"name":"wobbleAmp","group":"holo: Motion","control":{"type":"number","min":0,"max":25,"step":0.5},"rebuild":false,"parent":"holo"},{"name":"pose","group":"holo: Motion","control":{"type":"point","range":{"type":"number","min":-35,"max":35,"step":0.5}},"rebuild":false,"parent":"holo"}],"defaults":{"holo":[],"sourceChannel":"alpha","ink":0,"flat":false,"antialias":true,"material":"prism","quality":"medium","structureScale":1,"exposure":0.5,"tone":"neutral","glare":0.03,"grain":0.07,"studio":"studio","background":"#ffffff","bow":1.6,"lens":62,"pointer":"tilt","tiltRange":25,"wobble":true,"wobbleAmp":14,"pose":{"x":-25,"y":-20.5}},"formats":{}}</script>
                             </main>
                         </div>
                 <footer class="SiteFooter">
@@ -462,4 +656,4 @@
     </body>
 </html>
 
-<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.CmvZgXGT.js"></script>
+<script type="module" src="/vfx-js/_astro/_slug_.astro_astro_type_script_index_0_lang.Cx_K3zQW.js"></script>

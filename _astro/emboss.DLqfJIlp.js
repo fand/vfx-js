@@ -1,4 +1,4 @@
-import{a as e,d as t,l as n,m as r,p as i,u as a}from"./effects-list.m3JCyrXy.js";import{n as o,r as s,t as c}from"./build.ZQ8Ua7nb.js";var l=`function logoKernel() {
+import{a as e,d as t,l as n,m as r,p as i,u as a}from"./effects-list.B2UuvOa-.js";import{n as o,r as s,t as c}from"./build.ZQ8Ua7nb.js";var l=`function logoKernel() {
     const INF = 1e20;
     const f32 = new Float32Array(1), u32 = new Uint32Array(f32.buffer);
     function halfBits(b) {

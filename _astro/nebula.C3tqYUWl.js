@@ -1,4 +1,4 @@
-import{a as e}from"./effects-list.m3JCyrXy.js";import{i as t,n,r,t as i}from"./build.ZQ8Ua7nb.js";import{t as a}from"./glitter.WdC__lWR.js";var o=`uniform mat3 uCardRot, uPrevCardRot;
+import{a as e}from"./effects-list.B2UuvOa-.js";import{i as t,n,r,t as i}from"./build.ZQ8Ua7nb.js";import{t as a}from"./glitter.WdC__lWR.js";var o=`uniform mat3 uCardRot, uPrevCardRot;
 uniform int  uDebugLight;
 uniform vec3 uBaseColor;
 varying vec3 vWorldPos; varying vec3 vPrevWorldPos; varying vec2 vUv; varying vec3 vN; varying vec3 vT; varying vec3 vB;
