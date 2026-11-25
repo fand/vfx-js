@@ -15,6 +15,7 @@ import {
     GradientMapEffect,
     HalftoneEffect,
     HoloEffect,
+    type HoloSettingsInput,
     HueShiftEffect,
     JPEGGlitchEffect,
     LightStreakEffect,
@@ -125,6 +126,8 @@ export type EffectDemo = {
     text: string;
     /** A few sentences for the effect page. */
     about: string;
+    /** Credit line above the demo, in Markdown. */
+    credit?: string;
     media: DemoMedia;
     /** Make the effect with the demo params, then `values` on top. */
     create: (values?: Record<string, unknown>) => Effect;
@@ -140,6 +143,8 @@ export type EffectDemo = {
     rebuild?: string[];
     /** Overrides for the param pane. */
     controls?: Record<string, ControlOptions>;
+    /** Params that go inside another param, shown as their own rows. */
+    nested?: NestedParams;
     /** Named values for a param the pane shows as a list. */
     choices?: Record<
         string,
@@ -153,6 +158,16 @@ export type EffectDemo = {
     onClick?: (effect: Effect) => void;
     /** Draw order in the shared canvas. */
     zIndex?: number;
+};
+
+/** Params that go inside another param, like the shorthands in HoloEffect's `holo`. */
+export type NestedParams = {
+    /** The param that holds them. */
+    param: string;
+    /** The type that documents them. */
+    type: string;
+    /** Their values in the demo. Only these are shown. */
+    values: Record<string, unknown>;
 };
 
 type DemoInput<P> = Omit<EffectDemo, "create" | "createDefault" | "params"> & {
@@ -195,6 +210,63 @@ const backdropGroup = [
     "backdropRatio",
     "backdropSoftness",
 ];
+
+// The holo.spot ids that HoloEffect's shorthands write.
+const holoIds = {
+    exposure: "display.ev",
+    tone: "display.tone",
+    glare: "display.glare",
+    grain: "grain.amount",
+    studio: "studio.preset",
+    bow: "card.bow",
+    lens: "dof.lens",
+    pointer: "motion.pointer",
+    tiltRange: "motion.tiltRange",
+    wobble: "motion.wobble",
+    wobbleAmp: "motion.wobbleAmp",
+    pose: "motion.pose",
+};
+
+/** The values of HoloEffect's shorthands in a look. */
+function holoShorthands(look: HoloSettingsInput): Record<string, unknown> {
+    const effect = new HoloEffect({ holo: look });
+    const s = effect.resolvedSettings();
+    const options = look as { quality?: string; structureScale?: number };
+    return {
+        material: effect.material,
+        quality: options.quality ?? "medium",
+        structureScale: options.structureScale ?? 1,
+        exposure: s["display.ev"],
+        tone: s["display.tone"],
+        glare: s["display.glare"],
+        grain: s["grain.on"] ? s["grain.amount"] : 0,
+        studio: s["studio.preset"],
+        background:
+            s["scene.background"] === "colour"
+                ? s["scene.bgColor"]
+                : s["scene.background"],
+        bow: s["card.bow"],
+        lens: s["dof.lens"],
+        pointer: s["motion.pointer"],
+        tiltRange: s["motion.tiltRange"],
+        wobble: s["motion.wobble"],
+        wobbleAmp: s["motion.wobbleAmp"],
+        pose: s["motion.pose"],
+    };
+}
+
+/** Slider ranges of HoloEffect's shorthands, from holo.spot's settings. */
+function holoControls(): Record<string, ControlOptions> {
+    const specs = HoloEffect.settingSpecs("prism");
+    const controls: Record<string, ControlOptions> = {};
+    for (const [name, id] of Object.entries(holoIds)) {
+        const spec = specs.find((s) => s.id === id);
+        if (spec?.min !== undefined && spec.max !== undefined) {
+            controls[name] = { min: spec.min, max: spec.max, step: spec.step };
+        }
+    }
+    return controls;
+}
 
 const moshing = new WeakSet<Effect>();
 
@@ -441,11 +513,38 @@ img.addEventListener("click", () => {
     }),
     demo({
         name: "HoloEffect",
-        text: "Holographic foil from holo.spot. Move the pointer over it to tilt.",
+        text: "Holographic foil from holo.spot.",
         about: "Turns the element into a holographic foil card. The card tilts toward the pointer and catches the light in rainbow colors. Looks copied from holo.spot work as is.",
+        credit: "This is a port of the [holo.spot](https://www.holo.spot) shaders ([holospot](https://github.com/dmitrykurash/holospot), MIT). Huge thanks to [Dmitry Kurash](https://github.com/dmitrykurash)!",
         media: "logo",
         effect: HoloEffect,
         params: { holo: HoloEffect.looks.card },
+        groups: {
+            "holo: Material": ["material", "quality", "structureScale"],
+            "holo: Scene": [
+                "exposure",
+                "tone",
+                "glare",
+                "grain",
+                "studio",
+                "background",
+                "bow",
+                "lens",
+            ],
+            "holo: Motion": [
+                "pointer",
+                "tiltRange",
+                "wobble",
+                "wobbleAmp",
+                "pose",
+            ],
+        },
+        nested: {
+            param: "holo",
+            type: "HoloSettingsInput",
+            values: holoShorthands(HoloEffect.looks.card),
+        },
+        controls: holoControls(),
         choices: {
             holo: {
                 values: HoloEffect.looks,

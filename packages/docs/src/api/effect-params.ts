@@ -24,6 +24,8 @@ export type ParamControl =
     | { type: "colorArray" }
     /** 0xRRGGBB number. */
     | { type: "colorNumber" }
+    /** A `{ x, y }` point. */
+    | { type: "point"; range: NumberControl }
     /** Numbers in an array, one slider each. */
     | { type: "vector"; labels: string[]; items: NumberControl[] }
     /** "#rrggbb" strings in an array. */
@@ -41,6 +43,8 @@ export type ParamSpec = {
     control: ParamControl;
     /** The effect reads it only when it starts. Make a new one on change. */
     rebuild: boolean;
+    /** The param that holds it, for nested params. */
+    parent?: string;
 };
 
 export type ParamDoc = {
@@ -81,7 +85,7 @@ function paramMembers(api: Api, decl: Reflection, depth = 0): Reflection[] {
         return direct;
     }
     const fromType = (type: Type | undefined): Reflection[] => {
-        if (type?.type === "intersection") {
+        if (type?.type === "intersection" || type?.type === "union") {
             return type.types.flatMap(fromType);
         }
         if (type?.type === "reflection") {
@@ -90,6 +94,10 @@ function paramMembers(api: Api, decl: Reflection, depth = 0): Reflection[] {
         if (type?.type === "reference" && typeof type.target === "number") {
             const target = api.byId.get(type.target);
             return target ? paramMembers(api, target, depth + 1) : [];
+        }
+        // Partial<T> and other wrappers from TypeScript.
+        if (type?.type === "reference" && type.typeArguments?.[0]) {
+            return fromType(type.typeArguments[0]);
         }
         return [];
     };
@@ -344,6 +352,21 @@ function controlOf(
         }
         return undefined;
     }
+    if (
+        value &&
+        typeof value === "object" &&
+        Object.keys(value).join() === "x,y" &&
+        isNumbers(Object.values(value))
+    ) {
+        const range = numberControl(
+            name,
+            Object.values(value),
+            text,
+            fullText,
+            options,
+        );
+        return { type: "point", range };
+    }
     if (Array.isArray(value) && value.length > 0 && value.every(isHex)) {
         return { type: "colorList" };
     }
@@ -375,6 +398,27 @@ function summaryParts(member: Reflection) {
         ...parts.slice(0, end),
         { ...cut, text: cut.text.split(/\n\s*\n/)[0] },
     ];
+}
+
+/**
+ * Members of a nested params type, without the top-level names.
+ * A name in two members of a union takes the later one.
+ */
+function nestedMembers(
+    api: Api,
+    typeName: string,
+    topMembers: Reflection[],
+): Reflection[] {
+    const decl = api.pages.find((p) => p.decl.name === typeName)?.decl;
+    if (!decl) {
+        throw new Error(`No API page for ${typeName}`);
+    }
+    const byName = new Map<string, Reflection>();
+    for (const m of paramMembers(api, decl)) {
+        byName.set(m.name, m);
+    }
+    const topLevel = new Set(topMembers.map((m) => m.name));
+    return [...byName.values()].filter((m) => !topLevel.has(m.name));
 }
 
 export function effectParams(
@@ -423,8 +467,7 @@ export function effectParams(
         defaults: {},
         formats: {},
     };
-    for (const m of members) {
-        const value = source[m.name] ?? demo.defaults?.[m.name];
+    const add = (m: Reflection, value: unknown, parent?: string) => {
         const text = plainSummary(m);
         result.docs.push({
             name: m.name,
@@ -434,7 +477,7 @@ export function effectParams(
             descriptionHtml: inlineMarkdownHtml(api, summaryParts(m)),
         });
         if (value === undefined) {
-            continue;
+            return;
         }
         result.defaults[m.name] = value;
         const fullText = (m.comment?.summary ?? []).map((p) => p.text).join("");
@@ -442,7 +485,7 @@ export function effectParams(
             api,
             m,
             value,
-            demo.params[m.name],
+            parent ? undefined : demo.params[m.name],
             text,
             fullText,
             demo,
@@ -458,7 +501,20 @@ export function effectParams(
                 rebuild:
                     demo.rebuild?.includes(m.name) ??
                     /construct|init\(\)|re-add|baked/i.test(fullText),
+                ...(parent ? { parent } : {}),
             });
+        }
+    };
+    for (const m of members) {
+        add(m, source[m.name] ?? demo.defaults?.[m.name]);
+    }
+    const nested = demo.nested;
+    if (nested) {
+        const nestedSorted = nestedMembers(api, nested.type, members)
+            .filter((m) => m.name in nested.values)
+            .sort((a, b) => sortKey(a) - sortKey(b));
+        for (const m of nestedSorted) {
+            add(m, nested.values[m.name], nested.param);
         }
     }
     return result;

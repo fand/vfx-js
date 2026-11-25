@@ -59,6 +59,9 @@ const codeHtml = highlight(usageCode(demo).trim()).replace(
 );
 
 const aboutHtml = inlineMarkdownHtml(api, [{ kind: "text", text: demo.about }]);
+const creditHtml =
+    demo.credit &&
+    inlineMarkdownHtml(api, [{ kind: "text", text: demo.credit }]);
 
 /** JS value as short code for the table. */
 function defaultCode(value: unknown): string {
@@ -123,6 +126,7 @@ const clientData = {
 
     <h1>{demo.name}</h1>
     <p class="EffectLead">{demo.text}</p>
+    {creditHtml && <p set:html={creditHtml} />}
 
     <section id="example" class="EffectExample">
         <div class="EffectDemo" data-clickable={!!demo.onClick}>
@@ -245,7 +249,7 @@ const clientData = {
     import type { ParamSpec } from "../../api/effect-params";
     import { applyParams, mountParamPane } from "../../demos/effect-pane";
     import { lazyDemo } from "../../demos/lazy";
-    import { argsHtml } from "../../effect-code";
+    import { argsHtml, withNested } from "../../effect-code";
     import { effectDemos } from "../../effects-list";
     import { onPage } from "../../lifecycle";
 
@@ -300,12 +304,15 @@ const clientData = {
         const pane =
             container && data.specs.length > 0
                 ? mountParamPane(container, data.specs, values, demo, (name) => {
-                      changed[name] = values[name];
+                      // A nested param changes the param that holds it.
+                      const key = specs.get(name)?.parent ?? name;
+                      const value = withNested(demo, values, data.defaults)[key];
+                      changed[key] = value;
                       if (specs.get(name)?.rebuild) {
                           clearTimeout(timer);
                           timer = window.setTimeout(rebuild, 200);
                       } else if (current) {
-                          applyParams(current, { [name]: values[name] });
+                          applyParams(current, { [key]: value });
                       }
                       if (args) {
                           args.innerHTML = argsHtml(

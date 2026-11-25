@@ -129,6 +129,17 @@ export function mountParamPane(
                     });
                 break;
             }
+            case "point": {
+                const range = sliderOptions(control.range);
+                const proxy = { [name]: { ...(values[name] as object) } };
+                parent
+                    .addBinding(proxy, name, { x: range, y: range })
+                    .on("change", (ev) => {
+                        values[name] = { ...(ev.value as object) };
+                        changed();
+                    });
+                break;
+            }
             case "vector":
                 addParts(name, (folder, proxy) => {
                     const items = values[name] as number[];

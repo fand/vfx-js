@@ -75,6 +75,56 @@ export function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Constructor args from the pane values.
+ * Nested params that differ from the defaults go into their parent,
+ * after its value: `holo: [look, { exposure: 1 }]`.
+ */
+export function withNested(
+    demo: EffectDemo,
+    values: Record<string, unknown>,
+    defaults: Record<string, unknown>,
+): Record<string, unknown> {
+    const nested = demo.nested;
+    if (!nested) {
+        return values;
+    }
+    const args: Record<string, unknown> = {};
+    const changed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+        if (!(key in nested.values)) {
+            args[key] = value;
+        } else if (!sameValue(value, defaults[key])) {
+            changed[key] = value;
+        }
+    }
+    if (Object.keys(changed).length > 0) {
+        const base = args[nested.param];
+        const list = Array.isArray(base) ? base : base ? [base] : [];
+        args[nested.param] = [...list, changed];
+    }
+    return args;
+}
+
+/** A param value as code. Names values from the demo's `choices`. */
+function paramHtml(
+    demo: EffectDemo,
+    key: string,
+    value: unknown,
+    format: ParamFormat,
+): string {
+    const choice = demo.choices?.[key];
+    const choiceKey = choiceKeyOf(demo, key, value);
+    if (choice && choiceKey !== undefined) {
+        return escapeHtml(choice.code(choiceKey));
+    }
+    if (choice && Array.isArray(value)) {
+        const items = value.map((v) => paramHtml(demo, key, v, format));
+        return `[${items.join(", ")}]`;
+    }
+    return valueHtml(value, format);
+}
+
+/**
  * Highlighted constructor args: the params that differ from the defaults.
  * Goes inside the parens of `new XEffect(...)`.
  */
@@ -85,15 +135,13 @@ export function argsHtml(
     formats: Record<string, ParamFormat>,
 ): string {
     const lines: string[] = [];
-    for (const [key, value] of Object.entries(values)) {
+    for (const [key, value] of Object.entries(
+        withNested(demo, values, defaults),
+    )) {
         if (key in defaults && sameValue(value, defaults[key])) {
             continue;
         }
-        const choiceKey = choiceKeyOf(demo, key, value);
-        const html =
-            choiceKey !== undefined
-                ? escapeHtml(demo.choices?.[key]?.code(choiceKey) ?? "")
-                : valueHtml(value, formats[key]);
+        const html = paramHtml(demo, key, value, formats[key]);
         lines.push(`${escapeHtml(key)}: ${html}`);
     }
     if (lines.length === 0) {
