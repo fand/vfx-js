@@ -178,7 +178,8 @@ group to freeze it. Core distortion changes the displayed contour and Halo input
 distortion changes only the generated glow. A fully revealed core uses distance-field
 coverage after warping to keep steep thin streaks continuous; animated reveals
 retain the raster path. Smoke accumulates bounded density; Energy accumulates
-ridges conditioned by coarser ridges; Fluid warps that ridge field with another
+ridges with recoverable octave feedback (fine ridges can regain strength after
+a weak coarse sample); Fluid warps that ridge field with another
 fractal. Octave sums are not normalized. Bias applies signed power to each of
 the two displacement components. Multiply averages the two resulting density
 components, then interpolates from no modulation using Amount / 100.

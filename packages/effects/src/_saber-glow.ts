@@ -167,9 +167,12 @@ vec2 fractalDensity(vec3 p
         vec2 value = noisePair(position);
         vec2 signal = noiseType == 1
             ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
-            : pow(max(vec2(0.0), 1.0 - 0.9 * abs(value)), vec2(2.0));
+            : pow(max(vec2(0.0), 1.0 - 0.94 * abs(value)), vec2(2.0));
         total += weight * signal * feedback;
-        if (noiseType != 1) feedback *= clamp(1.5 * signal, 0.0, 1.0);
+        // AE's isolated 1→4 octave increments retain fine ridges even where
+        // the first octave is weak. Clamp the accumulated feedback so a later
+        // ridge can recover; multiplying clamped factors only loses detail.
+        if (noiseType != 1) feedback = clamp(1.7 * signal * feedback, 0.0, 1.0);
         p = p * lacunarity + vec3(17.1, 9.2, 13.7);
         // Octaves refine space, not the rate of evolution. Retain the seeded
         // phase offsets while keeping the same clock speed at every octave.

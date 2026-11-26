@@ -30,8 +30,8 @@ for path in sorted(args.directory.glob("t*.png")):
         "correlation": [float(np.corrcoef(crop.ravel(), image[32:480, 32+d:224+d].ravel())[0, 1])
                         for d in [1, 2, 4, 8, 16, 32]],
     })
-if len(rows) != 16:
-    raise ValueError(f"Expected 16 isolated fields, got {len(rows)}")
+if len(rows) not in (16, 32):
+    raise ValueError(f"Expected 16 or 32 isolated fields, got {len(rows)}")
 output = json.dumps(rows, indent=2) + "\n"
 if args.out:
     args.out.write_text(output)

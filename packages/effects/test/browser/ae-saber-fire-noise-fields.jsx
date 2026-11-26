@@ -1,11 +1,11 @@
-// AE: isolated Fluid/Energy density at two scales, complexities, and seeds.
+// AE: isolated Fluid/Energy density at two scales and seeds, with 1–4 octaves.
 // batches of 24, 16-bit PNG. Restores bit depth and existing queue flags.
 (function () {
     // Run once at1, then at2. The even samples reveal native interpolation.
     var renderScale = 1;
     var root = new Folder(
         ($.os.indexOf("Mac") >= 0 ? "/private/tmp" : Folder.temp.fsName) +
-            "/vfx-js-saber-fire-fields14" + (renderScale === 1 ? "" : "-x2")
+            "/vfx-js-saber-fire-fields16" + (renderScale === 1 ? "" : "-x2")
     );
     if (!root.exists && !root.create()) throw new Error(root.error);
     if (!app.project) app.newProject();
@@ -59,8 +59,8 @@
     base[37]=0; base[38]=0; base[39]=0; base[40]=178;
     base[41]=1; base[42]=4; base[43]=1.29; base[44]=0; base[45]=5000; base[46]=0;
     add('base',2,{33:0,71:100});
-    var scales=[25,178], complexities=[1,4];
-    for(var type=2;type<=3;type++)for(var si=0;si<2;si++)for(var ci=0;ci<2;ci++)for(var seed=0;seed<2;seed++){
+    var scales=[25,178], complexities=[1,2,3,4];
+    for(var type=2;type<=3;type++)for(var si=0;si<2;si++)for(var ci=0;ci<complexities.length;ci++)for(var seed=0;seed<2;seed++){
         add('t'+type+'-s'+scales[si]+'-c'+complexities[ci]+'-seed'+seed,2,{34:type,40:scales[si] * renderScale,42:complexities[ci],45:5000+100*seed,71:100});
     }
     var oldDepth = app.project.bitsPerChannel,

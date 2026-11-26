@@ -565,6 +565,92 @@ export async function runRidgeDensityChecks() {
     return { rows, failures };
 }
 
+// Native Energy complexity sweeps, same seed/scale/time, measured on lattice
+// knots. Compare incremental statistics, not unrelated random pixel phases.
+export async function runRidgeOctaveChecks() {
+    const fields = [[], [], [], []];
+    const rows = [],
+        failures = [];
+    for (const seed of [0, 100]) {
+        const f = await createSaberFixture({
+            Effect: DistortionProbe,
+            width: 512,
+            height: 512,
+            sourceWidth: 512,
+            sourceHeight: 512,
+            pixelRatio: 1,
+            options: {
+                type: "energy",
+                amount: 100,
+                noiseScale: 25,
+                noiseAspectRatio: 1.29,
+                noiseDetail: 0,
+                noiseBias: 1,
+                seed,
+            },
+        });
+        try {
+            for (let c = 1; c <= 4; c++) {
+                f.effect.params.noiseComplexity = c;
+                const shot = await f.capture("core-distortion", 0);
+                for (let y = 32; y < 480; y += 2) {
+                    for (let x = 32; x < 224; x += 2) {
+                        fields[c - 1].push(
+                            shot.pixels[((511 - y) * shot.width + x) * 4],
+                        );
+                    }
+                }
+            }
+            if (f.gl.getError()) {
+                failures.push({ seed, error: "WebGL" });
+            }
+        } finally {
+            f.destroy();
+        }
+    }
+    const references = [
+        { increment: 0.1286, correlation: 0.4717 },
+        { increment: 0.0526, correlation: 0.3097 },
+        { increment: 0.0224, correlation: 0.2316 },
+    ];
+    for (let c = 1; c < 4; c++) {
+        let sum = 0,
+            square = 0,
+            base = 0,
+            baseSquare = 0,
+            cross = 0;
+        const count = fields[0].length;
+        for (let i = 0; i < count; i++) {
+            const x = fields[0][i],
+                d = fields[c][i] - fields[c - 1][i];
+            sum += d;
+            square += d * d;
+            base += x;
+            baseSquare += x * x;
+            cross += x * d;
+        }
+        const row = {
+            complexity: c + 1,
+            increment: sum / count,
+            correlation:
+                (cross - (base * sum) / count) /
+                Math.sqrt(
+                    (baseSquare - (base * base) / count) *
+                        (square - (sum * sum) / count),
+                ),
+            reference: references[c - 1],
+        };
+        rows.push(row);
+        if (
+            Math.abs(row.increment - row.reference.increment) > 0.003 ||
+            Math.abs(row.correlation - row.reference.correlation) > 0.1
+        ) {
+            failures.push(row);
+        }
+    }
+    return { rows, failures };
+}
+
 // Native 16-bit masks are linear between even-pixel samples, including Bias3.
 // At twice the render resolution, even samples agree to <2e-6: the field is
 // sampled, not pixel-area filtered. Core light itself remains full resolution.

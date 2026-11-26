@@ -651,3 +651,32 @@ All16 doubled-resolution Fluid/Energy cases give point RMS exactly0 in the
 One60-frame Fire GPU timing run at960×540/DPR1: Stage14 median5.77ms, Stage15
 5.86ms (+1.7%); CPU median.20ms in both. This single-device result is not a
 cross-device performance guarantee. Each final preset has72 unique frames.
+
+## 16. Fire: recover fine ridges
+
+33 native 16-bit probes isolate Fluid/Energy at scales25/178, complexities1–4,
+and two seeds. Energy increments never decrease the field; Fluid increments
+also move its coordinates. This separates density feedback from domain warping.
+The old product of individually clamped feedback factors could only decay.
+Clamp the accumulated feedback instead, allowing later ridges to recover.
+Fit the common ridge coefficient .9→.94 and feedback gain1.5→1.7; no recipe,
+Bias, octave count, coordinate warp, or Core coverage changes in this phase.
+
+Energy increments at native2px knots, pooled over both scale25 seeds:
+
+| Added octave | AE mean increment | Stage15 | Stage16 |
+| --- | --- | --- | --- |
+| 2 | .1286 | .1285 | .1292 |
+| 3 | .0526 | .0477 | .0524 |
+| 4 | .0224 | .0177 | .0218 |
+
+Correlation of the fourth increment with the first octave: native .232,
+Stage15 .399, Stage16 .289. Single-octave mean .3484→.3393 (native .3357).
+These statistics calibrate an approximation; they do not recover native code
+or establish matching random phases. Fluid swirl topology remains under study.
+
+Validation:40 node tests and eight GPU suites, including new native octave
+increments, density, lattice, Amount/Invert, wind blur, evolution, Core filter
+ordering and odd-padding stability. All pass. Review snapshots include all
+12 presets ×72 frames. Evidence: ignored results/stage16-evidence/.
+Review: http://127.0.0.1:6040/stage16.html?before=stage15-presets#fire
