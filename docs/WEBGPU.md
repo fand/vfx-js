@@ -55,7 +55,16 @@ WebGPU backend:
 - `new VFX({ backend: "webgpu" })`, marked experimental.
 - Getting a device is async, so `add()` queues work until the device is ready.
 - Covers element shaders and post effects, written in WGSL.
-- Decide here how user WGSL gets `resolution`, `time` and `src`.
+- Effects, shader presets, transitions and capture throw on WebGPU until PR 2.
+- No fallback to WebGL2 yet: `backend: "webgpu"` throws when WebGPU is missing.
+
+How user WGSL gets its inputs:
+
+- The user writes a complete WGSL fragment module. The library supplies the vertex stage.
+- Uniforms sit in one struct bound as `var<uniform>` at group 0.
+  The library reads the struct from the source and fills the fields by name, built-ins (`resolution`, `time`, ...) and user uniforms alike.
+- A texture `var <name>: texture_2d<f32>` pairs with `var <name>Sampler: sampler`.
+- Targets keep rows bottom-up as in WebGL, so `@builtin(position)` equals `gl_FragCoord` and a shader ported line by line draws the same.
 
 ### PR 2: Port shaders and effects
 
@@ -103,6 +112,6 @@ Then the rest:
 
 ## Open questions
 
-- How user WGSL declares uniforms: a prelude added by the library, or a fixed struct.
+- Whether the struct reader in PR 1 is enough for user WGSL. It does not take nested structs or field attributes.
 - Whether the WebGL2 fallback of Bubble and Glass keeps the hand-written GLSL, if the generated one freezes too long.
 - Safari WebGPU and Windows behavior.

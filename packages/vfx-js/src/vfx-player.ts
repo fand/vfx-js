@@ -3,6 +3,7 @@ import type {
     Backend,
     BackendRenderTarget,
     BackendTexture,
+    ShaderLanguage,
     TextureSource,
     TextureWrap,
     Uniform,
@@ -108,9 +109,14 @@ export class VFXPlayer {
     #opts: VFXOptsInner;
 
     #canvas: HTMLCanvasElement;
-    #backend: Backend;
-    #programCache: ProgramCache;
-    #copyPass: CopyPass;
+    // Set once the backend exists: at construction on WebGL, later on WebGPU.
+    #backend!: Backend;
+    #programCache!: ProgramCache;
+    #copyPass!: CopyPass;
+
+    /** Pending WebGPU device request. Undefined on WebGL. */
+    #ready: Promise<void> | undefined;
+    #destroyed = false;
     #postEffectEntries: {
         pass: PostEffectPass;
         target: string | undefined;
@@ -193,21 +199,34 @@ export class VFXPlayer {
 
     #captures = new Set<CaptureEntry>();
     /** What a disposed capture samples: transparent 1×1. */
-    #emptyTexture: BackendTexture;
+    #emptyTexture!: BackendTexture;
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
         this.#opts = opts;
 
         this.#canvas = canvas;
-        this.#backend = createBackend(canvas, {
+        const backend = createBackend(canvas, {
+            backend: opts.backend,
             preserveDrawingBuffer: opts.preserveDrawingBuffer,
         });
         this.#pixelRatio = opts.pixelRatio;
         this.#timeScale = opts.timeScale;
         this.#wallPrev = Date.now() / 1000;
 
-        this.#programCache = new ProgramCache(this.#backend);
-        this.#emptyTexture = this.#backend.createTexture();
+        if (backend instanceof Promise) {
+            this.#ready = backend.then((b) => {
+                if (this.#destroyed) {
+                    b.dispose();
+                    return;
+                }
+                this.#initBackend(b);
+                this.#initPasses();
+            });
+            // add() rejects with the same error.
+            this.#ready.catch((err) => console.error(err));
+        } else {
+            this.#initBackend(backend);
+        }
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -215,15 +234,44 @@ export class VFXPlayer {
         }
         this.#resize();
 
+        if (!this.#ready) {
+            this.#initPasses();
+        }
+    }
+
+    #initBackend(backend: Backend): void {
+        this.#backend = backend;
+        this.#programCache = new ProgramCache(backend);
+        this.#emptyTexture = backend.createTexture();
+    }
+
+    #initPasses(): void {
         this.#copyPass = new CopyPass(this.#backend);
-        this.#initPostEffects(opts.postEffects);
+        this.#initPostEffects(this.#opts.postEffects);
+    }
+
+    get #isWebGPU(): boolean {
+        return this.#opts.backend === "webgpu";
+    }
+
+    #assertWebGL(feature: string): void {
+        if (this.#isWebGPU) {
+            throw new Error(
+                `[VFX-JS] ${feature} is not supported on the WebGPU backend yet.`,
+            );
+        }
     }
 
     destroy(): void {
+        this.#destroyed = true;
         this.stop();
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
             window.removeEventListener("pointermove", this.#pointermove);
+        }
+        // The WebGPU device is still pending, or failed.
+        if (!this.#copyPass) {
+            return;
         }
 
         this.#postEffectTarget?.dispose();
@@ -422,6 +470,9 @@ export class VFXPlayer {
         opts: VFXProps = {},
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        if (this.#ready) {
+            await this.#ready;
+        }
         // Effect path: mutually exclusive with `shader`. See plan.md.
         if (opts.effect !== undefined) {
             return this.#addEffectElement(
@@ -600,7 +651,7 @@ export class VFXPlayer {
         const passes: VFXElementPass[] = [];
         for (let i = 0; i < inputPasses.length; i++) {
             const p = inputPasses[i];
-            const frag = p.frag;
+            const frag = passCode(p, this.#backend.shaderLanguage);
 
             // Create per-pass uniforms
             const passUniforms: Uniforms = { ...sharedUniforms };
@@ -615,16 +666,12 @@ export class VFXPlayer {
                 if (name === p.target) {
                     continue;
                 }
-                if (
-                    frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
-                ) {
+                if (declaresTexture(frag, name, this.#backend.shaderLanguage)) {
                     passUniforms[name] = { value: rt.texture };
                 }
             }
             for (const [name, bb] of passBackbuffers) {
-                if (
-                    frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
-                ) {
+                if (declaresTexture(frag, name, this.#backend.shaderLanguage)) {
                     // Backbuffer read texture is always safe (double-buffered)
                     passUniforms[name] = { value: bb.texture };
                 }
@@ -703,16 +750,58 @@ export class VFXPlayer {
     }
 
     // Hide the element under its overlay, or freeze it inside a frozen root.
+    // While its shaders build, the element stays visible.
     #register(elem: VFXElement, hiddenOpacity: string | null): void {
+        if (this.#passesReady(elem)) {
+            this.#hide(elem, hiddenOpacity);
+        } else {
+            elem.pendingOpacity = hiddenOpacity;
+        }
+        // Sort is stable, so elements with the same z render in the order they were added.
+        this.#elements.push(elem);
+        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
+    }
+
+    #hide(elem: VFXElement, hiddenOpacity: string | null): void {
         if (
             !this.#freezes.adopt(elem, hiddenOpacity) &&
             hiddenOpacity !== null
         ) {
             elem.element.style.setProperty("opacity", hiddenOpacity);
         }
-        // Sort is stable, so elements with the same z render in the order they were added.
-        this.#elements.push(elem);
-        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
+    }
+
+    /** Whether every pipeline of a shader-path element is built. */
+    #passesReady(e: VFXElement): boolean {
+        const last = e.passes.length - 1;
+        let ready = true;
+        e.passes.forEach((p, i) => {
+            const float = i < last ? (p.float ?? false) : false;
+            // Ask for every pass, so they all start building now.
+            ready = this.#prepare(p.pass, float) && ready;
+        });
+        if (e.backbuffer) {
+            ready = this.#prepare(this.#copyPass.pass, false) && ready;
+        }
+        return ready;
+    }
+
+    /** Whether every shader post-effect pipeline is built. */
+    #postEffectsReady(): boolean {
+        const last = this.#postEffectEntries.length - 1;
+        let ready = true;
+        this.#postEffectEntries.forEach(({ pass }, i) => {
+            const float = i < last || pass.persistent ? pass.float : false;
+            ready = this.#prepare(pass.pass, float) && ready;
+            if (i === last && pass.persistent) {
+                ready = this.#prepare(this.#copyPass.pass, false) && ready;
+            }
+        });
+        return ready;
+    }
+
+    #prepare(pass: Pass, float: boolean): boolean {
+        return this.#backend.prepare(pass.program, pass.blend, float);
     }
 
     async #addEffectElement(
@@ -721,6 +810,7 @@ export class VFXPlayer {
         rawEffect: Effect | readonly Effect[],
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        this.#assertWebGL("`effect`");
         if (opts.shader !== undefined) {
             console.warn(
                 "[VFX-JS] Both `shader` and `effect` specified; `effect` takes precedence.",
@@ -893,6 +983,11 @@ export class VFXPlayer {
                 : p;
         if (Array.isArray(opts.shader)) {
             return opts.shader.map(inherit);
+        }
+        if (this.#isWebGPU) {
+            throw new Error(
+                "[VFX-JS] On the WebGPU backend, pass WGSL as `shader: [{ wgsl }]`. Shader presets and GLSL need the WebGL backend.",
+            );
         }
         const shaderCode = this.#getShader(opts.shader || "uvGradient");
         return [inherit({ frag: shaderCode })];
@@ -1088,6 +1183,7 @@ export class VFXPlayer {
         onDispose?: () => void,
         signal?: AbortSignal,
     ): Promise<VFXCapture> {
+        this.#assertWebGL("`capture()`");
         const entry = await createCapture(
             {
                 createTexture: (src) => this.#premultipliedTexture(src),
@@ -1137,6 +1233,7 @@ export class VFXPlayer {
 
     /** A transparent texture handle, for captures that render nothing. */
     emptyTexture(): EffectTexture {
+        this.#assertWebGL("`capture()`");
         return makeEffectTexture(
             () => this.#emptyTexture,
             () => 0,
@@ -1149,6 +1246,7 @@ export class VFXPlayer {
      * `texture` is null until the first capture.
      */
     liveTexture(): LiveTexture {
+        this.#assertWebGL("`captureLive()`");
         return createLiveTexture(
             (offscreen) => this.#premultipliedTexture(offscreen),
             (texture, offscreen) =>
@@ -1187,7 +1285,8 @@ export class VFXPlayer {
     }
 
     get maxTextureSize(): number {
-        return this.#backend.maxTextureSize;
+        // WebGPU's default limit, until the device is ready.
+        return this.#backend?.maxTextureSize ?? 8192;
     }
 
     isPlaying(): boolean {
@@ -1247,9 +1346,15 @@ export class VFXPlayer {
         this.#wallPrev = wall;
         const now = this.#time;
 
+        // The WebGPU device is still pending, or failed.
+        if (!this.#copyPass) {
+            return;
+        }
+
         // This must done every frame because iOS Safari doesn't fire
         // window resize event while the address bar is transforming.
         this.#updateCanvasSize();
+        this.#backend.beginFrame();
 
         // Clear the main canvas.
         this.#backend.clear({ target: null, color: true, depth: false });
@@ -1297,6 +1402,14 @@ export class VFXPlayer {
             if (e.chain) {
                 this.#renderEffectElement(e, rect, hit, now);
                 continue;
+            }
+
+            if (e.pendingOpacity !== undefined) {
+                if (!this.#passesReady(e)) {
+                    continue;
+                }
+                this.#hide(e, e.pendingOpacity);
+                e.pendingOpacity = undefined;
             }
 
             // Update uniforms
@@ -1581,6 +1694,7 @@ export class VFXPlayer {
                 this.#renderPostEffects(viewportGlRect, now);
             }
         }
+        this.#backend.endFrame();
     }
 
     #playLoop = (): void => {
@@ -1691,7 +1805,7 @@ export class VFXPlayer {
 
     #shouldUsePostEffect(): boolean {
         return (
-            this.#postEffectEntries.length > 0 ||
+            (this.#postEffectEntries.length > 0 && this.#postEffectsReady()) ||
             (this.#postEffectChain !== null && this.#postEffectChainReady)
         );
     }
@@ -1876,7 +1990,7 @@ export class VFXPlayer {
         // Effect-path post-effect: a single-slot VFXPostEffect whose
         // `effect` field is set. See plan.md task 4-4.
         const pe =
-            postEffects.length === 1 && !("frag" in postEffects[0])
+            postEffects.length === 1 && !isPass(postEffects[0])
                 ? (postEffects[0] as VFXPostEffect)
                 : null;
         if (pe && pe.effect !== undefined) {
@@ -1889,7 +2003,7 @@ export class VFXPlayer {
         // First pass: assign auto target names for intermediate VFXPass items
         const passItems: VFXPass[] = [];
         for (const pe of postEffects) {
-            if ("frag" in pe) {
+            if (isPass(pe)) {
                 passItems.push(pe);
             }
         }
@@ -1904,8 +2018,8 @@ export class VFXPlayer {
             let pass: PostEffectPass;
             let target: string | undefined;
 
-            if ("frag" in pe) {
-                frag = pe.frag;
+            if (isPass(pe)) {
+                frag = passCode(pe, this.#backend.shaderLanguage);
                 pass = new PostEffectPass(
                     this.#backend,
                     frag,
@@ -1921,6 +2035,11 @@ export class VFXPlayer {
                 if (pe.shader === undefined) {
                     throw new Error(
                         "VFXPostEffect requires `shader` (the `effect` path is not implemented yet).",
+                    );
+                }
+                if (this.#isWebGPU) {
+                    throw new Error(
+                        "[VFX-JS] On the WebGPU backend, pass the post effect as `VFXPass[]` with `wgsl`.",
                     );
                 }
                 frag = this.#getShader(pe.shader);
@@ -1967,8 +2086,10 @@ export class VFXPlayer {
         for (let i = 0; i < this.#postEffectEntries.length; i++) {
             for (const name of allTargetNames) {
                 if (
-                    shaderSources[i].match(
-                        new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`),
+                    declaresTexture(
+                        shaderSources[i],
+                        name,
+                        this.#backend.shaderLanguage,
                     )
                 ) {
                     this.#postEffectEntries[i].pass.registerBufferUniform(name);
@@ -1992,6 +2113,7 @@ export class VFXPlayer {
                 "[VFX-JS] Both `shader` and `effect` specified on post-effect; `effect` takes precedence.",
             );
         }
+        this.#assertWebGL("Post-effect `effect`");
         const effects: readonly Effect[] = Array.isArray(rawEffect)
             ? [...rawEffect]
             : [rawEffect];
@@ -2543,4 +2665,34 @@ function isTextPathElement(element: HTMLElement): boolean {
         element instanceof HTMLVideoElement ||
         element instanceof HTMLCanvasElement
     );
+}
+
+function isPass(pe: VFXPostEffect | VFXPass): pe is VFXPass {
+    return "frag" in pe || "wgsl" in pe;
+}
+
+/** The pass's fragment code in the backend's shading language. */
+function passCode(p: VFXPass, language: ShaderLanguage): string {
+    const code = language === "wgsl" ? p.wgsl : p.frag;
+    if (code === undefined) {
+        throw new Error(
+            language === "wgsl"
+                ? "[VFX-JS] The WebGPU backend needs `wgsl` on every pass."
+                : "[VFX-JS] The WebGL backend needs `frag` on every pass.",
+        );
+    }
+    return code;
+}
+
+/** Whether the shader declares a texture named `name`. */
+function declaresTexture(
+    code: string,
+    name: string,
+    language: ShaderLanguage,
+): boolean {
+    const re =
+        language === "wgsl"
+            ? new RegExp(`var\\s+${name}\\s*:\\s*texture_2d\\b`)
+            : new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`);
+    return re.test(code);
 }

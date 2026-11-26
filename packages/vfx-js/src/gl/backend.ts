@@ -44,6 +44,7 @@ export function createWebGLBackend(
  * @internal
  */
 export class WebGLBackend implements Backend {
+    readonly shaderLanguage = "glsl";
     readonly webgl: WebGLAccess;
     #ctx: GLContext;
     #gl: WebGL2RenderingContext;
@@ -142,6 +143,15 @@ export class WebGLBackend implements Backend {
             source.glslVersion,
         );
     }
+
+    prepare(): boolean {
+        return true;
+    }
+
+    // GL runs each call right away; there is no frame to open or submit.
+    beginFrame(): void {}
+
+    endFrame(): void {}
 
     createGeometry(
         geometry: EffectGeometry,

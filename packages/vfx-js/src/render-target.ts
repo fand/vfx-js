@@ -3,6 +3,7 @@ import type {
     BackendProgram,
     BackendRenderTarget,
     BlendMode,
+    ShaderSource,
     Uniforms,
 } from "./backend.js";
 import {
@@ -25,18 +26,11 @@ export type Pass = {
 /** @internal */
 export function createPass(
     backend: Backend,
-    vertSrc: string,
-    fragSrc: string,
+    source: ShaderSource,
     uniforms: Uniforms,
     blend: BlendMode,
-    glslVersion?: GlslVersion,
 ): Pass {
-    const program = backend.createProgram({
-        language: "glsl",
-        vert: vertSrc,
-        frag: fragSrc,
-        glslVersion,
-    });
+    const program = backend.createProgram(source);
     return { program, uniforms, blend, dispose: () => program.dispose() };
 }
 
@@ -85,6 +79,19 @@ export function createPassMaterial(
     } else {
         blend = "normal";
     }
+    if (backend.shaderLanguage === "wgsl") {
+        if (opts.vertexShader !== undefined) {
+            throw new Error(
+                "[VFX-JS] `vert` is not supported on the WebGPU backend yet.",
+            );
+        }
+        return createPass(
+            backend,
+            { language: "wgsl", frag: opts.fragmentShader },
+            opts.uniforms,
+            blend,
+        );
+    }
     const glslVersion =
         opts.glslVersion ?? detectGlslVersion(opts.fragmentShader);
     const vertexShader =
@@ -94,10 +101,13 @@ export function createPassMaterial(
             : DEFAULT_VERTEX_SHADER);
     return createPass(
         backend,
-        vertexShader,
-        opts.fragmentShader,
+        {
+            language: "glsl",
+            vert: vertexShader,
+            frag: opts.fragmentShader,
+            glslVersion,
+        },
         opts.uniforms,
         blend,
-        glslVersion,
     );
 }

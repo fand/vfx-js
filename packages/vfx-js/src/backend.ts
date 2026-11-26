@@ -81,18 +81,27 @@ export type Uniforms = { [name: string]: Uniform };
 /** Device-px rect, bottom-left origin. @internal */
 export type PixelRect = { x: number; y: number; w: number; h: number };
 
+/** @internal */
+export type ShaderLanguage = "glsl" | "wgsl";
+
 /**
  * Shader code in one shading language.
  * A backend throws on a language it can't run.
  * @internal
  */
-export type ShaderSource = {
-    readonly language: "glsl";
-    readonly vert: string;
-    readonly frag: string;
-    /** Auto-detected from `frag` when omitted. */
-    readonly glslVersion?: GlslVersion;
-};
+export type ShaderSource =
+    | {
+          readonly language: "glsl";
+          readonly vert: string;
+          readonly frag: string;
+          /** Auto-detected from `frag` when omitted. */
+          readonly glslVersion?: GlslVersion;
+      }
+    | {
+          readonly language: "wgsl";
+          /** Fragment module. The backend supplies the vertex stage. */
+          readonly frag: string;
+      };
 
 /** @internal */
 export interface BackendTexture {
@@ -230,6 +239,8 @@ export interface WebGLAccess {
  * @internal
  */
 export interface Backend {
+    /** Language of the shaders this backend runs. */
+    readonly shaderLanguage: ShaderLanguage;
     readonly maxTextureSize: number;
 
     /** Max render targets in one draw. */
@@ -273,10 +284,23 @@ export interface Backend {
         depthSource: BackendRenderTarget | null,
     ): BackendTargetGroup;
     createProgram(source: ShaderSource): BackendProgram;
+
+    /**
+     * Start building what a draw with this state needs.
+     * `float` is true for a float render target, false for the canvas or
+     * an 8-bit target.
+     * Returns true once such a draw renders. Draws skip until then.
+     */
+    prepare(program: BackendProgram, blend: BlendMode, float: boolean): boolean;
     createGeometry(
         geometry: EffectGeometry,
         program: BackendProgram,
     ): BackendGeometry;
+    /** Call before the first draw or clear of a frame. */
+    beginFrame(): void;
+
+    /** Submit the frame's work. */
+    endFrame(): void;
     draw(command: DrawCommand): void;
     clear(command: ClearCommand): void;
 

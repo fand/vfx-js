@@ -93,7 +93,7 @@ vfx.add(el, {
 - `addTransition(el, opts)` → `TransitionHandle`. See [references/transitions.md](references/transitions.md).
 - `play()`, `stop()`, `render()`, `destroy()`, `setTime(t)`, `timeScale`.
 
-`new VFX(opts)` options: `pixelRatio`, `zIndex`, `autoplay`, `scrollPadding`, `wrapper`, `postEffect`, `preserveDrawingBuffer`, `timeScale`.
+`new VFX(opts)` options: `pixelRatio`, `zIndex`, `autoplay`, `scrollPadding`, `wrapper`, `postEffect`, `preserveDrawingBuffer`, `timeScale`, `backend` (`"webgl"` default, or experimental `"webgpu"` for WGSL shaders; see [references/shader.md](references/shader.md#webgpu-experimental)).
 
 ## React
 

@@ -1,8 +1,14 @@
-import type { Backend, BackendTexture, Uniforms } from "./backend.js";
+import type {
+    Backend,
+    BackendTexture,
+    ShaderSource,
+    Uniforms,
+} from "./backend.js";
 import { COPY_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
 import { createPass, type Pass } from "./render-target.js";
 import { Vec2, Vec4 } from "./vec.js";
+import { WGSL_COPY_FRAGMENT } from "./webgpu/shaders.js";
 
 /**
  * Copies a source texture to the current framebuffer with premultiplied
@@ -21,13 +27,15 @@ export class CopyPass {
             resolution: { value: new Vec2() },
             viewport: { value: new Vec4() },
         };
-        this.pass = createPass(
-            backend,
-            DEFAULT_VERTEX_SHADER,
-            COPY_FRAGMENT_SHADER,
-            this.uniforms,
-            "premultiplied",
-        );
+        const source: ShaderSource =
+            backend.shaderLanguage === "wgsl"
+                ? { language: "wgsl", frag: WGSL_COPY_FRAGMENT }
+                : {
+                      language: "glsl",
+                      vert: DEFAULT_VERTEX_SHADER,
+                      frag: COPY_FRAGMENT_SHADER,
+                  };
+        this.pass = createPass(backend, source, this.uniforms, "premultiplied");
     }
 
     setUniforms(tex: BackendTexture, pixelRatio: number, xywh: GLRect): void {
