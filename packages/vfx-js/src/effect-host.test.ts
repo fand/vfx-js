@@ -256,7 +256,7 @@ vi.mock("./backbuffer.js", () => {
         disposed = false;
         readSides: [MockReadSide, MockReadSide];
         constructor(
-            ctx: { gl: unknown },
+            backend: { webgl: { gl: unknown } },
             w: number,
             h: number,
             pr: number,
@@ -267,7 +267,7 @@ vi.mock("./backbuffer.js", () => {
             const makeReadSide = (index: number): MockReadSide => ({
                 texture: { _brand: `mock-bb-tex-${index}` },
                 depthTexture: opts?.depth
-                    ? { _brand: `mock-bb-depth-${index}`, gl: ctx.gl }
+                    ? { _brand: `mock-bb-depth-${index}`, gl: backend.webgl.gl }
                     : null,
                 resolveColor: () => fbEvents.push(`resolveColor:bb${index}`),
                 resolveDepth: () => fbEvents.push(`resolveDepth:bb${index}`),
@@ -452,7 +452,12 @@ vi.mock("./effect-geometry.js", async () => {
 
 // Imports AFTER vi.mock.
 import { EffectHost } from "./effect-host.js";
+import { WebGLBackend } from "./gl/backend.js";
 import { ProgramCache } from "./program-cache.js";
+
+function makeBackend(glCtx: GLContext): WebGLBackend {
+    return new WebGLBackend(glCtx, {} as Quad);
+}
 
 // ---------------------------------------------------------------------------
 // Test GL stub
@@ -537,11 +542,10 @@ function makeCtxStub(gl: WebGL2RenderingContext): {
 function makeHost(glslVersion: "100" | "300 es" = "300 es") {
     const gl = makeGlStub();
     const { ctx: glCtx } = makeCtxStub(gl);
-    const quad = {} as Quad;
-    const programCache = new ProgramCache(glCtx);
+    const backend = makeBackend(glCtx);
+    const programCache = new ProgramCache(backend);
     const host = new EffectHost(
-        glCtx,
-        quad,
+        backend,
         2,
         {
             __brand: "EffectTexture",
@@ -1761,9 +1765,9 @@ describe("EffectHost.onContextRestored", () => {
                 return spy;
             },
         } as unknown as GLContext;
+        const backend = makeBackend(glCtx);
         const host = new EffectHost(
-            glCtx,
-            {} as Quad,
+            backend,
             1,
             {
                 __brand: "EffectTexture",
@@ -1771,7 +1775,7 @@ describe("EffectHost.onContextRestored", () => {
                 height: 1,
             } as unknown as EffectTexture,
             { autoCrop: true, glslVersion: "300 es" },
-            new ProgramCache(glCtx),
+            new ProgramCache(backend),
         );
         const returned = host.ctx.onContextRestored(() => {});
         expect(returned).toBe(unsubSpies[0]);
@@ -1901,9 +1905,9 @@ describe("EffectHost.resetState", () => {
             removeResource: () => {},
             onContextRestored: () => () => {},
         } as unknown as GLContext;
+        const backend = makeBackend(glCtx);
         const host = new EffectHost(
-            glCtx,
-            {} as Quad,
+            backend,
             1,
             {
                 __brand: "EffectTexture",
@@ -1911,7 +1915,7 @@ describe("EffectHost.resetState", () => {
                 height: 1,
             } as unknown as EffectTexture,
             { autoCrop: true, glslVersion: "300 es" },
-            new ProgramCache(glCtx),
+            new ProgramCache(backend),
         );
         host.setPhase("render");
         return { host, gl };

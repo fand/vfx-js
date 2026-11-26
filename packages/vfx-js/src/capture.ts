@@ -1,6 +1,6 @@
+import type { BackendTexture, TextureSource } from "./backend.js";
 import dom2canvas from "./dom-to-canvas.js";
 import { makeEffectTexture } from "./effect-host.js";
-import type { Texture, TextureSource } from "./gl/texture.js";
 import {
     releaseFirstCapture,
     requestCapture,
@@ -38,18 +38,21 @@ const UPDATE_TIMEOUT_MS = 1000;
 /** What the player gives `createCapture`. */
 export type CaptureDeps = {
     /** A new texture, premultiplied like `ctx.src`. */
-    createTexture(source: TextureSource): Texture;
+    createTexture(source: TextureSource): BackendTexture;
     /** Upload now. Throws when the upload fails. */
-    uploadTexture(texture: Texture): void;
+    uploadTexture(texture: BackendTexture): void;
     /**
      * Re-upload `offscreen` into `old`, or return a new texture with the
      * same settings and dispose `old` when the capture canvas changed.
      */
-    refreshTexture(old: Texture, offscreen: OffscreenCanvas): Texture;
+    refreshTexture(
+        old: BackendTexture,
+        offscreen: OffscreenCanvas,
+    ): BackendTexture;
     /** Native size of a texture's source, in physical px. */
-    textureSize(texture: Texture, axis: "w" | "h"): number;
+    textureSize(texture: BackendTexture, axis: "w" | "h"): number;
     /** Transparent texture that a disposed handle resolves to. */
-    emptyTexture: Texture;
+    emptyTexture: BackendTexture;
     maxTextureSize: number;
     /** z-index of the still copy that covers an html-in-canvas wrap. */
     stillZIndex: number;
@@ -75,7 +78,7 @@ type CaptureDriver = {
 
 /** Mutable texture slot shared by the driver and the handle. */
 type CaptureSlot = {
-    texture: Texture;
+    texture: BackendTexture;
     /** CSS size of `box` when `texture` was captured. */
     width: number;
     height: number;

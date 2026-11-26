@@ -1,7 +1,17 @@
 import { Backbuffer } from "./backbuffer.js";
+import type {
+    Backend,
+    BackendRenderTarget,
+    BackendTexture,
+    TextureSource,
+    TextureWrap,
+    Uniform,
+    Uniforms,
+} from "./backend.js";
 import { type CaptureEntry, createCapture } from "./capture.js";
 import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
+import { createBackend } from "./create-backend.js";
 import dom2canvas from "./dom-to-canvas.js";
 import { EffectChain } from "./effect-chain.js";
 import {
@@ -10,21 +20,9 @@ import {
 } from "./effect-host.js";
 import { FreezeTracker } from "./freeze.js";
 import GIFData from "./gif.js";
-import { GLContext } from "./gl/context.js";
-import type { Framebuffer } from "./gl/framebuffer.js";
-import { type Pass, renderPass } from "./gl/pass.js";
-import type { Uniform, Uniforms } from "./gl/program.js";
-import { Quad } from "./gl/quad.js";
-import {
-    loadImage,
-    Texture,
-    type TextureSource,
-    type TextureWrap,
-} from "./gl/texture.js";
-import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { isHicCanvas } from "./hic-canvas.js";
-import { getImageSourceUrl } from "./image-source.js";
+import { getImageSourceUrl, loadImage } from "./image-source.js";
 import {
     createIntersectionState,
     nextIsIn,
@@ -45,7 +43,11 @@ import {
     toCeiledRect,
     toRect,
 } from "./rect.js";
-import { createPassMaterial, createRenderTarget } from "./render-target.js";
+import {
+    createPassMaterial,
+    createRenderTarget,
+    type Pass,
+} from "./render-target.js";
 import type {
     Effect,
     EffectTexture,
@@ -64,6 +66,7 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types.js";
+import { Vec2, Vec4 } from "./vec.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -105,9 +108,7 @@ export class VFXPlayer {
     #opts: VFXOptsInner;
 
     #canvas: HTMLCanvasElement;
-    #ctx: GLContext;
-    #gl: WebGL2RenderingContext;
-    #quad: Quad;
+    #backend: Backend;
     #programCache: ProgramCache;
     #copyPass: CopyPass;
     #postEffectEntries: {
@@ -115,8 +116,9 @@ export class VFXPlayer {
         target: string | undefined;
         generators: { [name: string]: () => VFXUniformValue };
     }[] = [];
-    #postEffectTarget: Framebuffer | undefined;
-    #postEffectBufferTargets: Map<string, Framebuffer | undefined> = new Map();
+    #postEffectTarget: BackendRenderTarget | undefined;
+    #postEffectBufferTargets: Map<string, BackendRenderTarget | undefined> =
+        new Map();
 
     // Effect-path post-effect state (mutually exclusive with the shader
     // post-effect passes above).
@@ -191,22 +193,21 @@ export class VFXPlayer {
 
     #captures = new Set<CaptureEntry>();
     /** What a disposed capture samples: transparent 1×1. */
-    #emptyTexture: Texture;
+    #emptyTexture: BackendTexture;
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
         this.#opts = opts;
 
         this.#canvas = canvas;
-        this.#ctx = new GLContext(canvas, opts.preserveDrawingBuffer);
-        this.#gl = this.#ctx.gl;
-        this.#gl.clearColor(0, 0, 0, 0);
+        this.#backend = createBackend(canvas, {
+            preserveDrawingBuffer: opts.preserveDrawingBuffer,
+        });
         this.#pixelRatio = opts.pixelRatio;
         this.#timeScale = opts.timeScale;
         this.#wallPrev = Date.now() / 1000;
 
-        this.#quad = new Quad(this.#ctx);
-        this.#programCache = new ProgramCache(this.#ctx);
-        this.#emptyTexture = new Texture(this.#ctx);
+        this.#programCache = new ProgramCache(this.#backend);
+        this.#emptyTexture = this.#backend.createTexture();
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -214,15 +215,8 @@ export class VFXPlayer {
         }
         this.#resize();
 
-        this.#copyPass = new CopyPass(this.#ctx);
+        this.#copyPass = new CopyPass(this.#backend);
         this.#initPostEffects(opts.postEffects);
-
-        // Clear state that depends on frame-by-frame GPU output so the
-        // scene re-renders cleanly after a context restore (persistent
-        // backbuffers come back as black, then accumulate again).
-        this.#ctx.onContextRestored(() => {
-            this.#gl.clearColor(0, 0, 0, 0);
-        });
     }
 
     destroy(): void {
@@ -250,7 +244,7 @@ export class VFXPlayer {
         this.#emptyTexture.dispose();
         this.#copyPass.dispose();
         this.#programCache.dispose();
-        this.#quad.dispose();
+        this.#backend.dispose();
     }
 
     #updateCanvasSize(): void {
@@ -305,7 +299,7 @@ export class VFXPlayer {
         ) {
             this.#canvas.style.width = `${widthWithPadding}px`;
             this.#canvas.style.height = `${heightWithPadding}px`;
-            this.#ctx.setSize(
+            this.#backend.setSize(
                 widthWithPadding,
                 heightWithPadding,
                 this.#pixelRatio,
@@ -402,7 +396,7 @@ export class VFXPlayer {
                 return;
             }
 
-            const texture = new Texture(this.#ctx, canvas);
+            const texture = this.#backend.createTexture(canvas);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
@@ -456,7 +450,7 @@ export class VFXPlayer {
                 : Number.parseFloat(element.style.opacity);
 
         // Create values for element types
-        let texture: Texture;
+        let texture: BackendTexture;
         let type: VFXElementType;
         let isGif = false;
         if (element instanceof HTMLImageElement) {
@@ -467,20 +461,20 @@ export class VFXPlayer {
             if (isGif) {
                 const gif = await GIFData.create(imageUrl, this.#pixelRatio);
                 gifFor.set(element, gif);
-                texture = new Texture(this.#ctx, gif.getCanvas());
+                texture = this.#backend.createTexture(gif.getCanvas());
             } else {
                 const img = await loadImage(imageUrl);
-                texture = new Texture(this.#ctx, img);
+                texture = this.#backend.createTexture(img);
             }
         } else if (element instanceof HTMLVideoElement) {
-            texture = new Texture(this.#ctx, element);
+            texture = this.#backend.createTexture(element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
             if (isHicCanvas(element) && initialCapture) {
-                texture = new Texture(this.#ctx, initialCapture);
+                texture = this.#backend.createTexture(initialCapture);
                 type = "hic" as VFXElementType;
             } else {
-                texture = new Texture(this.#ctx, element);
+                texture = this.#backend.createTexture(element);
                 type = "canvas" as VFXElementType;
             }
         } else {
@@ -490,7 +484,7 @@ export class VFXPlayer {
                 undefined,
                 this.maxTextureSize,
             );
-            texture = new Texture(this.#ctx, canvas);
+            texture = this.#backend.createTexture(canvas);
             type = "text" as VFXElementType;
         }
 
@@ -547,7 +541,7 @@ export class VFXPlayer {
                     (rectWithOverflow.bottom - rectWithOverflow.top) *
                     this.#pixelRatio;
                 return new Backbuffer(
-                    this.#ctx,
+                    this.#backend,
                     bw,
                     bh,
                     this.#pixelRatio,
@@ -558,7 +552,7 @@ export class VFXPlayer {
         }
 
         // Create buffer targets for intermediate passes
-        const bufferTargets = new Map<string, Framebuffer>();
+        const bufferTargets = new Map<string, BackendRenderTarget>();
         const passBackbuffers = new Map<string, Backbuffer>();
         for (let i = 0; i < inputPasses.length - 1; i++) {
             const targetName = inputPasses[i].target ?? `pass${i}`;
@@ -585,7 +579,7 @@ export class VFXPlayer {
                 passBackbuffers.set(
                     targetName,
                     new Backbuffer(
-                        this.#ctx,
+                        this.#backend,
                         cssW,
                         cssH,
                         pixelRatio,
@@ -595,7 +589,7 @@ export class VFXPlayer {
             } else {
                 bufferTargets.set(
                     targetName,
-                    createRenderTarget(this.#ctx, bw, bh, {
+                    createRenderTarget(this.#backend, bw, bh, {
                         float: inputPasses[i].float,
                     }),
                 );
@@ -652,7 +646,7 @@ export class VFXPlayer {
                 }
             }
 
-            const pass = createPassMaterial(this.#ctx, {
+            const pass = createPassMaterial(this.#backend, {
                 vertexShader: p.vert,
                 fragmentShader: frag,
                 uniforms: passUniforms,
@@ -757,7 +751,7 @@ export class VFXPlayer {
                 ? 1
                 : Number.parseFloat(element.style.opacity);
 
-        let texture: Texture;
+        let texture: BackendTexture;
         let type: VFXElementType;
         let isGif = false;
         if (element instanceof HTMLImageElement) {
@@ -768,20 +762,20 @@ export class VFXPlayer {
             if (isGif) {
                 const gif = await GIFData.create(imageUrl, this.#pixelRatio);
                 gifFor.set(element, gif);
-                texture = new Texture(this.#ctx, gif.getCanvas());
+                texture = this.#backend.createTexture(gif.getCanvas());
             } else {
                 const img = await loadImage(imageUrl);
-                texture = new Texture(this.#ctx, img);
+                texture = this.#backend.createTexture(img);
             }
         } else if (element instanceof HTMLVideoElement) {
-            texture = new Texture(this.#ctx, element);
+            texture = this.#backend.createTexture(element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
             if (isHicCanvas(element) && initialCapture) {
-                texture = new Texture(this.#ctx, initialCapture);
+                texture = this.#backend.createTexture(initialCapture);
                 type = "hic" as VFXElementType;
             } else {
-                texture = new Texture(this.#ctx, element);
+                texture = this.#backend.createTexture(element);
                 type = "canvas" as VFXElementType;
             }
         } else {
@@ -791,7 +785,7 @@ export class VFXPlayer {
                 undefined,
                 this.maxTextureSize,
             );
-            texture = new Texture(this.#ctx, canvas);
+            texture = this.#backend.createTexture(canvas);
             type = "text" as VFXElementType;
         }
 
@@ -864,8 +858,7 @@ export class VFXPlayer {
             glslVersion: opts.glslVersion ?? "300 es",
         };
         const chain = new EffectChain(
-            this.#ctx,
-            this.#quad,
+            this.#backend,
             this.#pixelRatio,
             effects,
             vfxProps,
@@ -1013,7 +1006,7 @@ export class VFXPlayer {
 
         const img = await loadImage(getImageSourceUrl(element));
         const oldTexture = e.srcTexture;
-        const texture = new Texture(this.#ctx, img);
+        const texture = this.#backend.createTexture(img);
         texture.wrapS = oldTexture.wrapS;
         texture.wrapT = oldTexture.wrapT;
         texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
@@ -1031,7 +1024,7 @@ export class VFXPlayer {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {
             const oldTexture = e.srcTexture;
-            const texture = new Texture(this.#ctx, element);
+            const texture = this.#backend.createTexture(element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
@@ -1068,14 +1061,14 @@ export class VFXPlayer {
 
     // Re-upload the capture, or replace and dispose the texture when the capture canvas changed.
     #textureFromCapture(
-        oldTexture: Texture,
+        oldTexture: BackendTexture,
         offscreen: OffscreenCanvas,
-    ): Texture {
+    ): BackendTexture {
         if (oldTexture.source === offscreen) {
             oldTexture.needsUpdate = true;
             return oldTexture;
         }
-        const texture = new Texture(this.#ctx, offscreen);
+        const texture = this.#backend.createTexture(offscreen);
         texture.wrapS = oldTexture.wrapS;
         texture.wrapT = oldTexture.wrapT;
         texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
@@ -1120,9 +1113,9 @@ export class VFXPlayer {
 
     // Throws when the upload throws (e.g. a cross-origin image without CORS).
     // No gl.getError(): it stalls on the GPU.
-    #uploadNow(texture: Texture): void {
+    #uploadNow(texture: BackendTexture): void {
         try {
-            texture.upload(0);
+            this.#backend.uploadTexture(texture);
         } catch (err) {
             throw new Error(
                 `[VFX-JS] capture() could not upload the source: ${err}`,
@@ -1131,8 +1124,8 @@ export class VFXPlayer {
     }
 
     // Effects read `ctx.src` as premultiplied; match it.
-    #premultipliedTexture(source: TextureSource): Texture {
-        const texture = new Texture(this.#ctx, source);
+    #premultipliedTexture(source: TextureSource): BackendTexture {
+        const texture = this.#backend.createTexture(source);
         texture.premultiplyAlpha = true;
         return texture;
     }
@@ -1194,7 +1187,7 @@ export class VFXPlayer {
     }
 
     get maxTextureSize(): number {
-        return this.#ctx.maxTextureSize;
+        return this.#backend.maxTextureSize;
     }
 
     isPlaying(): boolean {
@@ -1253,16 +1246,13 @@ export class VFXPlayer {
         }
         this.#wallPrev = wall;
         const now = this.#time;
-        const gl = this.#gl;
 
         // This must done every frame because iOS Safari doesn't fire
         // window resize event while the address bar is transforming.
         this.#updateCanvasSize();
 
         // Clear the main canvas.
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, this.#canvas.width, this.#canvas.height);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        this.#backend.clear({ target: null, color: true, depth: false });
 
         const canvasW = this.#canvasRect.right - this.#canvasRect.left;
         const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
@@ -1275,9 +1265,11 @@ export class VFXPlayer {
         if (shouldUsePostEffect) {
             this.#setupPostEffectTarget(canvasW, canvasH);
             if (this.#postEffectTarget) {
-                gl.bindFramebuffer(gl.FRAMEBUFFER, this.#postEffectTarget.fbo);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                this.#backend.clear({
+                    target: this.#postEffectTarget,
+                    color: true,
+                    depth: false,
+                });
             }
         }
 
@@ -1334,7 +1326,7 @@ export class VFXPlayer {
             // Update GIF / video
             gifFor.get(e.element)?.update();
             if (e.type === "video" || e.isGif) {
-                (u["src"].value as Texture).needsUpdate = true;
+                (u["src"].value as BackendTexture).needsUpdate = true;
             }
 
             const glRect = rectToGLRect(
@@ -1381,7 +1373,7 @@ export class VFXPlayer {
             }
 
             // Track resolved buffer textures for dynamic uniform updates
-            const resolvedTargets = new Map<string, Texture>();
+            const resolvedTargets = new Map<string, BackendTexture>();
 
             // Pre-register persistent backbuffer textures
             for (const pass of e.passes) {
@@ -1393,7 +1385,7 @@ export class VFXPlayer {
             // Render intermediate passes, chaining src between passes
             // Use local inputTexture (like post-effects) to avoid corrupting
             // the shared src uniform across frames.
-            let inputTexture: Texture = e.srcTexture;
+            let inputTexture: BackendTexture = e.srcTexture;
 
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
@@ -1812,13 +1804,11 @@ export class VFXPlayer {
 
     #render(
         pass: Pass,
-        target: Framebuffer | null,
+        target: BackendRenderTarget | null,
         rect: GLRect,
         uniforms: Uniforms,
         clearTarget: boolean,
     ) {
-        const gl = this.#gl;
-
         // Clear intermediate targets, but never touch the post-effect target
         // here (it's cleared once per frame at the top of `render`).
         if (
@@ -1826,9 +1816,7 @@ export class VFXPlayer {
             target !== null &&
             target !== this.#postEffectTarget
         ) {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
-            gl.viewport(0, 0, target.width, target.height);
-            gl.clear(gl.COLOR_BUFFER_BIT);
+            this.#backend.clear({ target, color: true, depth: false });
         }
 
         // Viewport uniform uses un-clipped rect for shader uv calculation.
@@ -1842,17 +1830,33 @@ export class VFXPlayer {
             );
         }
 
+        // Clip the draw to the target.
+        const pr = this.#pixelRatio;
+        const targetCssW = target ? target.width / pr : this.#canvasSize[0];
+        const targetCssH = target ? target.height / pr : this.#canvasSize[1];
+        const cx1 = Math.max(0, rect.x);
+        const cy1 = Math.max(0, rect.y);
+        const cx2 = Math.min(targetCssW, rect.x + rect.w);
+        const cy2 = Math.min(targetCssH, rect.y + rect.h);
+        const cw = cx2 - cx1;
+        const ch = cy2 - cy1;
+        if (cw <= 0 || ch <= 0) {
+            return;
+        }
+
         try {
-            renderPass(
-                gl,
-                this.#quad,
-                pass,
+            this.#backend.draw({
+                program: pass.program,
+                uniforms: pass.uniforms,
                 target,
-                rect,
-                this.#canvasSize[0],
-                this.#canvasSize[1],
-                this.#pixelRatio,
-            );
+                viewport: {
+                    x: Math.round(cx1 * pr),
+                    y: Math.round(cy1 * pr),
+                    w: Math.round(cw * pr),
+                    h: Math.round(ch * pr),
+                },
+                blend: pass.blend,
+            });
         } catch (e) {
             console.error(e);
         }
@@ -1903,7 +1907,7 @@ export class VFXPlayer {
             if ("frag" in pe) {
                 frag = pe.frag;
                 pass = new PostEffectPass(
-                    this.#ctx,
+                    this.#backend,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
@@ -1921,7 +1925,7 @@ export class VFXPlayer {
                 }
                 frag = this.#getShader(pe.shader);
                 pass = new PostEffectPass(
-                    this.#ctx,
+                    this.#backend,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
@@ -2013,8 +2017,7 @@ export class VFXPlayer {
             glslVersion: pe.glslVersion ?? "300 es",
         };
         const chain = new EffectChain(
-            this.#ctx,
-            this.#quad,
+            this.#backend,
             this.#pixelRatio,
             effects,
             vfxProps,
@@ -2119,9 +2122,9 @@ export class VFXPlayer {
             return;
         }
 
-        let inputTexture: Texture = this.#postEffectTarget.texture;
+        let inputTexture: BackendTexture = this.#postEffectTarget.texture;
 
-        const resolvedTargets = new Map<string, Texture>();
+        const resolvedTargets = new Map<string, BackendTexture>();
 
         // Pre-register persistent backbuffer textures so that earlier passes
         // can read from later passes' previous-frame output.
@@ -2252,7 +2255,7 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    rt = createRenderTarget(this.#ctx, rtW, rtH, {
+                    rt = createRenderTarget(this.#backend, rtW, rtH, {
                         float: pass.float,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
@@ -2289,7 +2292,7 @@ export class VFXPlayer {
         ) {
             this.#postEffectTarget?.dispose();
             this.#postEffectTarget = createRenderTarget(
-                this.#ctx,
+                this.#backend,
                 targetWidth,
                 targetHeight,
             );
@@ -2299,7 +2302,7 @@ export class VFXPlayer {
         for (const { pass } of this.#postEffectEntries) {
             if (pass.persistent && !pass.backbuffer) {
                 pass.initializeBackbuffer(
-                    this.#ctx,
+                    this.#backend,
                     width,
                     height,
                     this.#pixelRatio,
@@ -2472,7 +2475,7 @@ export function parseIntersectionOpts(
  * Used by `ctx.src` for effect-path elements. Returns 0 if the source
  * is not yet ready (e.g. HTMLImageElement pre-load).
  */
-function readTextureSourceDim(tex: Texture, axis: "w" | "h"): number {
+function readTextureSourceDim(tex: BackendTexture, axis: "w" | "h"): number {
     const src = tex.source;
     if (!src) {
         return 0;

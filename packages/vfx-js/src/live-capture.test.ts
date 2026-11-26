@@ -1,13 +1,16 @@
 import { describe, expect, test, vi } from "vitest";
+import type { BackendTexture } from "./backend";
 import { resolveTexture } from "./effect-host";
-import type { Texture } from "./gl/texture";
 import {
     captureLive,
     createLiveTexture,
     type LiveTexture,
 } from "./live-capture";
 
-type FakeTexture = Texture & { offscreen: OffscreenCanvas; uploads: number };
+type FakeTexture = BackendTexture & {
+    offscreen: OffscreenCanvas;
+    uploads: number;
+};
 
 const offscreen = (width: number, height: number) =>
     ({ width, height }) as OffscreenCanvas;

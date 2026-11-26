@@ -1,52 +1,8 @@
-import type { EffectTexture } from "../types.js";
+import type { BackendProgram, Uniforms, UniformValue } from "../backend.js";
+import { detectGlslVersion, type GlslVersion } from "../glsl-version.js";
+import { Vec2, Vec4 } from "../vec.js";
 import type { GLContext, Restorable } from "./context.js";
 import { Texture } from "./texture.js";
-import { Vec2, Vec4 } from "./vec.js";
-
-/** @internal */
-export type UniformValue =
-    | number
-    | boolean
-    | Vec2
-    | Vec4
-    | Texture
-    | [number, number]
-    | [number, number, number]
-    | [number, number, number, number]
-    | number[]
-    | Float32Array
-    | Int32Array
-    | Uint32Array
-    // Effect-path handle. Effects resolve it; the shader path skips it.
-    | EffectTexture;
-
-/** @internal */
-export type Uniform = { value: UniformValue | null };
-
-/** @internal */
-export type Uniforms = { [name: string]: Uniform };
-
-/**
- * GLSL ES version of a shader. When omitted on a VFX prop, it is
- * auto-detected from the fragment shader:
- * GLSL 100 markers (`gl_FragColor`, `texture2D`, `varying`, `attribute`)
- * pick `"100"`, otherwise `"300 es"`.
- */
-export type GlslVersion = "100" | "300 es";
-
-/** @see {@link GlslVersion} */
-export function detectGlslVersion(src: string): GlslVersion {
-    if (/#version\s+300\s+es\b/.test(src)) {
-        return "300 es";
-    }
-    if (/#version\s+100\b/.test(src)) {
-        return "100";
-    }
-    if (/\bgl_FragColor\b|\btexture2D\b|\bvarying\b|\battribute\b/.test(src)) {
-        return "100";
-    }
-    return "300 es";
-}
 
 /** @internal */
 type ActiveUniform = {
@@ -67,7 +23,7 @@ type ActiveUniform = {
  * after a `webglcontextrestored` event.
  * @internal
  */
-export class Program implements Restorable {
+export class Program implements BackendProgram, Restorable {
     gl: WebGL2RenderingContext;
     program!: WebGLProgram;
     #ctx: GLContext;

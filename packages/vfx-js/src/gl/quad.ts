@@ -1,3 +1,4 @@
+import type { BackendGeometry } from "../backend.js";
 import type { GLContext, Restorable } from "./context.js";
 
 /**
@@ -10,7 +11,7 @@ import type { GLContext, Restorable } from "./context.js";
  * after a context loss.
  * @internal
  */
-export class Quad implements Restorable {
+export class Quad implements BackendGeometry, Restorable {
     gl: WebGL2RenderingContext;
     vao!: WebGLVertexArrayObject;
     #ctx: GLContext;

@@ -1,11 +1,9 @@
+import type { Backend, BackendRenderTarget } from "./backend.js";
 import {
     EffectHost,
     makeEffectRenderTargetFromFb,
     makeEffectTexture,
 } from "./effect-host.js";
-import type { GLContext } from "./gl/context.js";
-import { Framebuffer } from "./gl/framebuffer.js";
-import type { Quad } from "./gl/quad.js";
 import type { ProgramCache } from "./program-cache.js";
 import {
     createMargin,
@@ -86,7 +84,7 @@ type StageLayout = {
 
 /** @internal */
 type IntermediateEntry = {
-    fb: Framebuffer;
+    fb: BackendRenderTarget;
 
     /** Write handle (passed as `ctx.target`). */
     rtHandle: EffectRenderTarget;
@@ -129,8 +127,7 @@ type IntermediateEntry = {
  * @internal
  */
 export class EffectChain {
-    #glCtx: GLContext;
-    #quad: Quad;
+    #backend: Backend;
     #pixelRatio: number;
     #vfxProps: EffectVFXProps;
     #programCache: ProgramCache;
@@ -165,8 +162,7 @@ export class EffectChain {
     #ownedPassthroughHost: EffectHost | null = null;
 
     constructor(
-        glCtx: GLContext,
-        quad: Quad,
+        backend: Backend,
         pixelRatio: number,
         effects: readonly Effect[],
         vfxProps: EffectVFXProps,
@@ -174,8 +170,7 @@ export class EffectChain {
         isPostEffect: boolean,
         programCache: ProgramCache,
     ) {
-        this.#glCtx = glCtx;
-        this.#quad = quad;
+        this.#backend = backend;
         this.#pixelRatio = pixelRatio;
         this.#vfxProps = vfxProps;
         this.#programCache = programCache;
@@ -520,8 +515,7 @@ export class EffectChain {
 
     #newHost(): EffectHost {
         return new EffectHost(
-            this.#glCtx,
-            this.#quad,
+            this.#backend,
             this.#pixelRatio,
             this.#capture,
             this.#vfxProps,
@@ -687,7 +681,10 @@ export class EffectChain {
         if (current) {
             current.fb.dispose();
         }
-        const fb = new Framebuffer(this.#glCtx, bufferSize[0], bufferSize[1]);
+        const fb = this.#backend.createRenderTarget(
+            bufferSize[0],
+            bufferSize[1],
+        );
         const rtHandle = makeEffectRenderTargetFromFb(fb);
         const texHandle = makeEffectTexture(
             () => fb.texture,

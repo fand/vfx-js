@@ -1,27 +1,58 @@
+import type {
+    Backend,
+    BackendProgram,
+    BackendRenderTarget,
+    BlendMode,
+    Uniforms,
+} from "./backend.js";
 import {
     DEFAULT_VERTEX_SHADER,
     DEFAULT_VERTEX_SHADER_100,
 } from "./constants.js";
-import type { GLContext } from "./gl/context.js";
-import { Framebuffer } from "./gl/framebuffer.js";
-import { type BlendMode, Pass } from "./gl/pass.js";
-import {
-    detectGlslVersion,
-    type GlslVersion,
-    type Uniforms,
-} from "./gl/program.js";
+import { detectGlslVersion, type GlslVersion } from "./glsl-version.js";
+
+/**
+ * A fullscreen shader pass: program, uniforms and blend mode.
+ * @internal
+ */
+export type Pass = {
+    program: BackendProgram;
+    uniforms: Uniforms;
+    blend: BlendMode;
+    dispose(): void;
+};
+
+/** @internal */
+export function createPass(
+    backend: Backend,
+    vertSrc: string,
+    fragSrc: string,
+    uniforms: Uniforms,
+    blend: BlendMode,
+    glslVersion?: GlslVersion,
+): Pass {
+    const program = backend.createProgram({
+        language: "glsl",
+        vert: vertSrc,
+        frag: fragSrc,
+        glslVersion,
+    });
+    return { program, uniforms, blend, dispose: () => program.dispose() };
+}
 
 /**
  * Create a framebuffer matching the options passed to element/post-effect passes.
  * @internal
  */
 export function createRenderTarget(
-    ctx: GLContext,
+    backend: Backend,
     width: number,
     height: number,
     opts: { float?: boolean } = {},
-): Framebuffer {
-    return new Framebuffer(ctx, width, height, { float: opts.float ?? false });
+): BackendRenderTarget {
+    return backend.createRenderTarget(width, height, {
+        float: opts.float ?? false,
+    });
 }
 
 /**
@@ -33,7 +64,7 @@ export function createRenderTarget(
  * @internal
  */
 export function createPassMaterial(
-    ctx: GLContext,
+    backend: Backend,
     opts: {
         vertexShader?: string;
         fragmentShader: string;
@@ -61,8 +92,8 @@ export function createPassMaterial(
         (glslVersion === "100"
             ? DEFAULT_VERTEX_SHADER_100
             : DEFAULT_VERTEX_SHADER);
-    return new Pass(
-        ctx,
+    return createPass(
+        backend,
         vertexShader,
         opts.fragmentShader,
         opts.uniforms,

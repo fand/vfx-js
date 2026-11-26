@@ -1,14 +1,17 @@
 import type { Backbuffer } from "./backbuffer.js";
+import type {
+    BackendRenderTarget,
+    BackendTexture,
+    Uniforms,
+} from "./backend.js";
 import type { ShaderPreset } from "./constants.js";
 import type { EffectChain } from "./effect-chain.js";
-import type { Framebuffer } from "./gl/framebuffer.js";
-import type { Pass } from "./gl/pass.js";
-import type { GlslVersion, Uniforms } from "./gl/program.js";
-import type { Texture } from "./gl/texture.js";
+import type { GlslVersion } from "./glsl-version.js";
 import type { IntersectionState } from "./intersection-state.js";
 import type { ElementRect, Margin, MarginOpts } from "./rect.js";
+import type { Pass } from "./render-target.js";
 
-export type { GlslVersion } from "./gl/program.js";
+export type { GlslVersion } from "./glsl-version.js";
 
 /**
  * @deprecated Use `float?: boolean` instead.
@@ -479,7 +482,7 @@ export type VFXElement = {
     width: number;
     height: number;
     passes: VFXElementPass[];
-    bufferTargets: Map<string, Framebuffer>;
+    bufferTargets: Map<string, BackendRenderTarget>;
     startTime: number;
     enterTime: number;
     leaveTime: number;
@@ -489,7 +492,7 @@ export type VFXElement = {
     overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
-    srcTexture: Texture;
+    srcTexture: BackendTexture;
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;

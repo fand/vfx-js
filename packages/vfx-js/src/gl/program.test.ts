@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { detectGlslVersion, uploadScalarUniform } from "./program.js";
-import { Vec2, Vec4 } from "./vec.js";
+import { detectGlslVersion } from "../glsl-version.js";
+import { Vec2, Vec4 } from "../vec.js";
+import { uploadScalarUniform } from "./program.js";
 
 describe("detectGlslVersion", () => {
     it("picks 300 es when #version 300 es directive is present", () => {

@@ -1,5 +1,10 @@
+import type {
+    BackendRenderTarget,
+    RenderTargetOpts,
+    TextureWrap,
+} from "../backend.js";
 import type { GLContext, Restorable } from "./context.js";
-import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
+import { Texture } from "./texture.js";
 
 const warnedMultisample = new WeakSet<WebGL2RenderingContext>();
 
@@ -19,7 +24,7 @@ const warnedMultisample = new WeakSet<WebGL2RenderingContext>();
  * texture opts out of auto-registering; its storage is managed here.
  * @internal
  */
-export class Framebuffer implements Restorable {
+export class Framebuffer implements BackendRenderTarget, Restorable {
     gl: WebGL2RenderingContext;
     width: number;
     height: number;
@@ -48,14 +53,7 @@ export class Framebuffer implements Restorable {
         ctx: GLContext,
         width: number,
         height: number,
-        opts: {
-            float?: boolean;
-            wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
-            filter?: TextureFilter;
-            mipmap?: boolean;
-            depth?: boolean;
-            samples?: 1 | 4;
-        } = {},
+        opts: RenderTargetOpts = {},
     ) {
         this.#ctx = ctx;
         this.gl = ctx.gl;

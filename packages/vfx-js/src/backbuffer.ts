@@ -1,6 +1,10 @@
-import type { GLContext } from "./gl/context.js";
-import { Framebuffer } from "./gl/framebuffer.js";
-import type { Texture, TextureFilter, TextureWrap } from "./gl/texture.js";
+import type {
+    Backend,
+    BackendRenderTarget,
+    BackendTexture,
+    TextureFilter,
+    TextureWrap,
+} from "./backend.js";
 import { type GLRect, getGLRect } from "./gl-rect.js";
 
 /**
@@ -13,10 +17,10 @@ export class Backbuffer {
     #width: number;
     #height: number;
     #pixelRatio: number;
-    #buffers: [Framebuffer, Framebuffer];
+    #buffers: [BackendRenderTarget, BackendRenderTarget];
 
     constructor(
-        ctx: GLContext,
+        backend: Backend,
         width: number,
         height: number,
         pixelRatio: number,
@@ -44,28 +48,28 @@ export class Backbuffer {
             samples: opts.samples,
         };
         this.#buffers = [
-            new Framebuffer(ctx, pwidth, pheight, fbOpts),
-            new Framebuffer(ctx, pwidth, pheight, fbOpts),
+            backend.createRenderTarget(pwidth, pheight, fbOpts),
+            backend.createRenderTarget(pwidth, pheight, fbOpts),
         ];
     }
 
     /** Read side (the previous frame's output). */
-    get read(): Framebuffer {
+    get read(): BackendRenderTarget {
         return this.#buffers[0];
     }
 
     /** Read texture (the previous frame's output). */
-    get texture(): Texture {
+    get texture(): BackendTexture {
         return this.#buffers[0].texture;
     }
 
     /** Write target for the current frame. */
-    get target(): Framebuffer {
+    get target(): BackendRenderTarget {
         return this.#buffers[1];
     }
 
     /** Both sides, in no particular order. */
-    get framebuffers(): readonly Framebuffer[] {
+    get framebuffers(): readonly BackendRenderTarget[] {
         return this.#buffers;
     }
 
