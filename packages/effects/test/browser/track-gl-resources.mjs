@@ -64,7 +64,7 @@ export function trackGLResources(gl) {
             const stride =
                 format === gl.RGBA32F
                     ? 16
-                    : format === gl.RGBA16F
+                    : format === gl.RGBA16F || format === gl.RG32F
                       ? 8
                       : format === gl.R16F
                         ? 2

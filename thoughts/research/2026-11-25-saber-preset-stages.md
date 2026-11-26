@@ -806,3 +806,56 @@ warmup frames,batch2, GL errors0. DPR2 paired mean ratios ranged .63–.97.
 The initial DPR1 Arc +34% did not reproduce:100 samples after40 warmup,batch4,
 four alternating runs gave baseline2.37–2.79ms and candidate2.36–2.46ms.
 No clear sustained slowdown; do not extrapolate these load-sensitive numbers.
+
+
+## 20. RG32F distance fields
+
+Stage19 baseline; preset values, noise and other render-target resolutions unchanged.
+Full contours use RG32F for both the cached field and flood scratch. The field
+stores signed distance in R, normal angle+4 in G; G=0 is invalid and G=8 is a
+zero normal. Decode normals only at texel centers. Distorted core sampling keeps
+hardware-linear distance and separately reconstructs bilinear validity from
+four texels, avoiding interpolation of wrapped angles. Support culling reads
+validity directly without trigonometry.
+
+Two-channel flood seeds retain their original32F relative offsets. Invalid
+seeds use a large finite sentinel; flood reads exclude the zero-cleared region
+outside the processing rectangle. This preserves valid seeds at zero offset.
+Reveal needs arc position/length in the other two channels, so it retains the
+Stage19 RGBA path; returning to full contours rebuilds RG32F without discarding
+the source trace. Unsupported float-linear/blend extensions also retain the
+legacy path. No reduced-precision fallback is imposed on explicit RG32F callers.
+
+M4 Max/ANGLE Metal,960×540,DPR2,pad320, full contours (tracked texture storage,
+not total driver VRAM):
+
+| Preset | Stage19 steady | Stage20 steady | Stage19 rebuild/dynamic peak | Stage20 peak |
+|---|---:|---:|---:|---:|
+| Arc Reactor |289.56 MiB|231.94 MiB|404.79 MiB|289.56 MiB|
+| Fire |257.83 MiB|200.22 MiB|373.07 MiB|257.83 MiB|
+
+One field saves57.62MiB; the two-field peak saves115.23MiB. Reveal retains its
+prior footprint, including cached arc/payload targets. Do not apply these
+full-contour numbers to active reveals or unsupported devices.
+
+Validation:679 core +43 effects tests; ESM/CJS builds, TypeScript and docs checks.
+All12 presets × DPR1/2 × t=1,1.5,2 have zero screen-pixel difference from Stage19.
+All864 regenerated review PNGs match Stage19 byte-for-byte. Thin oblique lines,
+empty input and cropped processing regions: exact signed distances and validity,
+normal-component error <=4.47e-7, zero screen difference. Reveal↔full transitions
+and compact/legacy context recovery preserve pixels; all tracked objects release.
+RG32F GPU readback preserves32F fractional/HDR values in ordinary, persistent,
+mipmapped and MSAA-requested targets. Unsupported formats throw before allocation;
+MSAA fallback retains RG32F storage.
+
+Artifacts: ignored results/stage20-evidence/. Reproduce from the frozen Stage19
+candidate with prepare-saber-comparison.mjs; runFieldChecks() and memoryChecks({
+maxSteadyRatio:.9,maxPeakRatio:.9}) check this phase separately from Stage19's
+larger memory reduction against Stage17.
+Review: http://127.0.0.1:6040/stage20.html?before=stage19-presets#kryptonite
+
+Timing remains load-sensitive. The initial six-preset run showed noisy DPR1
+Electric/Energy results;50 warmup frames +100 samples,batch3 in alternating
+order gave Electric paired means2.98→2.98ms and Energy2.95→3.02ms. With dynamic
+sources at DPR2, repeated Arc Reactor medians21.80/21.98→13.63/13.36ms; Fire
+27.70/26.58→19.35/21.44ms. All GL errors0. No universal frame-rate claim.

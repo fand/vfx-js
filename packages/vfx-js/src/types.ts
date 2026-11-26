@@ -764,8 +764,11 @@ export type EffectRenderTargetOpts = {
      * RGBA8/16F/32F selection. Half-float formats retain HDR values with less
      * memory; R/RG omit unused channels (sampling returns 0 for missing RGB,
      * 1 for alpha). `readPixels` still returns four RGBA components per pixel.
+     * `rg32f` preserves 32-bit precision; requires EXT_float_blend and, for
+     * linear filtering, OES_texture_float_linear. Unsupported use throws;
+     * explicit formats never silently reduce precision.
      */
-    format?: "rgba8" | "r16f" | "rg16f" | "rgba16f";
+    format?: "rgba8" | "r16f" | "rg16f" | "rgba16f" | "rg32f";
 
     /**
      * Whether the target content should persist across frames (Default: `false`).
@@ -814,7 +817,7 @@ export type EffectRenderTargetOpts = {
      * The target still samples and blits like a normal texture.
      * It uses about 5 times the memory, or 10 times with `depth: true`.
      * If the GPU can't take 4 samples for the format, it uses 1 and warns.
-     * With `float: true`, asking for 4 samples always gives 16-bit float,
+     * Without an explicit `format`, `float: true` with 4 samples gives 16-bit float,
      * also when the GPU falls back to 1.
      * Other values are ignored with a warning.
      */

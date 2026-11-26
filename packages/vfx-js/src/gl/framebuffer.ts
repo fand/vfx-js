@@ -60,6 +60,16 @@ export class Framebuffer implements Restorable {
             samples?: 1 | 4;
         } = {},
     ) {
+        if (opts.format === "rg32f") {
+            if (!ctx.floatBlend) {
+                throw new Error("[VFX-JS] RG32F requires EXT_float_blend.");
+            }
+            if (opts.filter !== "nearest" && !ctx.floatLinearFilter) {
+                throw new Error(
+                    "[VFX-JS] Linear RG32F requires OES_texture_float_linear.",
+                );
+            }
+        }
         this.#ctx = ctx;
         this.gl = ctx.gl;
         this.width = Math.max(1, Math.floor(width));
@@ -144,6 +154,8 @@ export class Framebuffer implements Restorable {
                 return gl.RG16F;
             case "rgba16f":
                 return gl.RGBA16F;
+            case "rg32f":
+                return gl.RG32F;
         }
         return undefined;
     }
@@ -315,27 +327,29 @@ export class Framebuffer implements Restorable {
         // Choose format based on float/non-float. For float textures, use
         // RGBA16F as a fallback if linear filtering on RGBA32F is not
         // supported by the GPU.
-        // Asking for 4 samples always gives RGBA16F, even after the fallback to 1.
-        const floatLinear =
-            this.#ctx.floatLinearFilter &&
-            !this.#multisampleRequested &&
-            !this.#format;
-        if (this.float && floatLinear && !this.#ctx.floatBlend) {
+        // With automatic storage, 4 samples use RGBA16F even after fallback to 1.
+        // An explicit RG32F target retains its format and precision.
+        const useFloat32 =
+            this.#format === "rg32f" ||
+            (this.#ctx.floatLinearFilter &&
+                !this.#multisampleRequested &&
+                !this.#format);
+        if (this.float && useFloat32 && !this.#ctx.floatBlend) {
             // Blending into RGBA32F needs EXT_float_blend; fail fast
             // instead of letting blended draws drop silently.
             throw new Error("[VFX-JS] EXT_float_blend is not supported.");
         }
         const internalFormat =
             this.#explicitFormat() ??
-            (this.float ? (floatLinear ? gl.RGBA32F : gl.RGBA16F) : gl.RGBA8);
+            (this.float ? (useFloat32 ? gl.RGBA32F : gl.RGBA16F) : gl.RGBA8);
         const externalFormat =
             this.#format === "r16f"
                 ? gl.RED
-                : this.#format === "rg16f"
+                : this.#format === "rg16f" || this.#format === "rg32f"
                   ? gl.RG
                   : gl.RGBA;
         const type = this.float
-            ? floatLinear
+            ? useFloat32
                 ? gl.FLOAT
                 : gl.HALF_FLOAT
             : gl.UNSIGNED_BYTE;

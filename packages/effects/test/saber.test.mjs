@@ -523,6 +523,7 @@ function fixture({ width = 128, height = 96, pixelRatio = 1 } = {}) {
     let restored;
     const ctx = {
         time: 2,
+        gl: { getExtension: () => ({}) },
         src: { width, height },
         target: null,
         dims: {
@@ -540,6 +541,7 @@ function fixture({ width = 128, height = 96, pixelRatio = 1 } = {}) {
                 width: opts.size?.[0] ?? width,
                 height: opts.size?.[1] ?? height,
                 explicit: !!opts.size,
+                format: opts.format,
                 disposed: false,
                 dispose() {
                     this.disposed = true;
@@ -1180,5 +1182,48 @@ test("dynamic fields reuse flood scratch and release it when frozen", () => {
     effect.invalidate();
     f.render(effect);
     assert.equal(f.targets.filter((t) => !t.disposed).length, live - 1);
+    effect.dispose();
+});
+
+test("compact fields fall back for reveal and return without retracing the source", async () => {
+    const f = fixture();
+    const effect = steadyEffect({ dynamic: true, glow: 0 });
+    effect.init(f.ctx);
+    f.render(effect);
+    const field = () => f.draws.find(isCore).uniforms.field;
+    assert.equal(field().format, "rg32f");
+    const compact = field();
+    effect.setParams({ end: 0.5, dynamic: false });
+    f.render(effect);
+    assert.equal(compact.disposed, true);
+    assert.equal(field().format, undefined);
+    const expanded = field();
+    f.reads[0].resolve(
+        rectangleMask(f.reads[0].target.width, f.reads[0].target.height),
+    );
+    await Promise.resolve();
+    f.render(effect);
+    assert.equal(f.draws.find(isCore).uniforms.revealEnd, 0.5);
+    effect.setParams({ end: 1, dynamic: false });
+    f.render(effect);
+    assert.equal(field().format, "rg32f");
+    assert.equal(expanded.disposed, true);
+    effect.setParams({ end: 0.5 });
+    f.render(effect);
+    assert.equal(field().format, undefined);
+    assert.equal(f.draws.find(isCore).uniforms.revealEnd, 0.5);
+    assert.equal(f.reads.length, 1);
+    effect.dispose();
+});
+
+test("devices without linear float filtering keep the legacy field", () => {
+    const f = fixture();
+    f.ctx.gl.getExtension = () => null;
+    const effect = steadyEffect({ glow: 0 });
+    effect.init(f.ctx);
+    f.render(effect);
+    const core = f.draws.find(isCore);
+    assert.equal(core.uniforms.field.format, undefined);
+    assert.equal(core.uniforms.compactField, 0);
     effect.dispose();
 });

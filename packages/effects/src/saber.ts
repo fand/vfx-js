@@ -14,6 +14,7 @@ import { padOutputRect } from "./_pad.js";
 import { coreBlurSigma } from "./_saber-blur.js";
 import { saberColorRamp } from "./_saber-color.js";
 import { GLSL_LINE_COVERAGE } from "./_saber-coverage.js";
+import { GLSL_SABER_FIELD } from "./_saber-field.js";
 import { saberFlickerGain } from "./_saber-flicker.js";
 import {
     DEFAULT_DISTORTION,
@@ -79,6 +80,7 @@ in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D payload;
 uniform int payloadOn;
+uniform int compactField;
 ${GLSL_MASK}
 
 // Arc position and 1 + loop length of the nearest traced point within 4 texels.
@@ -127,7 +129,7 @@ void main() {
     bool hasX = abs(ox) <= 1.0;
     bool hasY = abs(oy) <= 1.0;
     if (!hasX && !hasY) {
-        outColor = vec4(0.0);
+        outColor = compactField == 1 ? vec4(1e20) : vec4(0.0);
         return;
     }
     // Nearest point on the straight line through both axis crossings.
@@ -153,11 +155,13 @@ precision highp float;
 out vec4 outColor;
 uniform sampler2D seed;
 uniform int stepSize;
+uniform int compactField;
+uniform vec4 floodRect;
 
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     ivec2 size = textureSize(seed, 0);
-    vec4 best = vec4(0.0);
+    vec4 best = compactField == 1 ? vec4(1e20) : vec4(0.0);
     float bestLen = 1e20;
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
@@ -166,8 +170,10 @@ void main() {
             if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, size))) {
                 continue;
             }
+            if (q.x < int(floodRect.x) || q.y < int(floodRect.y)
+                || q.x >= int(floodRect.z) || q.y >= int(floodRect.w)) continue;
             vec4 s = texelFetch(seed, q, 0);
-            if (s.a == 0.0) {
+            if (compactField == 1 ? s.r >= 1e19 : s.a == 0.0) {
                 continue;
             }
             vec2 candidate = s.rg + vec2(delta);
@@ -188,13 +194,14 @@ precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D seed;
+uniform int compactField;
 ${GLSL_MASK}
 
 void main() {
     vec2 dx = dFdx(uvSrc);
     vec2 dy = dFdy(uvSrc);
     vec4 s = texelFetch(seed, ivec2(gl_FragCoord.xy), 0);
-    if (s.a == 0.0) {
+    if (compactField == 1 ? s.r >= 1e19 : s.a == 0.0) {
         outColor = vec4(0.0);
         return;
     }
@@ -212,7 +219,9 @@ void main() {
         float len = length(grad);
         n = len > 0.0 ? -grad / len : vec2(0.0);
     }
-    outColor = vec4(side * d, n, 1.0);
+    outColor = compactField == 1
+        ? vec4(side * d, dot(n, n) > 0.0 ? atan(n.y, n.x) + 4.0 : 8.0, 0.0, 1.0)
+        : vec4(side * d, n, 1.0);
 }
 `;
 
@@ -278,6 +287,7 @@ uniform float revealEnd;
 uniform float segments;
 uniform float fade;
 ${GLSL_LINE_COVERAGE}
+${GLSL_SABER_FIELD}
 
 const float CUT_SOFTNESS = 3.0;
 const float HEAD_LENGTH = 12.0;
@@ -287,11 +297,11 @@ const float MIN_SEGMENT = 160.0;
 void main() {
     // Decide once per derivative quad, retaining all lanes needed for coverage.
     vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
-    if (quad.a < 0.5 || abs(quad.r) > thickness + 4.0) {
+    if (saberFieldValidity(quad) < 0.5 || abs(quad.r) > thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    vec4 f = texelFetch(field, ivec2(gl_FragCoord.xy), 0);
+    vec4 f = decodeSaberField(texelFetch(field, ivec2(gl_FragCoord.xy), 0));
     float d = f.r;
     vec2 n = f.gb;
     vec2 q = gl_FragCoord.xy - d * n;
@@ -655,6 +665,8 @@ export class SaberEffect implements Effect {
     params: SaberParams;
 
     #field: EffectRenderTarget | null = null;
+    #compactSupported = false;
+    #compactField = false;
     #floodScratch: EffectRenderTarget | null = null;
     #core: EffectRenderTarget | null = null;
     #region: EffectGeometry | undefined;
@@ -746,13 +758,25 @@ export class SaberEffect implements Effect {
 
     init(ctx: EffectContext): void {
         this.#disposed = false;
-        // Scalar emission needs one half-float channel. Geometry keeps normals
-        // and validity in RGBA; flood scratch exists only while rebuilding it.
-        this.#field = ctx.createRenderTarget({ float: true });
+        this.#compactSupported = !!(
+            ctx.gl.getExtension("OES_texture_float_linear") &&
+            ctx.gl.getExtension("EXT_float_blend")
+        );
+        this.#compactField =
+            this.#compactSupported &&
+            this.params.start <= 0 &&
+            this.params.end >= 1;
+        this.#field = ctx.createRenderTarget(
+            this.#compactField ? { format: "rg32f" } : { float: true },
+        );
         this.#core = ctx.createRenderTarget({ format: "r16f" });
         this.#dirty = true;
         // Restored targets come back empty, so the cached field must be built again.
         ctx.onContextRestored(() => {
+            this.#compactSupported = !!(
+                ctx.gl.getExtension("OES_texture_float_linear") &&
+                ctx.gl.getExtension("EXT_float_blend")
+            );
             this.#dirty = true;
         });
     }
@@ -764,6 +788,20 @@ export class SaberEffect implements Effect {
             return;
         }
         const { edge, edgeThreshold, dynamic, start, end } = this.params;
+        // Reveals propagate arc position/length alongside the seed vector.
+        // Preserve that four-channel path and its memory reuse while revealing.
+        const compact = this.#compactSupported && start <= 0 && end >= 1;
+        const formatChanged = compact !== this.#compactField;
+        if (formatChanged) {
+            field.dispose();
+            this.#floodScratch?.dispose();
+            this.#floodScratch = null;
+            this.#compactField = compact;
+            field = ctx.createRenderTarget(
+                compact ? { format: "rg32f" } : { float: true },
+            );
+            this.#field = field;
+        }
         if (!dynamic && this.#floodScratch) {
             this.#floodScratch.dispose();
             this.#floodScratch = null;
@@ -786,6 +824,7 @@ export class SaberEffect implements Effect {
             edgeThreshold !== this.#builtThreshold ||
             geometry.some((value, i) => value !== this.#builtGeometry[i]);
         const sourceChanged =
+            formatChanged ||
             geometryChanged ||
             regionChanged ||
             field.width !== this.#builtW ||
@@ -835,6 +874,7 @@ export class SaberEffect implements Effect {
                 frag: FRAG_CORE,
                 uniforms: {
                     field,
+                    compactField: this.#compactField ? 1 : 0,
                     thickness: thickness * pixelRatio,
                     pixelRatio,
                     arcTex: usePayload && this.#arc ? this.#arc : field,
@@ -895,6 +935,7 @@ export class SaberEffect implements Effect {
                 this.params.coreDistortion.composite === "distort"
                     ? {
                           field,
+                          compact: this.#compactField,
                           lineWidth: !reveal && !soften ? thickness : 0,
                           reach: thickness + (soften ? softness + 2 : 0),
                       }
@@ -1366,6 +1407,7 @@ export class SaberEffect implements Effect {
         const { edge, edgeThreshold } = this.params;
         const dst = this.outputRect(ctx.dims);
         const maskUniforms = {
+            compactField: this.#compactField ? 1 : 0,
             src: ctx.src,
             edgeMode: edge === "luminance" ? 1 : 0,
             edgeThreshold,
@@ -1379,7 +1421,10 @@ export class SaberEffect implements Effect {
         // Resolve into the unused ping-pong side and retain only that side.
         const seedA = field;
         const seedB =
-            this.#floodScratch ?? ctx.createRenderTarget({ float: true });
+            this.#floodScratch ??
+            ctx.createRenderTarget(
+                this.#compactField ? { format: "rg32f" } : { float: true },
+            );
         this.#floodScratch = null;
         if (this.#region) {
             ctx.clear(seedA);
@@ -1418,7 +1463,14 @@ export class SaberEffect implements Effect {
         const flood = (stepSize: number) => {
             ctx.draw({
                 frag: FRAG_JFA,
-                uniforms: { seed: read, stepSize },
+                uniforms: {
+                    seed: read,
+                    stepSize,
+                    compactField: this.#compactField ? 1 : 0,
+                    floodRect: this.#regionKey.length
+                        ? this.#regionKey.slice(0, 4)
+                        : [0, 0, field.width, field.height],
+                },
                 target: write,
                 geometry: this.#region,
             });

@@ -716,14 +716,14 @@ export async function sourceChecks() {
     return rows;
 }
 
-export async function contextRestoreChecks() {
+export async function contextRestoreChecks({ end = 0.65 } = {}) {
     const fixture = await createSaberFixture({
         pixelRatio: 2,
         trackResources: true,
         options: {
             ...STEADY_OPTIONS,
             pad: 320,
-            end: 0.65,
+            end,
             glowDistortion: { amount: 32 },
         },
     });
@@ -912,7 +912,11 @@ window.saberQualityChecks = {
 
 // Freeze Stage17 as baseline. Tracks effect textures, not total driver VRAM.
 // Include invalidation/dynamic peaks: steady-state alone hides flood scratch.
-export async function memoryChecks({ paint } = {}) {
+export async function memoryChecks({
+    paint,
+    maxSteadyRatio = 0.5,
+    maxPeakRatio = 0.65,
+} = {}) {
     const rows = [];
     for (const pixelRatio of [1, 2]) {
         for (const preset of [
@@ -1012,9 +1016,9 @@ export async function memoryChecks({ paint } = {}) {
                     candidate.frozen.textureBytes !==
                         candidate.static.textureBytes ||
                     candidate.static.textureBytes >
-                        baseline.static.textureBytes * 0.5 ||
+                        baseline.static.textureBytes * maxSteadyRatio ||
                     candidate.dynamic.peakTextureBytes >
-                        baseline.dynamic.peakTextureBytes * 0.65,
+                        baseline.dynamic.peakTextureBytes * maxPeakRatio,
             });
         }
     }

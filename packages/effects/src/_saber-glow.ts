@@ -7,6 +7,7 @@ import {
     remainingBlurSigma,
 } from "./_saber-blur.js";
 import { GLSL_LINE_COVERAGE } from "./_saber-coverage.js";
+import { GLSL_SABER_FIELD } from "./_saber-field.js";
 
 /** Independent procedural distortion; native noise patterns remain approximate. */
 export type SaberDistortionParams = {
@@ -111,6 +112,7 @@ uniform float polarity;
 #if defined(CORE_BOUNDS) || defined(ANALYTIC_CORE)
 uniform sampler2D contourField;
 uniform float supportReach;
+${GLSL_SABER_FIELD}
 #endif
 #ifdef ANALYTIC_CORE
 uniform float signedCoreWidth;
@@ -275,7 +277,7 @@ vec3 shadeNoise(vec2 n, float offset) {
     // Pulling a thin raster line through a steep warp misses whole pixels.
     // For a single steady contour, integrate the warped distance field
     // instead. Keep the raster path for animated reveals.
-    vec4 field = texture(contourField, warped);
+    vec4 field = sampleSaberField(contourField, warped);
 #ifdef CACHED_NOISE
     // Lattice knots make quad derivatives depend on odd/even padding. Sample
     // the actual pullback symmetrically around this pixel instead.
@@ -303,7 +305,7 @@ void main() {
     // The support bound includes displacement and shutter transport. Decide once per
     // derivative quad; retained quads still evaluate every derivative lane.
     vec4 bounds = texelFetch(contourField, ivec2(gl_FragCoord.xy) & ~1, 0);
-    if (bounds.a < 0.5 || abs(bounds.r) > supportReach) {
+    if (saberFieldValidity(bounds) < 0.5 || abs(bounds.r) > supportReach) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -557,6 +559,7 @@ export class SaberGlowPasses {
         layered = false,
         bounds?: {
             field: EffectRenderTarget;
+            compact?: boolean;
             reach: number;
             lineWidth?: number;
         },
@@ -607,6 +610,7 @@ export class SaberGlowPasses {
             ...(bounds
                 ? {
                       contourField: bounds.field,
+                      compactField: bounds.compact ? 1 : 0,
                       signedCoreWidth:
                           (bounds.lineWidth ?? 0) * ctx.dims.pixelRatio,
                       supportReach:

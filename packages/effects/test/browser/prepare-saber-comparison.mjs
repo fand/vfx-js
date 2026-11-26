@@ -67,6 +67,7 @@ await cp(
     path.join(destination, "saber-motion-checks.mjs"),
 );
 for (const file of [
+    "saber-field-checks.mjs",
     "saber-color-composition-checks.mjs",
     "saber-color-composition.json",
 ]) {
@@ -86,6 +87,7 @@ for (const file of [
     "candidate/_saber-glow.js",
     "candidate/_saber-blur.js",
     "candidate/_saber-coverage.js",
+    "candidate/_saber-field.js",
     "candidate/_saber-flicker.js",
     "candidate/saber-presets.js",
     "core/gl/framebuffer.js",
