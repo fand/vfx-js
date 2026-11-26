@@ -383,7 +383,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. Both are premultiplied alpha. |
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
-| `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. |
+| `createRenderTarget(opts)` | `{ size?, float?, format?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. `format` overrides `float`: `rgba8`, `r16f`, `rg16f`, `rgba16f`. Use R/RG half-float for scalar/vector HDR intermediates; omitted retains automatic RGBA storage. |
 | `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
 | `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. `target` can be an array to write several targets in one draw. |
 | `blit(source, target?)` | Copy a texture into a target. |

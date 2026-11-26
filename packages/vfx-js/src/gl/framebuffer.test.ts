@@ -34,6 +34,10 @@ function makeMockGl() {
         LINEAR_MIPMAP_LINEAR: 0x2703,
         CLAMP_TO_EDGE: 0x812f,
         RGBA: 0x1908,
+        RED: 0x1903,
+        RG: 0x8227,
+        R16F: 0x822d,
+        RG16F: 0x822f,
         RGBA8: 0x8058,
         RGBA16F: 0x881a,
         RGBA32F: 0x8814,
@@ -81,6 +85,65 @@ function makeCtx(
 }
 
 describe("Framebuffer", () => {
+    it.each(["r16f", "rg16f", "rgba16f", "rgba8"] as const)(
+        "keeps explicit %s storage through resize, mipmaps and restore",
+        (format) => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(
+                makeCtx(gl, { floatLinearFilter: true }),
+                8,
+                4,
+                {
+                    format,
+                    float: true,
+                    mipmap: true,
+                },
+            );
+            const internal = {
+                r16f: gl.R16F,
+                rg16f: gl.RG16F,
+                rgba16f: gl.RGBA16F,
+                rgba8: gl.RGBA8,
+            }[format];
+            const external =
+                format === "r16f"
+                    ? gl.RED
+                    : format === "rg16f"
+                      ? gl.RG
+                      : gl.RGBA;
+            const type = format === "rgba8" ? gl.UNSIGNED_BYTE : gl.HALF_FLOAT;
+            expect(fb.float).toBe(format !== "rgba8");
+            fb.setSize(16, 8);
+            fb.restore();
+            for (const call of gl.texImage2D.mock.calls) {
+                expect(call[2]).toBe(internal);
+                expect(call[6]).toBe(external);
+                expect(call[7]).toBe(type);
+            }
+        },
+    );
+
+    it("uses the explicit format for MSAA support and allocation", () => {
+        const gl = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 8, 8, {
+            format: "r16f",
+            samples: 4,
+        });
+        expect(fb.samples).toBe(4);
+        expect(gl.getInternalformatParameter).toHaveBeenCalledWith(
+            gl.RENDERBUFFER,
+            gl.R16F,
+            gl.SAMPLES,
+        );
+        expect(gl.renderbufferStorageMultisample).toHaveBeenCalledWith(
+            gl.RENDERBUFFER,
+            4,
+            gl.R16F,
+            8,
+            8,
+        );
+    });
+
     it.each([
         {},
         { depth: true },

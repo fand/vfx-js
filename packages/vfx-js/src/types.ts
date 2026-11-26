@@ -760,6 +760,14 @@ export type EffectRenderTargetOpts = {
     float?: boolean;
 
     /**
+     * Explicit color storage, overriding `float`. Omitted preserves automatic
+     * RGBA8/16F/32F selection. Half-float formats retain HDR values with less
+     * memory; R/RG omit unused channels (sampling returns 0 for missing RGB,
+     * 1 for alpha). `readPixels` still returns four RGBA components per pixel.
+     */
+    format?: "rgba8" | "r16f" | "rg16f" | "rgba16f";
+
+    /**
      * Whether the target content should persist across frames (Default: `false`).
      * Useful for feedback effects like trails or motion blur.
      */

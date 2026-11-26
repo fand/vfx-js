@@ -86,6 +86,7 @@ type MockFramebuffer = {
     opts:
         | {
               float?: boolean;
+              format?: string;
               wrap?: unknown;
               filter?: string;
               mipmap?: boolean;
@@ -110,6 +111,7 @@ type MockBackbuffer = {
         pr: number;
         float?: boolean;
         opts?: {
+            format?: string;
             wrap?: unknown;
             filter?: string;
             mipmap?: boolean;
@@ -798,6 +800,14 @@ describe("EffectHost.wrapTexture", () => {
 // ---------------------------------------------------------------------------
 
 describe("EffectHost.createRenderTarget", () => {
+    it("forwards explicit storage to ordinary and persistent targets", () => {
+        const { host } = makeHost();
+        host.ctx.createRenderTarget({ format: "r16f" });
+        host.ctx.createRenderTarget({ format: "rg16f", persistent: true });
+        expect(framebuffers[0].opts?.format).toBe("r16f");
+        expect(backbuffers[0].ctorArgs.opts?.format).toBe("rg16f");
+    });
+
     it("persistent: false → Framebuffer at element size × pr by default", () => {
         const { host } = makeHost();
         const rt = host.ctx.createRenderTarget();

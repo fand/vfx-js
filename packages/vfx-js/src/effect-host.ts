@@ -502,6 +502,7 @@ export class EffectHost {
     #createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget {
         const persistent = opts?.persistent ?? false;
         const float = opts?.float ?? false;
+        const format = opts?.format;
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
         const mipmapOpt = opts?.mipmap ?? false;
@@ -522,6 +523,7 @@ export class EffectHost {
             const cssW = explicitSize ? sizeW : sizeW / pr;
             const cssH = explicitSize ? sizeH : sizeH / pr;
             const bb = new Backbuffer(this.#glCtx, cssW, cssH, pr, float, {
+                format,
                 wrap,
                 filter,
                 mipmap,
@@ -563,6 +565,7 @@ export class EffectHost {
         } else {
             const fb = new Framebuffer(this.#glCtx, sizeW, sizeH, {
                 float,
+                format,
                 wrap,
                 filter,
                 mipmap,
