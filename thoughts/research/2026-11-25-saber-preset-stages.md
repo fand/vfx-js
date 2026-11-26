@@ -550,3 +550,46 @@ Fire Bias3 small-point probes give signed-cube displacement RMSE .0186px;
 this does not support an arbitrary new Bias law. Residual native noise patterns,
 wide-Core support and detailed fire motion remain approximate. This stage does
 not claim pixel parity or a GPU speedup.
+
+
+## 14. Fire Core: isolate the underlying ridge field
+
+56 new native frames: 17 point-grid probes, 9 matched Glow masks, 17 scale/
+complexity probes, 9 text/Core probes, and 4 Lock Noise toggles (56 total).
+The point grid uses225 closed1px square masks; open paths are ignored by Saber
+and were discarded. Four seeds × Bias1/3 × Amount.25/1 separate displacement
+from line thickness. Paired Glow masks confirm the same two-component field:
+`.5 + .25*(nx+ny)` has .031–.040 RMS residual. Changing Lock Noise has exactly
+zero pixel difference on this centered text fixture, both Core-only and full.
+It does not justify a new text-coordinate mode.
+
+The initial Fire samples do not support simply increasing distortion amount:
+Bias3 magnitude below.05 occurs in19.6% of native vectors and17.0% of Stage13
+vectors. Their fields differ in topology and frequency, not just coverage.
+Single-octave probes expose an overly broad, bright ridge primitive. Two seeds
+at scale25/aspect1.29 cover many cells and isolate this from Fluid advection.
+Change the common Fluid/Energy frequency .8→1 and ridge coefficient .8→.9;
+keep octave count, amplitudes, Bias, Fluid warp, and every preset unchanged.
+
+| Energy, scale25 | AE | Stage13 | Stage14 |
+| --- | --- | --- | --- |
+| 1 octave mean | .33573 | ~.370 | .34837 |
+| 1 octave std | .11836 | ~.106 | .11527 |
+| 1 octave gradient RMS | .02892 | ~.0205 | .02752 |
+| 4 octaves mean | .53935 | ~.596 | .54228 |
+| 4 octaves std | .17807 | ~.168 | .17888 |
+| 4 octaves gradient RMS | .04876 | ~.0390 | .05016 |
+
+`ae-saber-fire-noise-fields.jsx` + `analyze-saber-fire-noise.py` reproduce the
+native field measurements; `runRidgeDensityChecks()` checks ensemble moments,
+not equal seeded pixels. Core grid/text JSX retain the other isolated probes.
+The native data, candidate sweeps and discarded alternatives are archived in
+ignored `results/stage14-evidence/`. Increasing Fluid warp1.3→1.8 helps broad
+scale178 correlation but worsens scale25 gradients; it is not shipped here.
+Fluid topology still differs and Fire still has overly smooth contour sections.
+
+Validation:40 node tests; nine GPU suites (ridge density, Smoke density, Amount/
+Invert, wind blur, evolution, Core filter order, Glow field resolution, mask
+composition,51 native RGB samples), all pass.12×72 frames rendered, GL error0.
+No additional noise evaluations or render passes in this change.
+Review: `http://127.0.0.1:6040/stage14.html?before=stage13-presets#fire`.

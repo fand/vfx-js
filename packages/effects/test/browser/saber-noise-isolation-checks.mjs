@@ -471,3 +471,85 @@ export async function runSmokeDensityChecks() {
     }
     return { rows, failures };
 }
+
+// ae-saber-fire-noise-fields.jsx: saturated native Energy masks, scale25,
+// aspect1.29, seeds5000/5100. Compare ensemble moments, not seeded pixels.
+// This also exercises the ridge accumulation shared by Fluid's Core field.
+export async function runRidgeDensityChecks() {
+    const references = [
+        { complexity: 1, mean: 0.335731, std: 0.118357, gradient: 0.02892 },
+        { complexity: 4, mean: 0.539352, std: 0.178067, gradient: 0.048763 },
+    ];
+    const rows = [],
+        failures = [];
+    for (const reference of references) {
+        const samples = [];
+        for (const seed of [0, 100]) {
+            const f = await createSaberFixture({
+                Effect: DistortionProbe,
+                width: 512,
+                height: 512,
+                sourceWidth: 512,
+                sourceHeight: 512,
+                pixelRatio: 1,
+                options: {
+                    type: "energy",
+                    amount: 100,
+                    noiseScale: 25,
+                    noiseAspectRatio: 1.29,
+                    noiseComplexity: reference.complexity,
+                    noiseDetail: 0,
+                    noiseBias: 1,
+                    seed,
+                },
+            });
+            try {
+                const shot = await f.capture("core-distortion", 0);
+                let sum = 0,
+                    square = 0,
+                    gradientSquare = 0,
+                    count = 0;
+                for (let y = 32; y < 480; y++) {
+                    for (let x = 32; x < 224; x++) {
+                        const i = ((shot.height - 1 - y) * shot.width + x) * 4;
+                        const value = shot.pixels[i];
+                        sum += value;
+                        square += value * value;
+                        gradientSquare += (value - shot.pixels[i + 4]) ** 2;
+                        count++;
+                    }
+                }
+                const mean = sum / count;
+                samples.push({
+                    mean,
+                    std: Math.sqrt(square / count - mean * mean),
+                    gradient: Math.sqrt(gradientSquare / count),
+                    glError: f.gl.getError(),
+                });
+            } finally {
+                f.destroy();
+            }
+        }
+        const average = (key) =>
+            samples.reduce((sum, sample) => sum + sample[key], 0) /
+            samples.length;
+        const row = {
+            complexity: reference.complexity,
+            mean: average("mean"),
+            std: average("std"),
+            gradient: average("gradient"),
+            samples,
+            reference,
+        };
+        rows.push(row);
+        if (
+            samples.some((sample) => sample.glError) ||
+            Math.abs(row.mean - reference.mean) > 0.02 ||
+            Math.abs(row.std - reference.std) > 0.012 ||
+            Math.abs(row.gradient - reference.gradient) > 0.005
+        ) {
+            failures.push(row);
+        }
+    }
+    return { rows, failures };
+}

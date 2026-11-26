@@ -172,7 +172,7 @@ vec2 fractalDensity(vec3 p, float footprint
             vec2 value = noisePair(position);
             signal = noiseType == 1
                 ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
-                : pow(max(vec2(0.0), 1.0 - 0.8 * abs(value)), vec2(2.0));
+                : pow(max(vec2(0.0), 1.0 - 0.9 * abs(value)), vec2(2.0));
             signal = mix(vec2(0.6), signal, band);
         }
         total += weight * signal * feedback;
@@ -220,7 +220,7 @@ vec2 distortionAt(float offset) {
     vec2 q = (uvContent * contentSize - wind - windVelocity * offset) / noiseScale;
     q.x /= aspect;
     // One type-specific wavelength conversion, fitted to isolated AE fields.
-    float frequency = noiseType == 1 ? 1.15 : 0.8;
+    float frequency = noiseType == 1 ? 1.15 : 1.0;
     q *= frequency;
     vec3 p = vec3(q, sampleClock) + vec3(seed * 0.123, seed * 0.719, seed * 0.317);
     float footprint = noiseFootprint(p.xy);

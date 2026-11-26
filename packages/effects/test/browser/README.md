@@ -410,3 +410,16 @@ Raw evidence and analysis are retained under local `results/stage13-evidence/`.
 `runCoreFilterOrderingChecks()` checks production Core and Halo under an affine
 2× pullback at DPR1/2: width halves while peak intensity remains constant.
 Both Core Softness and Halo reuse the original-source blur across animation.
+
+
+### Fire Core noise isolation
+
+`ae-saber-fire-noise-fields.jsx` exports16 Fluid/Energy fields plus a baseline,
+with scale25/178, complexity1/4 and two seeds. Analyze genuine16-bit PNGs with
+`python3 analyze-saber-fire-noise.py <output directory>` (numpy + pypng).
+`ae-saber-fire-core-grid.jsx` measures225 closed point masks at two amounts,
+Bias1/3 and four seeds. `ae-saber-fire-core-text.jsx` isolates Core width,
+Bias and wind blur using native Fire text. All scripts restore bit depth and
+existing render-queue flags and remove their own temporary project items.
+`runRidgeDensityChecks()` checks native ensemble mean/std/gradient from the
+field probes. The Stage14 research note records limitations and local evidence.
