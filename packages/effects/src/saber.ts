@@ -1038,12 +1038,6 @@ export class SaberEffect implements Effect {
                     undefined,
                     this.params.glowFlow,
                     [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
-                    glowNoiseResolution(
-                        this.params.glowDistortion,
-                        effectiveLayers,
-                        this.params.glowSizeMultiplier,
-                        pixelRatio,
-                    ),
                 );
                 this.#glowResultKey = glowResultKey;
             }
@@ -1485,33 +1479,6 @@ function maskFilterStep(ctx: EffectContext, x: number, y: number): number[] {
 
 function sameKey(a: CacheKey, b: CacheKey): boolean {
     return a.length === b.length && a.every((value, i) => value === b[i]);
-}
-
-// Keep warped Fluid at full resolution: small field errors can move sharp
-// folds by many pixels. Broad, resolved fields can use fewer procedural samples;
-// their light sampling and the Core/Halo targets remain full resolution.
-function glowNoiseResolution(
-    p: SaberDistortionParams,
-    layers: readonly SaberGlowLayer[],
-    sizeMultiplier: number,
-    pixelRatio: number,
-): number {
-    if (p.type === "fluid" && p.composite === "distort") {
-        return 1;
-    }
-    const broad = layers
-        .slice(0, 3)
-        .every(
-            (layer) =>
-                layer.intensity <= 0 ||
-                layer.size <= 0 ||
-                layer.size * sizeMultiplier * pixelRatio >= 4,
-        );
-    const octaves = Math.max(1, Math.min(8, Math.round(p.noiseComplexity)));
-    const finest =
-        (p.noiseScale * pixelRatio * Math.min(1, p.noiseAspectRatio)) /
-        2 ** ((1 + (7 / 6) * p.noiseDetail) * (octaves - 1));
-    return broad && finest >= (p.type === "fluid" ? 16 : 8) ? 2 : 1;
 }
 
 function distortionKey(p: SaberDistortionParams, time: number): CacheKey {

@@ -802,13 +802,11 @@ export async function runCoreOverlayChecks() {
     }
 }
 
-// Compare adaptive Glow resolution against the same shader at full resolution.
+// The native two-pixel noise grid must stay content-aligned across odd padding.
 export async function runGlowResolutionChecks() {
     const rows = [],
         failures = [];
     for (const preset of ["arc-reactor", "fire", "wormhole", "tractor-beam"]) {
-        let full = false,
-            target;
         const f = await createSaberFixture({
             width: 960,
             height: 540,
@@ -816,33 +814,10 @@ export async function runGlowResolutionChecks() {
             sourceHeight: 540,
             pixelRatio: 1,
             options: { preset, source: false, pad: 320 },
-            transformDraw: (draw, ctx) => {
-                if (
-                    full &&
-                    draw.uniforms?.glowPass === 1 &&
-                    draw.uniforms?.noiseFieldPass
-                ) {
-                    target ??= ctx.createRenderTarget({ float: true });
-                    return { ...draw, target };
-                }
-                if (
-                    full &&
-                    draw.uniforms?.glowPass === 1 &&
-                    draw.uniforms?.noiseField &&
-                    target
-                ) {
-                    return {
-                        ...draw,
-                        uniforms: { ...draw.uniforms, noiseField: target },
-                    };
-                }
-                return draw;
-            },
         });
         try {
             const a = f.screen(2);
-            full = true;
-            f.effect.invalidate();
+            f.effect.setParams({ pad: 321 });
             const b = f.screen(2);
             let squared = 0,
                 count = 0,

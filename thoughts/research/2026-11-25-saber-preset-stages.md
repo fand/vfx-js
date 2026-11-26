@@ -593,3 +593,61 @@ Invert, wind blur, evolution, Core filter order, Glow field resolution, mask
 composition,51 native RGB samples), all pass.12×72 frames rendered, GL error0.
 No additional noise evaluations or render passes in this change.
 Review: `http://127.0.0.1:6040/stage14.html?before=stage13-presets#fire`.
+
+## 15. Native noise lattice and Fluid deformation
+
+The failed stronger-warp experiment exposed a missing sampling stage. Native
+odd pixels are almost exactly the average of adjacent even samples, including
+Bias3. Doubling comp dimensions, line coordinates, Glow radius and Noise Scale
+retains the original even samples. It does not retain the interpolated odd
+samples. Full comp/render resolution was separately verified as1×1; Core light
+itself does not have this interpolation. This is a sampled noise lattice, not
+an accidental Half render or area antialiasing.
+
+`ae-saber-fire-noise-fields.jsx` now supports renderScale2;
+`analyze-saber-noise-grid.py` compares corresponding points and odd interpolation.
+The additional horizontal/vertical Core-line probes show the same parity:
+odd-position displacement second-difference RMS .055–.056 versus .158–.169 at
+knots for Bias1, and .020 versus .116–.125 for Bias3. Finite Core footprint and
+warp inversion prevent these centroid estimates from being exact vector reads.
+They support the same lattice in Core, independently of flat Glow masks.
+
+Core/Glow/Halo now evaluate biased vectors on a two-CSS-pixel grid, interpolate
+that field, then sample full-resolution light. Remove derivative-based octave
+attenuation: native point samples persist at twice the output resolution.
+The lattice stays content-aligned across padding/DPR and includes wind-blur
+margins. Blur samples the current spatial lattice, not future independently
+regenerated fields. Grid targets are reused and released with other resources.
+
+With this sampling stage, Fluid domain warp1.3→1.8 improves both scales instead
+of oversharpening small-scale fields. No preset settings or octave counts change.
+At scale25/complexity4 the native gradient RMS is .0876; direct Stage14 is .1155;
+Stage15 is about.087. At Fire scale178, native correlations at4/16px are
+.855/.362, Stage14 .900/.492, Stage15 .862/.390. Noise topology and tails still
+differ; these statistics do not establish identical native noise.
+
+The new piecewise-bilinear field also exposed two parity bugs. Compute lattice
+origin from the constant content rectangle, not cancellation of interpolated
+varyings: near a floor boundary that changed Wormhole's origin within a draw.
+Compute sharp-Core coverage gradients with centered distance samples instead of
+GPU quad derivatives. A1px padding change now gives maximum channel deltas
+3/1/5/4 for Arc/Fire/Wormhole/Tractor (RMS .12–.34/255), versus an intermediate
+242/255 Wormhole failure. The regression checks the whole effect, including Core.
+
+The undistorted Fire Core footprint agrees with native CoreSize10.3 at IoU .981
+at half intensity. Remaining smooth/wide Fire sections come from warped noise,
+not a fundamentally different text source or Core width. Matching random fields
+and the native extreme tails remains unresolved; the page keeps that visible.
+
+Validation:40 node tests, docs118 exports, ESM/CJS builds;12 GPU suites including
+DPR1/2 lattice/Bias, padding, freeze/seek, native density/evolution, source filter
+ordering, overlay,51 RGB probes and appearance checks. All pass, GL error0.
+All12×72 comparison frames regenerated. Raw probes, fits and checks are under
+ignored `results/stage15-evidence/`, with snapshot hashes in the review manifest.
+Review: `http://127.0.0.1:6040/stage15.html?before=stage13-presets#fire`.
+
+All16 doubled-resolution Fluid/Energy cases give point RMS exactly0 in the
+16-bit PNGs. Odd interpolation99th-percentile error stays ≤2.29e-5.
+One60-frame Fire GPU timing run at960×540/DPR1: Stage14 median5.77ms, Stage15
+5.86ms (+1.7%); CPU median.20ms in both. This single-device result is not a
+cross-device performance guarantee. Each final preset has72 unique frames.

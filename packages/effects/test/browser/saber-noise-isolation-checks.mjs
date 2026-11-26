@@ -228,9 +228,20 @@ export async function runNoiseBlurChecks() {
             },
         });
         try {
-            const samples = Array.from({ length: 6 }, (_, i) =>
-                f.screen(1 + i * 0.03),
-            );
+            const field = f.screen(1);
+            // Native blur samples the current spatial lattice, not fields
+            // re-evaluated at future wind positions (different lattice phase).
+            const samples = Array.from({ length: 6 }, (_, i) => {
+                const pixels = new Uint8Array(field.pixels.length);
+                pixels.set(
+                    field.pixels.subarray(
+                        0,
+                        field.pixels.length - i * 3 * field.width * 4,
+                    ),
+                    i * 3 * field.width * 4,
+                );
+                return { pixels };
+            });
             f.effect.params.motionBlur = 0.15;
             const blurred = f.screen(1);
             let maximum = 0,
@@ -549,6 +560,89 @@ export async function runRidgeDensityChecks() {
             Math.abs(row.gradient - reference.gradient) > 0.005
         ) {
             failures.push(row);
+        }
+    }
+    return { rows, failures };
+}
+
+// Native 16-bit masks are linear between even-pixel samples, including Bias3.
+// At twice the render resolution, even samples agree to <2e-6: the field is
+// sampled, not pixel-area filtered. Core light itself remains full resolution.
+export async function runNoiseGridChecks() {
+    const rows = [],
+        failures = [];
+    for (const pixelRatio of [1, 2]) {
+        for (const type of ["smoke", "fluid", "energy"]) {
+            for (const noiseBias of [1, 3]) {
+                const f = await createSaberFixture({
+                    Effect: DistortionProbe,
+                    width: 256,
+                    height: 256,
+                    sourceWidth: 256,
+                    sourceHeight: 256,
+                    pixelRatio,
+                    options: {
+                        type,
+                        noiseBias,
+                        amount: 100,
+                        noiseScale: 25,
+                        noiseComplexity: 4,
+                        noiseDetail: 0,
+                    },
+                });
+                try {
+                    const field = await f.capture("noise-field", 0);
+                    const shot = await f.capture("core-distortion", 0);
+                    let maximum = 0,
+                        count = 0;
+                    for (let y = 16 * pixelRatio; y < 240 * pixelRatio; y++) {
+                        for (
+                            let x = 16 * pixelRatio;
+                            x < 240 * pixelRatio;
+                            x++
+                        ) {
+                            if (pixelRatio === 1 ? x % 2 !== 1 : x % 4 < 2) {
+                                continue;
+                            }
+                            const i =
+                                ((shot.height - 1 - y) * shot.width + x) * 4;
+                            const a = shot.pixels[i - 4],
+                                b = shot.pixels[i],
+                                c = shot.pixels[i + 4];
+                            if (Math.min(a, b, c) < 0.01) {
+                                continue;
+                            }
+                            maximum = Math.max(
+                                maximum,
+                                Math.abs(b - (a + c) * 0.5),
+                            );
+                            count++;
+                        }
+                    }
+                    const row = {
+                        pixelRatio,
+                        type,
+                        noiseBias,
+                        maximum,
+                        count,
+                        fieldWidth: field.width,
+                        lightWidth: shot.width,
+                        glError: f.gl.getError(),
+                    };
+                    rows.push(row);
+                    if (
+                        !count ||
+                        maximum > 0.0015 ||
+                        field.width !== 130 ||
+                        shot.width !== 256 * pixelRatio ||
+                        row.glError
+                    ) {
+                        failures.push(row);
+                    }
+                } finally {
+                    f.destroy();
+                }
+            }
         }
     }
     return { rows, failures };

@@ -314,7 +314,7 @@ test("original core overlay requires both Glow and Core Distortion", () => {
     effect.dispose();
 });
 
-test("broad Glow uses fewer pixels while Halo retains its full-resolution source", () => {
+test("noise uses a fixed content grid while light retains full resolution", () => {
     const effect = steadyEffect({
         glowLayers: Array.from({ length: 4 }, () => ({
             size: 20,
@@ -331,14 +331,17 @@ test("broad Glow uses fewer pixels while Halo retains its full-resolution source
     effect.init(f.ctx);
     const a = f.render(effect);
     const pass = f.draws.find((d) => d.uniforms.noiseFieldPass === 1);
-    assert.equal(pass.target.width * 2, a.uniforms.glowTex.width);
+    assert.equal((pass.target.width - 2) * 2, a.uniforms.glowTex.width);
     assert.deepEqual(pass.uniforms.bufferSize, [128, 96]);
     const previous = pass.target;
     effect.setParams({ glowDistortion: { noiseScale: 16 } });
     const b = f.render(effect);
     assert.equal(b.uniforms.glowTex.width, 128);
-    assert.ok(!f.draws.some((d) => d.uniforms.noiseFieldPass));
-    assert.equal(previous.disposed, true);
+    assert.equal(
+        f.draws.find((d) => d.uniforms.noiseFieldPass).target,
+        previous,
+    );
+    assert.equal(previous.disposed, false);
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
@@ -436,9 +439,9 @@ test("turbulent advection invalidates only the glow result and clamps its streng
         effect.setParams({ glowDistortion: { noiseTurbulence: strength } });
         f.render(effect);
         const distortion = f.draws.filter((d) => d.uniforms.glowPass === 1);
-        assert.equal(distortion.length, 1);
+        assert.equal(distortion.length, 2);
         assert.equal(distortion[0].uniforms.noiseTurbulence, expected);
-        assert.equal(f.draws.length, 2); // Distortion + composition, no new blur/field.
+        assert.equal(f.draws.length, 3); // Noise grid + distortion + composition; no new light blur.
         f.render(effect);
         assert.equal(f.draws.length, 1);
     }
@@ -717,14 +720,14 @@ test("static light is reused while glow distortion and composition stay live", (
     f.render(effect);
     assert.equal(
         f.draws.length,
-        2,
-        "animated glow distortion plus final composition",
+        3,
+        "animated noise grid, glow distortion and final composition",
     );
     assert.equal(f.draws[0].uniforms.glowPass, 1);
     effect.params.color = "#ff8800";
     effect.params.glowBias = 1;
     const composite = f.render(effect);
-    assert.equal(f.draws.length, 2);
+    assert.equal(f.draws.length, 3);
     assert.equal(composite.uniforms.glowBias, undefined);
     assert.deepEqual(
         composite.uniforms.colorRamp,

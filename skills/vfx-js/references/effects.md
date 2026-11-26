@@ -187,7 +187,8 @@ components, then interpolates from no modulation using Amount / 100.
 halves at every level. Spatial frequency increases per octave; evolution speed
 does not. The shared time conversion is 1 for Smoke and 0.75 for Fluid/Energy,
 fitted to isolated temporal correlations rather than individual preset motion.
-Unresolved bands retain their approximate mean density.
+Noise is evaluated on a two-CSS-pixel content-aligned grid, then bilinearly
+interpolated after signed Bias. Octaves are not dropped as pixel ratio changes.
 `noiseTurbulence` separates octave wind speeds: at 1 the first four move at
 0.6/0.9/1.2/1.5 times `windSpeed` (later ones cap at 1.8). Smoke/Energy also gain
 a small domain warp. This optional extension is independent of the four blurred
@@ -199,9 +200,9 @@ Six equally weighted samples span the interval while evolution stays at the
 current time. Source pixels do not translate. Native Motion Blur maps to
 `motionBlur = native * 0.15`; zero wind bypasses the samples, even with evolving
 noise. A transient noise texture avoids six procedural evaluations. There is no
-framebuffer history, so seeking remains deterministic. Broad, well-resolved Glow
-noise may use a half-resolution field; light sampling, Core and Halo remain at
-full resolution. Fluid Distort retains full-resolution noise to preserve folds.
+framebuffer history, so seeking remains deterministic. Core, Glow and Halo use
+the same two-pixel noise grid; light sampling and coverage remain full resolution.
+The grid includes wind-blur margins and stays aligned when padding changes.
 
 With `glowDistortAllLayers: false`, distortion acts on narrow blur layers;
 wide layers stay smooth.
@@ -235,10 +236,11 @@ Their Gaussian kernels account for downsampling and use smooth cubic
 reconstruction; changing radius across resolution levels avoids abrupt bright
 rings. Subpixel radii approach an unblurred source; zero explicitly disables
 the layer. Thin core lines use pixel
-coverage filtering, and distortion detail finer than a pixel fades out.
+coverage filtering with centered gradients after deformation.
 Minified alpha sources receive an area prefilter; degenerate contour normals
 cannot turn a fractional-width line into a fully lit pixel.
-Energy-noise ridges also integrate their sharp cusp over the pixel footprint.
+The native-style noise lattice interpolates sampled ridges; very small Noise
+Scale can alias instead of automatically discarding high octaves.
 
 Noise coordinates follow the element, so changing padding does not reseed the
 pattern. Static core/glow passes are cached independently: a steady core with
@@ -246,7 +248,7 @@ animated glow distortion reuses its blurred source. Live parameter edits,
 `invalidate()`, dynamic sources, layout changes and context restoration refresh
 the relevant caches. Reveals trace the source bounds and reuse their contours
 when only output padding or fullscreen position changes.
-Large padding restricts field/core work to a conservative source region while
+Large padding restricts distance-field/core work to a conservative source region while
 keeping full-size glow/distortion outputs.
 
 `glow` is input gain before per-layer Pre Gamma and amplification.

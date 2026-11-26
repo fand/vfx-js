@@ -81,7 +81,9 @@ uniform sampler2D src;
 uniform sampler2D noiseField;
 #endif
 uniform vec2 contentSize;
+uniform vec4 contentRectUv;
 uniform vec2 bufferSize;
+uniform vec2 noiseMargin;
 uniform vec2 wind;
 uniform vec2 windVelocity;
 uniform float motionBlur;
@@ -116,12 +118,12 @@ ${GLSL_LINE_COVERAGE}
 #endif
 ${SNOISE3D}
 
-float noiseFootprint(vec2 p) {
-    return max(length(dFdx(p)), length(dFdy(p)));
-}
-
-float noiseBand(float footprint) {
-    return 1.0 - smoothstep(0.25, 1.0, footprint);
+// Native fields sample every two content pixels, then interpolate *biased*
+// vectors. The origin stays attached to the content, including odd padding.
+vec2 noiseGridOrigin() {
+    vec2 contentOrigin = contentRectUv.xy * bufferSize;
+    vec2 anchor = vec2(0.5, mod(contentSize.y - 0.5, 2.0));
+    return floor((-contentOrigin - noiseMargin - anchor) / 2.0) * 2.0 + anchor;
 }
 
 // The three native modes share octave scales, but not their accumulation.
@@ -131,26 +133,23 @@ vec2 noisePair(vec3 p) {
     return vec2(snoise(p), snoise(p + vec3(43.7, 17.3, 9.1)));
 }
 
-vec2 fractalWarp(vec3 p, float footprint) {
+vec2 fractalWarp(vec3 p) {
     vec2 total = vec2(0.0);
     float weight = 0.5;
     float lacunarity = exp2(1.0 + (7.0 / 6.0) * noiseDetail);
     for (int i = 0; i < 8; i++) {
         if (i >= complexity) break;
-        float band = noiseBand(footprint);
-        if (band <= 0.0) break;
-        total += weight * band * vec2(snoise(p + 3.1), snoise(p + 19.7));
+        total += weight * vec2(snoise(p + 3.1), snoise(p + 19.7));
         p = p * lacunarity + vec3(17.1, 9.2, 13.7);
         // Octaves refine space, not the rate of evolution. Retain the seeded
         // phase offsets while keeping the same clock speed at every octave.
         p.z -= clock * (lacunarity - 1.0);
-        footprint *= lacunarity;
         weight *= 0.5;
     }
     return total;
 }
 
-vec2 fractalDensity(vec3 p, float footprint
+vec2 fractalDensity(vec3 p
 #ifdef TURBULENT_NOISE
     , vec2 transport
 #endif
@@ -161,20 +160,14 @@ vec2 fractalDensity(vec3 p, float footprint
     float lacunarity = exp2(1.0 + (7.0 / 6.0) * noiseDetail);
     for (int i = 0; i < 8; i++) {
         if (i >= complexity) break;
-        float band = noiseBand(footprint);
         vec3 position = p;
 #ifdef TURBULENT_NOISE
         position.xy += transport * frequency * (1.0 - min(0.6 + 0.3 * float(i), 1.8)) * noiseTurbulence;
 #endif
-        // Unresolved bands retain mean density instead of changing exposure.
-        vec2 signal = vec2(0.6);
-        if (band > 0.0) {
-            vec2 value = noisePair(position);
-            signal = noiseType == 1
-                ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
-                : pow(max(vec2(0.0), 1.0 - 0.9 * abs(value)), vec2(2.0));
-            signal = mix(vec2(0.6), signal, band);
-        }
+        vec2 value = noisePair(position);
+        vec2 signal = noiseType == 1
+            ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
+            : pow(max(vec2(0.0), 1.0 - 0.9 * abs(value)), vec2(2.0));
         total += weight * signal * feedback;
         if (noiseType != 1) feedback *= clamp(1.5 * signal, 0.0, 1.0);
         p = p * lacunarity + vec3(17.1, 9.2, 13.7);
@@ -182,7 +175,6 @@ vec2 fractalDensity(vec3 p, float footprint
         // phase offsets while keeping the same clock speed at every octave.
         p.z -= clock * (lacunarity - 1.0);
         frequency *= lacunarity;
-        footprint *= lacunarity;
         weight *= 0.5;
     }
     // AE complexity sweeps retain the octave sum; normalizing it erases the
@@ -212,32 +204,39 @@ vec3 sampleLight(vec2 p) {
     return light;
 }
 
+#ifdef CACHED_NOISE
+vec2 cachedNoiseAt(vec2 position) {
+    vec2 fieldUv = ((position - noiseGridOrigin()) / 2.0 + 0.5)
+        / vec2(textureSize(noiseField, 0));
+    return texture(noiseField, clamp(fieldUv, 0.0, 1.0)).rg;
+}
+#endif
+
 vec2 distortionAt(float offset) {
 #ifdef CACHED_NOISE
-    return texture(noiseField, clamp(uv - windVelocity * offset / bufferSize, 0.0, 1.0)).rg;
+    vec2 position = uvContent * contentSize - windVelocity * offset;
+    return cachedNoiseAt(position);
 #else
     float sampleClock = clock;
-    vec2 q = (uvContent * contentSize - wind - windVelocity * offset) / noiseScale;
+    vec2 position = noiseGridOrigin() + floor(gl_FragCoord.xy) * 2.0;
+    vec2 q = (position - wind - windVelocity * offset) / noiseScale;
     q.x /= aspect;
     // One type-specific wavelength conversion, fitted to isolated AE fields.
     float frequency = noiseType == 1 ? 1.15 : 1.0;
     q *= frequency;
     vec3 p = vec3(q, sampleClock) + vec3(seed * 0.123, seed * 0.719, seed * 0.317);
-    float footprint = noiseFootprint(p.xy);
     if (noiseType == 0) {
-        p.xy += 1.3 * fractalWarp(p, footprint);
-        footprint = max(footprint, noiseFootprint(p.xy));
+        p.xy += 1.8 * fractalWarp(p);
     }
 #ifdef TURBULENT_NOISE
     vec2 transport = (wind + windVelocity * offset) / noiseScale * frequency;
     transport.x /= aspect;
     if (noiseType != 0 && noiseTurbulence > 0.0) {
-        p.xy += 0.2 * noiseTurbulence * noiseBand(footprint)
+        p.xy += 0.2 * noiseTurbulence
             * vec2(snoise(p + 3.1), snoise(p + 19.7));
-        footprint = max(footprint, noiseFootprint(p.xy));
     }
 #endif
-    return fractalDensity(p, footprint
+    return fractalDensity(p
 #ifdef TURBULENT_NOISE
         , transport
 #endif
@@ -252,7 +251,15 @@ float maskGain(vec2 n) {
     return max(0.0, mix(1.0, mask, amount / 100.0));
 }
 
-vec3 shadeNoise(vec2 n) {
+#if defined(ANALYTIC_CORE) && defined(CACHED_NOISE)
+float nearbyDistance(vec2 delta, float offset) {
+    vec2 n = cachedNoiseAt(uvContent * contentSize + delta * bufferSize - windVelocity * offset);
+    n = mix(n, flowDirection * dot(n, flowDirection), directionality);
+    return texture(contourField, uv + delta + n * amount / bufferSize).r;
+}
+#endif
+
+vec3 shadeNoise(vec2 n, float offset) {
     vec3 light;
     n = mix(n, flowDirection * dot(n, flowDirection), directionality);
     vec2 warped = uv + n * amount / bufferSize;
@@ -261,7 +268,16 @@ vec3 shadeNoise(vec2 n) {
     // For a single steady contour, integrate the warped distance field
     // instead. Keep the raster path for animated reveals.
     vec4 field = texture(contourField, warped);
+#ifdef CACHED_NOISE
+    // Lattice knots make quad derivatives depend on odd/even padding. Sample
+    // the actual pullback symmetrically around this pixel instead.
+    vec2 stepUv = 0.5 / vec2(textureSize(src, 0));
+    vec2 gradient = vec2(
+        nearbyDistance(vec2(stepUv.x, 0.0), offset) - nearbyDistance(vec2(-stepUv.x, 0.0), offset),
+        nearbyDistance(vec2(0.0, stepUv.y), offset) - nearbyDistance(vec2(0.0, -stepUv.y), offset));
+#else
     vec2 gradient = vec2(dFdx(field.r), dFdy(field.r));
+#endif
     float slope = max(length(gradient), 1e-3);
     vec2 normal = slope > 1e-3 ? gradient / slope : vec2(1.0, 0.0);
     light = vec3(lineCoverage(abs(field.r) / slope, signedCoreWidth / slope, normal));
@@ -305,12 +321,12 @@ void main() {
         }
         light = sampleLight(uv) * gain;
     } else {
-        light = shadeNoise(n);
+        light = shadeNoise(n, 0.0);
         if (motionBlur > 0.0) {
             // Distort averages separately warped source samples. Evolution
             // stays at the current time; only the noise travels with the wind.
             for (int i = 1; i < 6; i++) {
-                light += shadeNoise(distortionAt(motionBlur * float(i) / 5.0));
+                light += shadeNoise(distortionAt(motionBlur * float(i) / 5.0), motionBlur * float(i) / 5.0);
             }
             light /= 6.0;
         }
@@ -352,15 +368,10 @@ function noiseShaders(fragment: string) {
     let shaders = noiseShaderVariants.get(fragment);
     if (!shaders) {
         const main = fragment.lastIndexOf("void main() {");
-        const bounds = fragment.slice(
-            main,
-            fragment.indexOf("    if (amount <= 0.0)", main),
-        );
         shaders = {
             field:
                 fragment.slice(0, main) +
-                bounds +
-                `
+                `void main() {
     outColor = vec4(distortionAt(0.0), 0.0, 1.0);
 }
 `,
@@ -543,7 +554,6 @@ export class SaberGlowPasses {
         },
         flowDistance = 0,
         layerShares: readonly number[] = [1, 1, 1],
-        resolution = 1,
     ): EffectRenderTarget {
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
@@ -600,6 +610,20 @@ export class SaberGlowPasses {
                 src.width / ctx.dims.pixelRatio,
                 src.height / ctx.dims.pixelRatio,
             ],
+            noiseMargin: [
+                Math.max(
+                    0,
+                    Math.cos(angle) *
+                        params.windSpeed *
+                        Math.max(0, Math.min(0.25, params.motionBlur)),
+                ),
+                Math.max(
+                    0,
+                    Math.sin(angle) *
+                        params.windSpeed *
+                        Math.max(0, Math.min(0.25, params.motionBlur)),
+                ),
+            ],
             wind: [Math.cos(angle) * distance, Math.sin(angle) * distance],
             windVelocity: [
                 Math.cos(angle) * params.windSpeed,
@@ -649,9 +673,21 @@ export class SaberGlowPasses {
             composite: params.composite === "multiply" ? 1 : 0,
             polarity: params.invert ? -1 : 1,
         };
-        if (params.amount > 0 && (uniforms.motionBlur > 0 || resolution > 1)) {
-            const width = Math.ceil(src.width / resolution);
-            const height = Math.ceil(src.height / resolution);
+        if (params.amount > 0) {
+            const width =
+                Math.ceil(
+                    (uniforms.bufferSize[0] +
+                        Math.abs(uniforms.windVelocity[0]) *
+                            uniforms.motionBlur) /
+                        2,
+                ) + 2;
+            const height =
+                Math.ceil(
+                    (uniforms.bufferSize[1] +
+                        Math.abs(uniforms.windVelocity[1]) *
+                            uniforms.motionBlur) /
+                        2,
+                ) + 2;
             let field = this.#noise[kind];
             if (field && (field.width !== width || field.height !== height)) {
                 field.dispose();

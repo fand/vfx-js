@@ -1,9 +1,11 @@
 // AE: isolated Fluid/Energy density at two scales, complexities, and seeds.
 // batches of 24, 16-bit PNG. Restores bit depth and existing queue flags.
 (function () {
+    // Run once at1, then at2. The even samples reveal native interpolation.
+    var renderScale = 1;
     var root = new Folder(
         ($.os.indexOf("Mac") >= 0 ? "/private/tmp" : Folder.temp.fsName) +
-            "/vfx-js-saber-fire-fields14"
+            "/vfx-js-saber-fire-fields14" + (renderScale === 1 ? "" : "-x2")
     );
     if (!root.exists && !root.create()) throw new Error(root.error);
     if (!app.project) app.newProject();
@@ -50,15 +52,16 @@
                 params[69 + 2 * j] = layer === j + 1 ? 1 : 0;
         cases.push({ name: name, params: params });
     }
+    base[8]=[256 * renderScale,480 * renderScale]; base[9]=[256 * renderScale,32 * renderScale];
     base[2]=1; base[86]=1; base[7]=1; base[11]=1; base[23]=0;
-    base[4]=500; base[71]=100; base[72]=200;
+    base[4]=500; base[71]=100; base[72]=200 * renderScale;
     base[33]=100; base[34]=2; base[35]=2; base[36]=0;
     base[37]=0; base[38]=0; base[39]=0; base[40]=178;
     base[41]=1; base[42]=4; base[43]=1.29; base[44]=0; base[45]=5000; base[46]=0;
     add('base',2,{33:0,71:100});
     var scales=[25,178], complexities=[1,4];
     for(var type=2;type<=3;type++)for(var si=0;si<2;si++)for(var ci=0;ci<2;ci++)for(var seed=0;seed<2;seed++){
-        add('t'+type+'-s'+scales[si]+'-c'+complexities[ci]+'-seed'+seed,2,{34:type,40:scales[si],42:complexities[ci],45:5000+100*seed,71:100});
+        add('t'+type+'-s'+scales[si]+'-c'+complexities[ci]+'-seed'+seed,2,{34:type,40:scales[si] * renderScale,42:complexities[ci],45:5000+100*seed,71:100});
     }
     var oldDepth = app.project.bitsPerChannel,
         prior = [],
@@ -86,8 +89,8 @@
                 var test = cases[n];
                 var comp = app.project.items.addComp(
                     test.name,
-                    512,
-                    512,
+                    512 * renderScale,
+                    512 * renderScale,
                     1,
                     2,
                     24
@@ -97,8 +100,8 @@
                 var layer = comp.layers.addSolid(
                     [0, 0, 0],
                     "Saber measurement source",
-                    512,
-                    512,
+                    512 * renderScale,
+                    512 * renderScale,
                     1,
                     2
                 );

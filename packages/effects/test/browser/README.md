@@ -423,3 +423,11 @@ Bias and wind blur using native Fire text. All scripts restore bit depth and
 existing render-queue flags and remove their own temporary project items.
 `runRidgeDensityChecks()` checks native ensemble mean/std/gradient from the
 field probes. The Stage14 research note records limitations and local evidence.
+
+For the native lattice, run `ae-saber-fire-noise-fields.jsx` at renderScale1 and2,
+then `python3 analyze-saber-noise-grid.py <1x output> <2x output>`.
+`runNoiseGridChecks()` checks post-Bias interpolation and a fixed CSS grid at
+DPR1/2. `runGlowResolutionChecks()` now checks odd-padding invariance of the
+whole effect, including steep Core folds; the old adaptive-resolution comparison
+was superseded by the measured native grid. Wind-blur checks use spatial samples
+of the current field instead of independently re-evaluating future time.
