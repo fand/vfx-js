@@ -3,12 +3,17 @@ import * as quality from "./saber-quality.mjs";
 
 export const cases = [
     { name: "calm-layers", options: { ...quality.STEADY_OPTIONS, pad: 160 } },
-    ...["electric", "fire", "energy", "tractor-beam", "ice", "unstable"].map(
-        (preset) => ({
-            name: preset,
-            options: { preset, pad: 160 },
-        }),
-    ),
+    ...[
+        "electric",
+        "fire",
+        "energy",
+        "tractor-beam",
+        "arc-reactor",
+        "windy",
+    ].map((preset) => ({
+        name: preset,
+        options: { preset, pad: 160 },
+    })),
     {
         name: "fluid-glow",
         options: {

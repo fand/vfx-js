@@ -13,7 +13,28 @@ import { SaberEffect } from "../../src/saber.ts";
 // Neutral diagnostic appearance: explicit so default-preset changes cannot
 // accidentally animate coverage, cache, or halo probes. Also accepted by baseline.
 export const STEADY_OPTIONS = Object.freeze({
-    preset: "laser",
+    intensity: 1,
+    gamma: 1,
+    brightness: 1,
+    saturation: 1,
+    coreSoftness: 0,
+    coreBlendOnTop: false,
+    haloIntensity: 100,
+    haloSize: 100,
+    glowWhiteness: 0.15,
+    glowBias: 1,
+    glowPreGamma: 1,
+    glowFlow: 0,
+    glowDistortAllLayers: false,
+    flickerIntensity: 0,
+    coreDistortion: { ...DEFAULT_DISTORTION },
+    glowDistortion: { ...DEFAULT_DISTORTION, seed: 71 },
+    glowLayers: [
+        { size: 3, intensity: 3 },
+        { size: 12, intensity: 6 },
+        { size: 36, intensity: 9 },
+        { size: 96, intensity: 12 },
+    ],
     color: "#3399ff",
     thickness: 2,
     coreIntensity: 1,
@@ -42,6 +63,9 @@ function passName({ uniforms: u = {} }) {
     }
     if (u.revealEnd !== undefined) {
         return "core";
+    }
+    if (u.noiseFieldPass) {
+        return "noise-field";
     }
     if (u.noiseType !== undefined) {
         return u.glowPass ? "glow-distortion" : "core-distortion";
@@ -118,6 +142,12 @@ export class GlowProbe {
             spread: 1,
             offset: [0, 0],
             line: false,
+            normalized: false,
+            preGamma: 1,
+            layerBias: [1, 1, 1, 1],
+            response: 0,
+            inputGain: 1,
+            layers: null,
             ...options,
         };
         this.passes = new GlowPasses();
@@ -148,15 +178,36 @@ void main() {
             },
             target: this.input,
         });
+        const layers = this.params.layers ?? [
+            { size: radius, intensity: 1 },
+            { size: 0, intensity: 0 },
+            { size: 0, intensity: 0 },
+            { size: 0, intensity: 0 },
+        ];
+        if (this.params.normalized) {
+            const prepared = this.passes.prepareLayers(
+                ctx,
+                this.input,
+                layers,
+                spread,
+                48,
+                false,
+                true,
+            );
+            const output = this.passes.combineLayers(ctx, {
+                ...prepared,
+                preGamma: this.params.preGamma,
+                layerBias: this.params.layerBias,
+                response: this.params.response,
+                inputGain: this.params.inputGain,
+            });
+            ctx.blit(output);
+            return;
+        }
         const output = this.passes.layers(
             ctx,
             this.input,
-            [
-                { size: radius, intensity: 1 },
-                { size: 0, intensity: 0 },
-                { size: 0, intensity: 0 },
-                { size: 0, intensity: 0 },
-            ],
+            layers,
             // Frozen baselines retain the removed spread argument.
             ...(this.legacyLayers ? [spread, 1, 48] : [spread, 48]),
         );

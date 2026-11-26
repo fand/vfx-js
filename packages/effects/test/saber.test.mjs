@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { saberColorRamp } from "../lib/esm/_saber-color.js";
 import { saberFlickerGain } from "../lib/esm/_saber-flicker.js";
+import { DEFAULT_DISTORTION } from "../lib/esm/_saber-glow.js";
 import { SaberEffect } from "../lib/esm/saber.js";
 import { SABER_PRESETS } from "../lib/esm/saber-presets.js";
 
@@ -9,7 +11,28 @@ function steadyEffect(options = {}) {
         return new SaberEffect(options);
     }
     return new SaberEffect({
-        preset: "laser",
+        intensity: 1,
+        gamma: 1,
+        brightness: 1,
+        saturation: 1,
+        coreSoftness: 0,
+        coreBlendOnTop: false,
+        haloIntensity: 100,
+        haloSize: 100,
+        glowWhiteness: 0.15,
+        glowBias: 1,
+        glowPreGamma: 1,
+        glowFlow: 0,
+        glowDistortAllLayers: false,
+        flickerIntensity: 0,
+        coreDistortion: { ...DEFAULT_DISTORTION },
+        glowDistortion: { ...DEFAULT_DISTORTION, seed: 71 },
+        glowLayers: [
+            { size: 3, intensity: 3 },
+            { size: 12, intensity: 6 },
+            { size: 36, intensity: 9 },
+            { size: 96, intensity: 12 },
+        ],
         color: "#3399ff",
         thickness: 2,
         coreIntensity: 1,
@@ -49,7 +72,7 @@ test("brightness flicker is bounded, deterministic, continuous and independently
 
 test("presets reset appearance without changing input/reveal or sharing mutable state", () => {
     const effect = steadyEffect({
-        preset: "unstable",
+        preset: "windy",
         source: false,
         edge: "luminance",
         pad: 177,
@@ -131,47 +154,45 @@ test("core appearance and brightness flicker preserve the glow cache", () => {
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
-test("halo and original-core overlay remain independent of glow and cache static shapes", () => {
-    const effect = steadyEffect({});
+test("Halo scales only layer 4 and positive gains reuse the blur pyramid", () => {
+    const effect = steadyEffect({ haloIntensity: 100, haloSize: 100 });
     const f = fixture();
     effect.init(f.ctx);
     const base = f.render(effect);
-    effect.setParams({ haloIntensity: 1, haloSize: 4 });
-    const halo = f.render(effect);
-    assert.notEqual(halo.uniforms.haloTex, base.uniforms.core);
-    assert.equal(halo.uniforms.layer0, base.uniforms.layer0);
-    assert.ok(f.draws.some((d) => d.uniforms.axis));
-    effect.setParams({
-        haloIntensity: 2,
-        coreBlendOnTop: true,
-        flickerIntensity: 0.4,
-    });
+    effect.setParams({ haloIntensity: 200, coreBlendOnTop: true });
     const gain = f.render(effect);
-    assert.equal(
-        f.draws.length,
-        1,
-        "gain/overlay/flicker reuse the cached halo",
-    );
-    assert.equal(gain.uniforms.haloTex, halo.uniforms.haloTex);
-    assert.ok(gain.frag.includes("#define CORE_OVERLAY"));
-    effect.params.haloSize = 8;
-    f.render(effect);
-    assert.ok(f.draws.some((d) => d.uniforms.axis));
-    effect.setParams({ haloIntensity: 0 });
-    assert.ok(!f.render(effect).frag.includes("#define HALO"));
     assert.equal(f.draws.length, 1);
-    effect.setParams({ haloIntensity: 1, haloSize: 0 });
-    assert.ok(!f.render(effect).frag.includes("#define HALO"));
-    effect.setParams({ haloSize: 4 });
-    effect.invalidate();
-    f.render(effect);
+    assert.deepEqual(
+        gain.uniforms.weights.slice(0, 3),
+        base.uniforms.weights.slice(0, 3),
+    );
+    assert.equal(gain.uniforms.weights[3], base.uniforms.weights[3] * 2);
+    assert.equal(gain.uniforms.layer3, base.uniforms.layer3);
+    assert.ok(!gain.frag.includes("#define CORE_OVERLAY"));
+    effect.setParams({ haloSize: 200 });
+    const resized = f.render(effect);
     assert.ok(f.draws.some((d) => d.uniforms.axis));
+    assert.equal(resized.uniforms.layer0, base.uniforms.layer0);
+    assert.ok(!f.draws.some(isCore));
+    effect.setParams({ haloIntensity: 0 });
+    assert.equal(f.render(effect).uniforms.weights[3], 0);
+    effect.setParams({ haloIntensity: 100, haloSize: 0 });
+    assert.equal(f.render(effect).uniforms.weights[3], 0);
+    effect.setParams({ haloSize: 100, glow: 0 });
+    assert.equal(f.render(effect).uniforms.glowGain, 0);
+    assert.equal(f.draws.length, 1, "disabled glow also disables Halo");
+    effect.setParams({ glow: 1 });
+    f.render(effect);
+    effect.params.glow = 2;
+    const input = f.render(effect);
+    assert.equal(input.uniforms.inputGain, 2);
+    assert.equal(f.draws.length, 1, "input gain does not rebuild blurs");
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
 test("output grading and glow tint preserve cached shapes and reset with presets", () => {
-    const effect = steadyEffect({ preset: "laser" });
+    const effect = steadyEffect();
     const f = fixture();
     effect.init(f.ctx);
     const before = f.render(effect);
@@ -190,11 +211,48 @@ test("output grading and glow tint preserve cached shapes and reset with presets
     assert.equal(after.uniforms.outputBrightness, 0.4);
     assert.equal(after.uniforms.outputSaturation, 0);
     assert.equal(after.uniforms.whiteMix, 0.8);
-    effect.setParams({ preset: "laser" });
+    effect.setParams({ preset: "electric" });
     for (const key of ["gamma", "brightness", "saturation"]) {
-        assert.equal(effect.params[key], SABER_PRESETS.laser[key]);
+        assert.equal(effect.params[key], SABER_PRESETS.electric[key]);
     }
-    assert.equal(effect.params.glowWhiteness, 0.15);
+    assert.equal(
+        effect.params.glowWhiteness,
+        SABER_PRESETS.electric.glowWhiteness,
+    );
+    effect.dispose();
+});
+
+test("distorted glow applies brightness before masking without rebuilding blur", () => {
+    const effect = steadyEffect({
+        glowDistortion: {
+            amount: 100,
+            composite: "multiply",
+            windSpeed: 0,
+            noiseSpeed: 0,
+        },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    effect.setParams({ brightness: 0.25 });
+    const result = f.render(effect);
+    assert.equal(result.uniforms.glowOutputBrightness, 1);
+    assert.equal(result.uniforms.outputBrightness, 0.25);
+    assert.equal(
+        f.draws.find((d) => d.uniforms.distortionBrightness !== undefined)
+            .uniforms.distortionBrightness,
+        0.25,
+    );
+    assert.ok(f.draws.some((d) => d.uniforms.glowPass === 1));
+    assert.ok(!f.draws.some((d) => d.uniforms.axis || isCore(d)));
+    effect.setParams({ gamma: 0.7, saturation: 0.8 });
+    f.render(effect);
+    assert.equal(f.draws.length, 1);
+    effect.setParams({ glowDistortion: { amount: 0 } });
+    assert.equal(f.render(effect).uniforms.glowOutputBrightness, 0.25);
+    effect.setParams({ brightness: 0.5 });
+    assert.equal(f.render(effect).uniforms.glowOutputBrightness, 0.5);
+    assert.equal(f.draws.length, 1);
     effect.dispose();
 });
 
@@ -232,6 +290,57 @@ test("output grading bounds also apply to live parameter mutations", () => {
         );
     }
     effect.dispose();
+});
+
+test("original core overlay requires both Glow and Core Distortion", () => {
+    const effect = steadyEffect({ coreBlendOnTop: true });
+    const f = fixture();
+    effect.init(f.ctx);
+    const enabled = () =>
+        f.render(effect).frag.includes("#define CORE_OVERLAY");
+    assert.equal(enabled(), false);
+    effect.setParams({ coreDistortion: { amount: 0.001 } });
+    assert.equal(enabled(), true);
+    effect.setParams({ glow: 0 });
+    assert.equal(enabled(), false);
+    effect.setParams({
+        glow: 1,
+        glowLayers: Array.from({ length: 4 }, () => ({
+            size: 20,
+            intensity: 0,
+        })),
+    });
+    assert.equal(enabled(), false);
+    effect.dispose();
+});
+
+test("broad Glow uses fewer pixels while Halo retains its full-resolution source", () => {
+    const effect = steadyEffect({
+        glowLayers: Array.from({ length: 4 }, () => ({
+            size: 20,
+            intensity: 1,
+        })),
+        glowDistortion: {
+            amount: 50,
+            noiseScale: 256,
+            type: "fluid",
+            composite: "multiply",
+        },
+    });
+    const f = fixture();
+    effect.init(f.ctx);
+    const a = f.render(effect);
+    const pass = f.draws.find((d) => d.uniforms.noiseFieldPass === 1);
+    assert.equal(pass.target.width * 2, a.uniforms.glowTex.width);
+    assert.deepEqual(pass.uniforms.bufferSize, [128, 96]);
+    const previous = pass.target;
+    effect.setParams({ glowDistortion: { noiseScale: 16 } });
+    const b = f.render(effect);
+    assert.equal(b.uniforms.glowTex.width, 128);
+    assert.ok(!f.draws.some((d) => d.uniforms.noiseFieldPass));
+    assert.equal(previous.disposed, true);
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
 test("soft original overlay stays soft and cached while distorted core animates", () => {
@@ -613,8 +722,11 @@ test("static light is reused while glow distortion and composition stay live", (
     effect.params.glowBias = 1;
     const composite = f.render(effect);
     assert.equal(f.draws.length, 2);
-    assert.equal(composite.uniforms.glowBias, 1);
-    assert.deepEqual(composite.uniforms.color, [1, 136 / 255, 0]);
+    assert.equal(composite.uniforms.glowBias, undefined);
+    assert.deepEqual(
+        composite.uniforms.colorRamp,
+        saberColorRamp([1, 136 / 255, 0]),
+    );
     effect.setParams({ glowDistortion: { windSpeed: 0, noiseSpeed: 0 } });
     f.render(effect);
     f.render(effect);
@@ -640,9 +752,17 @@ test("static light is reused while glow distortion and composition stay live", (
     assert.ok(f.draws.some((d) => d.uniforms.glowPass === 0));
     assert.ok(
         f.draws.some((d) => d.uniforms.axis),
-        "animated core distortion refreshes the glow",
+        "animated core distortion refreshes only the Halo pyramid",
     );
     assert.ok(!f.draws.some((d) => isCore(d)));
+    effect.setParams({ haloIntensity: 0 });
+    f.render(effect);
+    f.render(effect);
+    assert.ok(f.draws.some((d) => d.uniforms.glowPass === 0));
+    assert.ok(
+        !f.draws.some((d) => d.uniforms.axis),
+        "Core animation cannot invalidate independent Glow layers",
+    );
     f.restore();
     f.render(effect);
     assert.ok(f.draws.some((d) => d.uniforms.payloadOn !== undefined));
@@ -688,6 +808,47 @@ test("crossing a glow mip boundary preserves unaffected layer targets", () => {
     assert.ok(old.slice(6).every((target) => target.disposed));
 });
 
+test("glow size redistributes energy and Pre Gamma reuses the blur pyramid", () => {
+    for (const amount of [0, 20]) {
+        const f = fixture();
+        const effect = steadyEffect({
+            glowSizeMultiplier: 1,
+            glowLayers: [8, 16, 32, 64].map((size) => ({ size, intensity: 2 })),
+            glowDistortion: { amount, windSpeed: 0, noiseSpeed: 0 },
+        });
+        effect.init(f.ctx);
+        f.render(effect);
+        const layerDraw = () => f.draws.find((draw) => draw.uniforms.layer0);
+        assert.deepEqual(layerDraw().uniforms.weights, [2, 2, 2, 2]);
+        effect.params.glowSizeMultiplier = 2;
+        f.render(effect);
+        assert.deepEqual(layerDraw().uniforms.weights, [2, 2, 2, 2]);
+        const target = layerDraw().uniforms.layer0;
+        effect.params.glowPreGamma = 2;
+        f.render(effect);
+        assert.equal(layerDraw().uniforms.layer0, target);
+        assert.equal(layerDraw().uniforms.preGamma, 2);
+        assert.ok(!f.draws.some((draw) => draw.uniforms.axis || isCore(draw)));
+        effect.params.glowPreGamma = 0;
+        f.render(effect);
+        assert.equal(layerDraw().uniforms.preGamma, 0.1);
+        effect.params.glowBias = 0;
+        f.render(effect);
+        assert.deepEqual(layerDraw().uniforms.layerBias, [
+            0,
+            1 / 3,
+            3 / 5,
+            4 / 5,
+        ]);
+        assert.equal(layerDraw().uniforms.layer0, target);
+        assert.ok(!f.draws.some((draw) => draw.uniforms.axis || isCore(draw)));
+        effect.params.glowBias = Number.NaN;
+        f.render(effect);
+        assert.deepEqual(layerDraw().uniforms.layerBias, [1, 1, 1, 1]);
+        effect.dispose();
+    }
+});
+
 test("equal radii share a blur, including a tiny target with a very wide glow", () => {
     const f = fixture({ width: 1, height: 1 });
     const effect = steadyEffect({
@@ -701,7 +862,7 @@ test("equal radii share a blur, including a tiny target with a very wide glow", 
     assert.equal(f.draws.filter((d) => d.uniforms.axis).length, 2);
     assert.equal(f.targets.filter((t) => t.explicit).length, 2);
     assert.equal(result.uniforms.layer0, result.uniforms.layer3);
-    assert.deepEqual(result.uniforms.weights, [1000, 500, 250, 125]);
+    assert.deepEqual(result.uniforms.weights, [1, 0.5, 0.25, 0.125]);
     const weights = f.draws.find((d) => d.uniforms.axis).uniforms.weights;
     assert.ok(weights.every((x) => Number.isFinite(x) && x >= 0));
     effect.params.glowLayers[1].size = 500;
@@ -952,7 +1113,7 @@ test("removed and unknown options fail before any preset or parameter mutation",
         assert.throws(() => new SaberEffect({ [key]: 1 }), new RegExp(key));
         assert.throws(
             () =>
-                effect.setParams({ preset: "ice", color: "#000000", [key]: 1 }),
+                effect.setParams({ preset: "fog", color: "#000000", [key]: 1 }),
             new RegExp(key),
         );
         assert.deepEqual(effect.params, original, key);
@@ -963,14 +1124,28 @@ test("removed and unknown options fail before any preset or parameter mutation",
     }
 });
 
-test("Ice and Unstable use distinct independently animated core distortions", () => {
-    const ice = new SaberEffect({ preset: "ice" }).params;
-    const unstable = new SaberEffect({ preset: "unstable" }).params;
-    assert.ok(ice.coreDistortion.amount > 0);
-    assert.ok(unstable.coreDistortion.amount > ice.coreDistortion.amount);
-    assert.ok(
-        unstable.coreDistortion.noiseSpeed > ice.coreDistortion.noiseSpeed,
-    );
-    assert.ok(ice.coreBlendOnTop);
-    assert.ok(unstable.flickerIntensity > 0);
+test("only AE-inspired preset names and the Burning alias remain", () => {
+    assert.equal(Object.keys(SABER_PRESETS).length, 12);
+    assert.equal(SABER_PRESETS.embers, SABER_PRESETS.burning);
+    const effect = new SaberEffect({ preset: "fire" });
+    const original = structuredClone(effect.params);
+    for (const preset of [
+        "neon",
+        "plasma",
+        "ice",
+        "toxic",
+        "spectral",
+        "laser",
+        "unstable",
+    ]) {
+        assert.throws(
+            () => new SaberEffect({ preset }),
+            /Unknown Saber preset/,
+        );
+        assert.throws(
+            () => effect.setParams({ preset, color: "#000000" }),
+            /Unknown Saber preset/,
+        );
+        assert.deepEqual(effect.params, original);
+    }
 });

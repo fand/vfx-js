@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gaussianKernel } from "../lib/esm/_saber-blur.js";
+import {
+    coreBlurKernel,
+    coreBlurSigma,
+    gaussianKernel,
+} from "../lib/esm/_saber-blur.js";
 
 function expand({ weights, offsets }) {
     const taps = new Float64Array(25);
@@ -54,5 +58,24 @@ test("very wide clipped kernels retain their infinite-Gaussian normalization", (
             Math.abs(weights[0] * sigma * Math.sqrt(2 * Math.PI) - 1) < 1e-6,
         );
         assert.ok(weights.every((x) => Number.isFinite(x) && x >= 0));
+    }
+});
+
+// Independent AE isolated-line measurements: softness 1 has a binomial kernel;
+// softness 5 and 10 add variances 6.3321 and 19.9898 (16-bit quantization).
+test("core softness matches measured double-box profiles", () => {
+    const taps = expand(coreBlurKernel(2));
+    const expected = [1, 4, 6, 4, 1].map((x) => x / 16);
+    for (let i = 0; i < expected.length; i++) {
+        assert.ok(Math.abs(taps[10 + i] - expected[i]) < 1e-7);
+    }
+    for (const [softness, variance] of [
+        [0, 0],
+        [1, 1],
+        [5, 6.3321],
+        [10, 19.9898],
+        [25, 112.8797],
+    ]) {
+        assert.ok(Math.abs(coreBlurSigma(softness) ** 2 - variance) < 0.13);
     }
 });

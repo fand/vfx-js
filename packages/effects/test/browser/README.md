@@ -32,10 +32,35 @@ Both renderers intentionally use the same host; this isolates effect costs.
 For AE appearance comparisons, use the original `*-raw` preset exports.
 The older `*-display` exports override Core Size to 2 and Glow Intensity to 20;
 they expose structure but are not the native preset brightness reference.
-Fire is the intentional exception: preserve its separately approved look.
+Fire also uses the original export; its previously approved dimmer version remains an archival comparison.
 Use the exported source alpha, identical times, and identical cropping. With a
-full-frame 960×540 source, `pad: 160` supplies overscan for distorted broad glow;
+full-frame 960×540 source, `pad: 320` supplies overscan for distorted broad glow;
 crop the viewport readback to the source rectangle instead of resizing it.
+
+## Isolated AE Glow response
+
+Run `ae-saber-glow-probe.jsx` through AE's `DoScript` to export one-parameter
+sweeps to `/private/tmp/vfx-js-saber-glow-probe` on macOS, or
+`Folder.temp/vfx-js-saber-glow-probe` elsewhere.
+It creates a temporary 512×512 line
+comp, disables Halo/Core/Glow distortion and flicker, and records actual
+property values. It renders at the references' 16-bit depth, then restores the
+original depth and removes its temporary comp/solid (existing comps are untouched).
+Wait for all 43 PNGs to finish writing after `DoScript` returns before analysis.
+Some high-gain frames clip; use only unsaturated profiles for numerical fits.
+Keep project depth controlled. Later matched 16/32-bpc tests found near-identical
+16-bit outputs; the earlier apparent depth difference was confounded.
+
+`await (await import('./saber-appearance-checks.mjs')).runGlowCalibrationChecks()`
+checks production float-buffer line profiles at DPR 1/2. The linear blur helper
+conserves energy as radius changes; post-blur Pre Gamma changes the width.
+`GlowProbe` accepts `normalized: true` and `preGamma` to inspect this path;
+its default remains the radius-weighted Halo/Core-softness diagnostic.
+
+The normalized Glow migration converts recipe gains once as
+`oldIntensity * size * glowSizeMultiplier`. It is a unit conversion, not a fit.
+Pre Gamma 1 recipes should remain unchanged at their stored radius; recipes
+with non-neutral Pre Gamma intentionally change after moving it after blur.
 
 After changing output grading, run
 `await (await import('./saber-appearance-checks.mjs')).runOutputChecks()`.
@@ -152,7 +177,7 @@ attractive animated result. Storybook includes `thin-lines`,
 After freezing the pre-consolidation baseline with `prepare-saber-comparison.mjs`,
 import `runCombustionChecks` from `saber-combustion-checks.mjs` and pass the
 baseline `SaberEffect` class. It checks distortion compatibility with explicit
-steady settings, independent halo radius/gain, deterministic animated presets
+steady settings, Layer 4 Halo radius/gain, deterministic animated presets
 and disposal at DPR 1/2 using layered glow. Bounds checks retain analytic
 Fire/Embers rendering and raster sampling for synthetic extreme-noise cases.
 Continue running `runAppearanceChecks` for all-preset switching and
@@ -183,12 +208,167 @@ Parameter-consolidation regression (frozen baseline required):
 ```js
 const appearance = await import('./saber-appearance-checks.mjs');
 const preserved = await appearance.preservedPresetChecks(saberComparison.Baseline);
-// All 17 unchanged presets, 4 times, DPR 1/2: require failures.length === 0.
+// Retained recipes, 4 times, DPR 1/2: require failures.length === 0.
 ```
 
 `preservedPresetChecks(Baseline, { presets, times, pixelRatios })` can run smaller
-batches. Ice and Unstable intentionally changed topology; inspect their animation
-separately. The no-preset appearance is now Electric. Coverage/cache probes use
+batches. Use a baseline with the same composition semantics.
+The no-preset appearance is Electric. Coverage/cache probes use
 explicit steady settings, avoiding dependence on that default. Glow is always
 layered; obsolete pyramid/legacy-room probes have been removed. Existing motion,
 reveal, softness, resource and context-restoration diagnostics remain.
+
+### AE Bias and layer composition
+
+Run `ae-saber-glow-layers.jsx` with AE DoScriptFile. It writes 78 independent
+512px straight-core cases to `/private/tmp/vfx-js-saber-glow-layers` on macOS,
+using the installed AE 2025 `_HIDDEN X-Factor 16` template for 16-bit PNG.
+Check `manifest.txt` ends with `DONE 78` and all images are present. The script
+restores bit depth/previous queue enable flags and removes only its own items.
+A different AE version may require an equivalent 16-bit PNG output template.
+
+Cases isolate each layer across Bias 0–4, individual and combined layers at
+Pre Gamma 0.5/1/2, and Layer 4 with/without Halo. Subtract the constant far-field
+floor before computing glow ratios; avoid clipped core pixels. Bias balance
+is a small-signal approximation. The later transfer probe below supersedes the additive/Halo-source hypothesis. Do not use these tests as a preset-parity score.
+
+`runGlowCompositionChecks()` from `saber-appearance-checks.mjs` exercises the
+linear blur helper's sum-before/after-gamma distinction, four isolated layers versus
+their combination, and exactly dark disabled layers at DPR 1/2.
+
+Analyze the 16-bit PNGs with:
+
+```sh
+uv run --with pypng --with numpy packages/effects/test/browser/analyze-saber-glow-layers.py /private/tmp/vfx-js-saber-glow-layers
+```
+
+This writes `analysis.json` (Bias curves, additive residuals, Halo dependency)
+and `profiles.json` (raw center rows). It rejects missing images and 8-bit output.
+
+
+### AE nonlinear amplification, Screen and Halo
+
+Run `ae-saber-glow-transfer.jsx` through AE `DoScriptFile`. It writes 231
+independent cases to `/private/tmp/vfx-js-saber-glow-transfer`, in batches of 24.
+It checks every queue item's completion, restores depth/queue enable flags, and
+removes only its own project items. The installed AE 2025 template is required.
+
+```sh
+uv run --with pypng --with numpy packages/effects/test/browser/analyze-saber-glow-transfer.py /private/tmp/vfx-js-saber-glow-transfer
+```
+
+The analyzer requires `DONE 231`, all frames and 16-bit output. It writes center
+profiles and measured gain, Screen, Halo product, output-grade and distortion
+comparisons. Gains 0.1–4, Pre Gamma 0.5/1/2, held-out radii 8/32/64, Halo size
+and intensity, and controlled output brightness isolate the transfer ordering.
+The fitted cubic is an approximation; white-line data do not establish colored
+preset or noise parity. Very weak signals hit AE's quantization floor.
+
+`runGlowTransferChecks()` from `saber-appearance-checks.mjs` exercises the actual
+Saber compositor at DPR 1/2: Screen versus addition, Halo exclusion from Glow
+Distortion/flow, zero Halo, matched size/gain products, nonlinear amplification
+and finite HDR bounds. The raw blur helper's `response: 0` remains linear;
+`GlowProbe({ normalized: true, response: 1, inputGain: 50 })` exposes the same
+RGBA layer transfer used by production. Its alpha channel is Halo energy,
+not opacity. Run the existing output/appearance/cache checks as well.
+
+Halo now means Layer 4, with neutral multipliers 100/100. Historical frozen
+comparisons expecting an independent Halo or unchanged pixels must be interpreted
+against their original renderer. The updated combustion Halo checks follow the
+new units; its old-vs-new distortion compatibility check still needs a baseline
+with the same composition semantics.
+
+`runHaloBoundaryChecks()` renders Arc Reactor, Burning and Tractor Beam on a
+text source at t=1/2/3, DPR 1/2. It checks the pre-clamp Halo signal for broad
+saturated plateaus, not merely finite pixels. An optional `Effect` supplies a
+frozen baseline and `paint` supplies a reference alpha. The pre-fix weak-signal
+Halo compensation fails all 18 cases; the corrected input gains should pass.
+
+## Current presets beside AE
+
+`saber-preset-review.html` shows all twelve retained names, an AE/current overview,
+frame-locked playback, stepping and slow motion. The eleven AE-inspired recipes
+use original `*-raw` references, including Fire. Embers maps to Burning; the
+seven original recipes were removed. Manual AE selection is explicitly labeled.
+
+Use a comparison root containing `ae-source.png` and
+`ae/<name>-raw/000.png` through `071.png` (960×540, 24 fps, AE times 1–4 s).
+Build effects ESM, then freeze the current renderer:
+
+```sh
+node packages/effects/test/browser/prepare-saber-comparison.mjs \
+  packages/effects/lib/esm <root>/current-presets-renderer
+cp packages/effects/test/browser/capture-saber-preset-review.mjs <root>/current-presets-renderer/
+cp packages/effects/test/browser/saber-preset-review.html <root>/current-presets.html
+```
+
+Serve that root with the local diagnostic server supporting POST writes under
+`/results/`. Open `current-presets-renderer/index.html`, then run:
+
+```js
+await (await import('./capture-saber-preset-review.mjs')).capturePresetReview();
+```
+
+Progress is in `window.presetReviewJob`; do not navigate away during capture.
+The completed manifest is written last, recording all preset options, source
+thresholds and renderer hashes. It generates 12×72 PNGs under
+`results/preset-review/`. Then open `current-presets.html`. It preloads only the
+selected pair's 72 frames and draws both canvases from one integer frame clock;
+there is no independent video playback drift. Changing the renderer requires
+rebuilding, freezing and recapturing. The page is a snapshot, not live HMR.
+
+
+## Staged calibration review
+
+Freeze a separate renderer before each stage and capture with a unique destination:
+
+```js
+await (await import('./capture-saber-preset-review.mjs')).capturePresetReview({
+    destination: "stage4-presets",
+});
+```
+
+Copy `saber-preset-review.html`, replacing `results/preset-review` with the stage's
+result directory. Add `?before=stage3-presets#fog` to show AE, the previous stage,
+and the current stage on one shared frame clock. Keep earlier directories frozen.
+A completed manifest, 72 PNGs per preset, and zero GL errors are required before
+sharing a stage. `prepare-saber-comparison.mjs` also hashes the native preset data
+and empirical color-response helper in the candidate build.
+
+`ae-saber-color-palette.jsx` exports 185 isolated color/radiance cases.
+`analyze-saber-color-palette.py <export directory> <output.json>` regenerates the
+36 hue curves (requires NumPy and pypng). Values in `_saber-color.ts` are rounded
+to six decimals. Independent core-only color samples validate interpolation.
+`ae-saber-noise-isolation.jsx` exports 37 isolated Amount/Invert/Bias/Wind/Core
+cases. Additional stage scripts and raw measurements are archived under the
+ignored review results; the research note records conclusions and limitations.
+
+`runGlowMaskOrderingChecks()` in `saber-noise-isolation-checks.mjs` checks the
+production compositor with a constant half-density diagnostic field at DPR1/2.
+It separates pre-mask brightness/clipping from the procedural noise model.
+`runGlowTransferChecks()` measures amplification below that clipping knee and
+checks that the distorted RGB intermediate stays bounded.
+
+Additional isolated regressions after the noise/transport calibration:
+
+```js
+const noise = await import('./saber-noise-isolation-checks.mjs');
+const appearance = await import('./saber-appearance-checks.mjs');
+await noise.runGlowMaskOrderingChecks(); // two components, pre-mask clipping
+await noise.runNoiseBlurChecks(); // six spatial samples; wind0 bypass
+await appearance.runCoreOverlayChecks(); // Screen and activation conditions
+await appearance.runGlowResolutionChecks(); // full-resolution field reference
+```
+
+The shared noise fields approximate native density statistics and correlation;
+these regressions do not assert native random-pattern or animation equivalence.
+Motion Blur tests compare six separate source-anchored samples at frozen noise
+evolution. `motionBlur` remains seconds; native Motion Blur converts by 0.15.
+
+`runNoiseEvolutionChecks()` compares the four-octave noise against held-out AE
+time correlations at starts3/4 seconds and intervals .0625/.125/.25 seconds.
+Spatial lacunarity must not multiply the evolution clock at each octave.
+
+`runSmokeDensityChecks()` compares single-/four-octave Smoke field mean,
+standard deviation and spatial-gradient RMS with AE saturated white probes.
+It catches low-contrast fields without requiring identical random patterns.

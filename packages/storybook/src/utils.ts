@@ -1040,12 +1040,12 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     line.addBinding(p, "intensity", range(0, 5, 0.01));
     line.addBinding(p, "coreIntensity", range(0, 10, 0.01));
     line.addBinding(p, "coreWhiteness", range(0, 1, 0.01));
-    line.addBinding(p, "coreSoftness", range(0, 12, 0.05));
+    line.addBinding(p, "coreSoftness", range(0, 25, 0.05));
     line.addBinding(p, "coreBlendOnTop");
     const halo = pane.addFolder({ title: "Halo" });
-    halo.addBinding(p, "haloIntensity", range(0, 8, 0.01));
-    halo.addBinding(p, "haloSize", range(0, 60, 0.1));
-    line.addBinding(p, "thickness", range(0.5, 10, 0.1));
+    halo.addBinding(p, "haloIntensity", range(0, 1000, 1));
+    halo.addBinding(p, "haloSize", range(0, 1000, 1));
+    line.addBinding(p, "thickness", range(0.1, 25, 0.1));
 
     const brightness = pane.addFolder({ title: "Brightness flicker" });
     brightness.addBinding(p, "flickerIntensity", range(0, 1, 0.01));
@@ -1059,18 +1059,18 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     reveal.addBinding(p, "fade", range(0, 300, 1));
 
     const glow = pane.addFolder({ title: "Glow" });
-    glow.addBinding(p, "glow", range(0, 5, 0.01));
+    glow.addBinding(p, "glow", range(0, 1000, 0.1));
     glow.addBinding(p, "glowWhiteness", range(0, 1, 0.01));
-    glow.addBinding(p, "glowBias", range(-2, 2, 0.01));
+    glow.addBinding(p, "glowBias", range(0, 5, 0.01));
     glow.addBinding(p, "glowSizeMultiplier", range(0, 4, 0.01));
-    glow.addBinding(p, "glowPreGamma", range(0.1, 3, 0.01));
+    glow.addBinding(p, "glowPreGamma", range(0.1, 5, 0.01));
     p.glowLayers.forEach((layer, i) => {
         const folder = glow.addFolder({
-            title: `Layer ${i + 1}`,
+            title: i === 3 ? "Layer 4 (Halo)" : `Layer ${i + 1}`,
             expanded: false,
         });
         folder.addBinding(layer, "size", range(0, 200, 0.5));
-        folder.addBinding(layer, "intensity", range(0, 5, 0.01));
+        folder.addBinding(layer, "intensity", range(0, 10, 0.01));
     });
 
     for (const key of ["coreDistortion", "glowDistortion"] as const) {
@@ -1084,7 +1084,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         const d = p[key];
         if (key === "glowDistortion") {
             distortion.addBinding(p, "glowDistortAllLayers", {
-                label: "All glow layers",
+                label: "All glow layers (1–3)",
             });
             distortion.addBinding(p, "glowFlow", {
                 ...range(0, 120, 1),
@@ -1114,7 +1114,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
         distortion.addBinding(d, "directionality", range(0, 1, 0.01));
         distortion.addBinding(d, "motionBlur", {
             ...range(0, 0.25, 0.005),
-            label: "Shutter (s)",
+            label: "Wind blur (s)",
         });
         distortion.addBinding(d, "seed", range(0, 10000, 1));
     }

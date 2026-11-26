@@ -57,7 +57,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `RainbowEffect` | Moving rainbow gradient. |
 | `RgbGlitchEffect` | Block glitch with RGB split. |
 | `RgbShiftEffect` | RGB channel shift. |
-| `SaberEffect` | A distorted core and four glow layers along the outline, with independent `coreDistortion` / `glowDistortion`, optional halo, brightness flicker and nineteen presets. Defaults to Electric. `thickness` and `pad` use CSS px (`pad`: 80 or `"fullscreen"`); `source: false` draws light only. Outline from alpha, or `edge: "luminance"` with `edgeThreshold` for photos. `start` / `end` (0..1 along each outline loop) reveal or erase the contour; `segments` (default 3) creates several reveal heads; `fade` (CSS px, default 100) adds a fading tail behind `start` (0 = crisp cut). Outline caching: call `effect.invalidate()` after `await vfx.update(el)` changes content without resizing, or use `dynamic: true` for video. |
+| `SaberEffect` | A distorted core and four glow layers along the outline, with independent `coreDistortion` / `glowDistortion`, optional halo, brightness flicker and twelve preset names. Defaults to Electric. `thickness` and `pad` use CSS px (`pad`: 80 or `"fullscreen"`); `source: false` draws light only. Outline from alpha, or `edge: "luminance"` with `edgeThreshold` for photos. `start` / `end` (0..1 along each outline loop) reveal or erase the contour; `segments` (default 3) creates several reveal heads; `fade` (CSS px, default 100) adds a fading tail behind `start` (0 = crisp cut). Outline caching: call `effect.invalidate()` after `await vfx.update(el)` changes content without resizing, or use `dynamic: true` for video. |
 | `ScanlineEffect` | CRT scanlines. |
 | `SinewaveEffect` | Sine wave distortion. |
 | `SliceShiftEffect` | Split into strips and shift each toward the center. |
@@ -72,88 +72,86 @@ Live demos: https://amagi.dev/vfx-js/storybook
 
 ### Saber distortion and layered glow
 
-`SABER_PRESETS` contains nineteen appearance recipes, keyed by
+`SABER_PRESETS` contains twelve names for eleven AE-inspired recipes, keyed by
 `SaberPresetName`: `arc-reactor`, `burning`, `electric`, `energy`, `fog`,
-`kryptonite`, `fire`, `torch`, `tractor-beam`, `windy`, `wormhole`, plus
-`neon`, `plasma`, `ice`, `toxic`, `spectral`, `embers`, `laser`, `unstable`.
+`kryptonite`, `fire`, `torch`, `tractor-beam`, `windy`, `wormhole`, and `embers`.
 The first eleven reference the same-named AE Saber presets; `embers` is an alias
-of `burning`. The others are original recipes. Use
+of `burning`. Original presets `neon`, `plasma`, `ice`, `toxic`, `spectral`,
+`laser`, and `unstable` were removed; passing those names throws. Use
 `new SaberEffect({ preset: "fire", source: false })` or
 `effect.setParams({ preset: "fire", coreIntensity: 0.5 })`. A preset resets
 appearance; explicit options override it, including partial distortion groups.
 Source/edge detection, dynamic input, padding and reveal settings are retained.
 Without a preset, construction starts from Electric, then applies explicit options.
 Use `coreDistortion: { amount: 0 }`, `glowDistortion: { amount: 0 }` and
-`glowFlow: 0` for a steady outline without glow flow. Ice and Unstable also use
-the same core-distortion pipeline; there is no separate multi-line generator.
+`glowFlow: 0` for a steady outline without glow flow. There is no separate multi-line generator.
 Unknown top-level constructor or `setParams` options throw before changing state.
 Nested values are copied per instance; the shared recipes are frozen.
-These approximate AE's appearance and motion, not its proprietary shaders or
-numeric parameter units. The ten AE-inspired looks other than Fire are tuned
-against original preset exports, not the older Core Size 2 / Glow Intensity 20
-comparison override. Fire retains its broad, weak glow and core, with
-scale-dependent upward noise transport.
-Fog preserves a dim cyan contour; Burning/Embers and Tractor Beam restore the
-stronger luminous body of their AE references. Fire uses Fluid core +
-Energy/multiply glow; Burning uses Fluid core + Smoke/multiply glow and retains
-the original outline.
-Burning has billowing density noise; Fog uses soft Energy glow and Torch uses
-Fluid displacement. Kryptonite uses evolving Smoke; Wormhole adds gently
-warped turbulent Smoke. Arc Reactor has upward-moving smoke density.
-Windy uses four glow octaves; lower core gain/whiteness limit bright knots
-while retaining its deformation, halo, glow color and layer radii.
-Tractor Beam has a cooler blue tint. Wormhole uses the user-selected recipe:
-exponential output, glow 4, bias 0.7, layer sizes `[60, 8, 24, 60]`,
-intensities `[0.21, 0.06, 0.3, 0.11]`, core distortion amount 30 and Smoke
-glow distortion amount 80 with seed 0. Its matching demo input is
-`{ edge: "alpha", edgeThreshold: 1, source: false, pad: 320 }`; these input
-options remain separate from appearance presets.
-Fire/Torch rise, Tractor Beam stretches vertically, and Windy's core and glow
-travel in opposite directions. None of the eleven uses global brightness
-flicker or emits independent particles.
-Fire defaults to four footprint-filtered octaves for both Core and Glow. Its
-Energy/multiply Glow uses a signed fractal density field with diminishing
-fine detail, preserving broad flame pockets instead of emphasizing thin ridges.
-Multiply evaluates one noise field instead of the two needed for displacement.
+The eleven recipes now import native AE color, output grades, Core Size/Softness,
+Halo controls and four Glow layers through measured unit conversions. They target
+the original AE exports, including Fire; the previously approved dimmer Fire and
+hand-selected Wormhole/Fog settings are historical snapshots, not these defaults.
+Glow sigma is `2 * AE Spread * AE Size Multiplier * AE layer Size`.
+Full core width is `2 * AE Core Size`; input Glow gain is
+`AE Glow Intensity * AE Intensity Multiplier / 200`.
+The renderer limits Glow source mass for contours wider than 6.8px, following
+isolated AE large-Core-Size probes; the wide-source footprint is approximate.
+Native distortion amounts, wind, and core shape settings are imported too.
+Wind converts at 100 CSS px/second per AE unit. Native noise type, scale,
+Bias, aspect, evolution speed and seed are imported. Presets retain four octaves,
+with detail, turbulence, directionality and synthetic flow at zero. The procedural
+fields match isolated distributions and spatial correlations approximately;
+they do not reproduce native random patterns or all temporal behavior.
+Matching numeric values alone does not yet give matching animations.
+There is no independent particle generator or global preset flicker.
 Set `coreDistortion.noiseComplexity` and `glowDistortion.noiseComplexity`
 independently (integers 1..8), including through `setParams`. The demo exposes
 both as **Noise octaves** under Core Distortion / Glow Distortion.
-`laser` is a static white core with a tight red glow, with distortion and flicker
-disabled. It supplies the beam's appearance, not a moving beam simulation;
-animate `start`/`end` separately to reveal it.
 
-`coreIntensity` (Electric default 1.66) scales visible core brightness independently of
-glow. `coreWhiteness` (0..1, Electric default 0.7) mixes its tint toward white.
-`coreSoftness` (CSS px Gaussian sigma, Electric default 2) softens only the visible core
-after core distortion; glow continues to use the sharp distorted core. Zero
+`coreIntensity` (Electric default 1) scales visible core brightness independently of
+glow. `coreWhiteness` (0..1, Electric default 0) mixes its tint toward white.
+`coreSoftness` (Electric default 25; two centered box filters of width `softness + 1` CSS px) softens only the visible core
+after core distortion; Glow layers 1–3 use the original sharp core, while Halo follows the sharp distorted core. Zero
 bypasses the blur. Nonzero softness adds cached blur work and render targets;
 an animated core must update that blur each frame.
-`coreBlendOnTop` (Electric default true) takes the maximum of the original and displayed
-core, retaining a clean outline; both respect `coreSoftness`. The original
-outline's blur is cached separately from animated distortion. Overlay does not
-alter the light feeding glow/halo.
-`glowWhiteness` (0..1, default 0.15) controls glow tint independently of core and
+`coreBlendOnTop` (Electric default true) Screens the independently graded original
+core over the result when both Glow and nonzero Core Distortion are active.
+Both outlines respect `coreSoftness`. The original outline's blur is cached
+separately from animated distortion. Overlay does not alter either Glow input.
+`glowWhiteness` (0..1, named recipes use 0) controls glow tint independently of core and
 halo. Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
 `saturation` (0..2). Each is neutral at 1; named recipes may override them.
-The order is saturation about the RGB mean, brightness multiplication, then
-`pow(rgb, gamma)` and display clipping. Gamma below 1 lifts midtones; above 1
+The order is brightness multiplication, measured hue/radiance colorization,
+saturation about the RGB mean, then `pow(rgb, gamma)` and display clipping.
+The colorizer uses 36 measured hue curves with 33 luminance knots, interpolated
+on color changes without another texture or render pass. Gamma below 1 lifts midtones; above 1
 darkens them. Saturation 0 makes grayscale; brightness 0 hides the effect.
 These directions, ranges and ordering were checked against installed AE Saber.
-Grading affects core/glow/halo together, before source composition, and leaves
-cached shapes and source pixels unchanged. It adds no render pass.
-The old `toneMapping` option is removed (passing it throws). Recipes formerly
-using linear clipping have neutral grades; other recipes use fitted grades to
-approximate their established appearance. The power curve cannot exactly
-reproduce the old exponential shoulder, so some highlights differ. These
-recipe values preserve VFX-JS looks, not AE preset parameter compatibility.
-Fog uses neutral grading with the user-selected cyan `#20c0ff`, glow 0.02,
-halo 0.5, and first glow layer 100/2.
-`haloIntensity` (Electric default 1.71) and `haloSize` (CSS px Gaussian radius, Electric default 2.8)
-add a separately controlled halo tinted with `color`, without the glow's white
-mix. It uses the distorted core before display softness, independently of glow
-size, bias and distortion. Zero intensity or size bypasses its blur. Static
-halos are cached; animated cores add blur work. Halo also follows overall
-`intensity` and brightness flicker.
+The three glow layers are graded separately, then Screen-composited with the
+graded core/Halo. Source composition comes last. Grading leaves cached shapes
+and source pixels unchanged; it adds no render pass.
+When Glow Distortion or flow is active, each scalar Glow layer is multiplied by
+Brightness and clipped to 0..1 **before** distortion/masking, then colorized and
+graded without a second Brightness multiplication. This preserves dark noise
+inside otherwise saturated light. Brightness changes rerun layer composition
+and distortion, reusing the blur pyramid; Gamma/Saturation only affect output.
+The old `toneMapping` option is removed (passing it throws). Output recipes now
+use the exported AE Gamma/Brightness/Saturation, not fitted replacements for
+the old exponential curve. The empirical colorizer is approximate near curve
+knees; colored overlap and intense highlights still differ from AE.
+`haloIntensity` and `haloSize` are Layer 4 multipliers in percent, 0..1000,
+neutral 100. Layer 4 radius is `size * glowSizeMultiplier * haloSize / 100`;
+its input gain includes `haloIntensity / 100`. Either multiplier at zero
+hides Layer 4. Halo is tinted with `color`, without the glow's white mix.
+It follows the core that feeds the glow, but not Glow Distortion or `glowFlow`.
+There is no separate Halo blur or independent fifth light source.
+AE's white-line sweeps show an extra Brightness factor on Halo: it is bounded
+and screened under the core before their shared output grading. Outside the
+core, with white light, output is `pow(B * min(B * layer4, 1), gamma)`.
+Changing positive Halo intensity reuses the blur pyramid; changing Halo size
+rebuilds Layer 4's blur. Halo also follows overall `intensity` and flicker.
+The previous independent-Halo units have changed; custom settings require
+reauthoring. Named recipes use their native exported percentages.
 
 `flickerIntensity` (0..1, default 0) modulates core, halo and glow brightness without
 affecting source pixels. Gain stays between `1 - flickerIntensity` and 1.
@@ -166,51 +164,50 @@ Brightness flicker only changes final composition and does not invalidate the co
 `SaberParams` holds their fully populated, live values. Both use
 `SaberDistortionParams`: `amount` (CSS px, 0 bypasses), `type` (`"fluid"`,
 `"smoke"`, `"energy"`), `composite` (`"distort"` warps; `"multiply"` modulates
-brightness, reaching full modulation at amount 32), and `invert`. Each group has
+brightness, reaching full modulation at amount 100), and `invert`. Each group has
 independent `windSpeed` (CSS px/s), `windDirection` (degrees, 0 right / 90 up),
-`noiseSpeed` (cycles/s), `noiseScale` (CSS px), `noiseBias` (positive contrast
-control), `noiseComplexity` (1..8), `noiseDetail` (0..1; Electric core 0.5 / glow 0.15),
+`noiseSpeed` (AE-calibrated evolution rate), `noiseScale` (CSS px), `noiseBias` (positive contrast
+control), `noiseComplexity` (1..8), `noiseDetail` (0..1, default 0),
 `noiseTurbulence` (0..1, default 0; scale-dependent transport),
 `noiseAspectRatio` (horizontal stretch),
 `directionality` (0..1, default 0; constrain displacement to the wind axis),
 and deterministic `seed`. Noise is anchored to the element. These clocks use VFX
 time independently for core and glow; set wind and noise speeds to zero in each
-group to freeze it. Core distortion changes the contour and its glow source; glow
-distortion changes only the generated glow. With nonzero detail,
-a fully revealed core uses distance-field coverage after warping
-to keep steep thin streaks continuous; animated reveals retain the raster path.
-Fluid/smoke glow uses broad wind-aligned flow when both detail and turbulence
-are zero; otherwise it uses fractal noise. Nonzero
-detail uses a Fluid fBm / billowing Smoke fractal displacement field. Fluid core
-retains domain warping; above `noiseBias: 1`, its detailed turbulence concentrates
-in moving pockets, leaving calm regions between them.
-`noiseTurbulence` separates the wind speeds of the noise octaves. At 1,
-the first four octaves move at 0.6/0.9/1.2/1.5 times `windSpeed` (later ones
-cap at 1.8); at 0 every octave uses the same wind. This is independent of
-the four blurred `glowLayers`. Fluid/Smoke glow also gains a gentle evolving
-domain warp. Fire uses 1, Arc Reactor 0.65, Wormhole 0.5; other recipes default to 0.
-It adds no render passes; the Fluid/Smoke warp adds two coarse noise samples.
-Both wind and evolution still freeze when their speeds are zero. `glowFlow`
-continues to control the light envelope's reach, not octave speeds.
-`noiseDetail` raises octave frequency spacing from 2.03 to 2.7, fine-band gain
-from 0.5 to 0.58, and multiply contrast. Density glow keeps gain 0.5. For Energy/multiply
-Glow it blends ridges toward signed fBm density, with fine octaves kept weaker
-than the coarse envelope. Energy displacement retains wind-stretched strands.
-Zero retains the previous appearance. Unresolved noise bands are attenuated at
-the current resolution.
-Each distortion group accepts `motionBlur` (approximate shutter seconds,
-0..0.25, default 0). It evaluates two noise fields and integrates five light
-samples along their interpolated displacement, without framebuffer history.
-This smooths fast streaks while keeping seeking deterministic. It adds shader
-work, so use it selectively; zero bypasses it. Freezing both noise and wind
-also bypasses the shutter.
+group to freeze it. Core distortion changes the displayed contour and Halo input; glow
+distortion changes only the generated glow. A fully revealed core uses distance-field
+coverage after warping to keep steep thin streaks continuous; animated reveals
+retain the raster path. Smoke accumulates bounded density; Energy accumulates
+ridges conditioned by coarser ridges; Fluid warps that ridge field with another
+fractal. Octave sums are not normalized. Bias applies signed power to each of
+the two displacement components. Multiply averages the two resulting density
+components, then interpolates from no modulation using Amount / 100.
+
+`noiseDetail` raises octave frequency spacing from 2 to about 4.49; octave gain
+halves at every level. Spatial frequency increases per octave; evolution speed
+does not. The shared time conversion is 1 for Smoke and 0.75 for Fluid/Energy,
+fitted to isolated temporal correlations rather than individual preset motion.
+Unresolved bands retain their approximate mean density.
+`noiseTurbulence` separates octave wind speeds: at 1 the first four move at
+0.6/0.9/1.2/1.5 times `windSpeed` (later ones cap at 1.8). Smoke/Energy also gain
+a small domain warp. This optional extension is independent of the four blurred
+`glowLayers`; named presets use zero. `glowFlow` controls envelope reach, not
+noise octave speeds, and named presets use zero.
+
+Each group accepts `motionBlur` (wind transport interval in seconds, 0..0.25).
+Six equally weighted samples span the interval while evolution stays at the
+current time. Source pixels do not translate. Native Motion Blur maps to
+`motionBlur = native * 0.15`; zero wind bypasses the samples, even with evolving
+noise. A transient noise texture avoids six procedural evaluations. There is no
+framebuffer history, so seeking remains deterministic. Broad, well-resolved Glow
+noise may use a half-resolution field; light sampling, Core and Halo remain at
+full resolution. Fluid Distort retains full-resolution noise to preserve folds.
 
 With `glowDistortAllLayers: false`, distortion acts on narrow blur layers;
 wide layers stay smooth.
 The deformable share fades from full at radius `noiseScale / 4` to zero at
 radius `noiseScale`, using effective radii rather than layer order.
-`glowDistortAllLayers: true` includes every layer, used by the AE-inspired recipes
-so broad glow also moves. It leaves the independent `haloIntensity` halo unchanged.
+`glowDistortAllLayers: true` includes all three glow layers, used by the
+AE-inspired recipes so broad glow also moves. Layer 4 (Halo) is always protected.
 Electric and Tractor Beam default to true; Tractor Beam also transports its broad haze.
 These are procedural approximations, not a reproduction of VideoCopilot's noise algorithm.
 
@@ -222,9 +219,12 @@ comes from `windSpeed`, evolution from `noiseSpeed`. It also works with
 `glowDistortion.amount: 0`; wide protected halos remain symmetric.
 
 Glow always uses exactly four `SaberGlowLayer` objects in `glowLayers`,
-each with `size` (approximate Gaussian sigma in CSS px) and `intensity` (brightness
-normalized for thin lines). Either value at zero disables that layer. Electric
-uses sizes `[2.8, 6, 18, 32]` and intensities `[0.75, 0.8, 0.113, 0.07]`.
+each with `size` (approximate Gaussian sigma in CSS px) and `intensity` (input
+energy gain). The blur conserves energy before nonlinear amplification;
+final displayed energy is not conserved as radius changes. Either value at
+zero disables that layer. Layer 4 is the Halo, with additional percent multipliers.
+Earlier radius-weighted gains first converted as
+`newIntensity = oldIntensity * size * glowSizeMultiplier`.
 
 Effective radius is `size * glowSizeMultiplier`; the multiplier defaults to 1,
 and zero disables glow. `pad` only bounds the
@@ -232,7 +232,8 @@ output: allow roughly 3 times the largest effective radius plus distortion
 reach, or use `"fullscreen"`. Large radii use lower-resolution blurs.
 Their Gaussian kernels account for downsampling and use smooth cubic
 reconstruction; changing radius across resolution levels avoids abrupt bright
-rings. Subpixel radii fade continuously to zero. Thin core lines use pixel
+rings. Subpixel radii approach an unblurred source; zero explicitly disables
+the layer. Thin core lines use pixel
 coverage filtering, and distortion detail finer than a pixel fades out.
 Minified alpha sources receive an area prefilter; degenerate contour normals
 cannot turn a fractional-width line into a fully lit pixel.
@@ -247,13 +248,29 @@ when only output padding or fullscreen position changes.
 Large padding restricts field/core work to a conservative source region while
 keeping full-size glow/distortion outputs.
 
-`glowPreGamma` (positive, `pow(core, 1/gamma)` before blur) and
-`glowBias` (`pow(glow, 2^bias)` after glow distortion, -4..4) shape glow only.
-Electric defaults are 1 and -0.0333. `glow` scales the resulting glow (Electric: 2.2);
-`intensity` scales core, halo and glow together (Electric default 2). Nested defaults/options are copied per instance;
+`glow` is input gain before per-layer Pre Gamma and amplification.
+`glowPreGamma` (0.1..5) raises each weighted, blurred layer to a power.
+Below 1 broadens dim tails; above 1 narrows them. Isolated AE gain sweeps are
+approximated by `f(x) = x * (0.34 + x * (0.18 + 0.48*x))`; Layer 1 uses
+`(x + f(x))/2`, Layers 2–4 use `f(x)`. This is an empirical fit, not AE source.
+The shader preserves four independent channels through composition; distortion
+changes only the first three. Output grading precedes Screen combination.
+
+`glowBias` (0..5, neutral 1) approximates AE's layer balance with relative
+input gains `[b, (1+2b)/3, (3+2b)/5, (4+b)/5]` before Pre Gamma.
+It is not a contrast exponent. Glow gain, positive layer gains, Bias and Pre
+Gamma reuse the blur pyramid and leave core extraction unchanged. They also
+apply to Layer 4. Turning a layer on/off can rebuild the blur pyramid.
+
+Recipes use native AE layer order and gains. Earlier weak-signal migration
+compensation is removed. Multiply blends linearly toward a noise-density mask
+at Amount 100, replacing the former up-to-8x hotspot amplification.
+`intensity` scales core, halo and glow together (Electric default 1).
+Nested defaults/options are copied per instance;
 `setParams({ glowDistortion: { amount: 20 } })` preserves other group values.
-These are procedural WebGL approximations, not AE-compatible parameter units
-or a reproduction of Video Copilot's proprietary renderer.
+AE blur kernels, Bias outside the measured range, colored-light behavior,
+noise and very dim quantized output still differ. These are procedural WebGL
+approximations, not interchangeable AE parameters or proprietary source.
 
 ```ts
 const saber = new SaberEffect({
@@ -287,9 +304,9 @@ Removed options are rejected; there are no compatibility aliases.
 | `glowSpread` | Set `glowSizeMultiplier` to the old `glowSpread * glowSizeMultiplier`. |
 | `glowIntensityMultiplier` | Set `glow` to the old `glow * glowIntensityMultiplier`. |
 
-Default construction now uses Electric. Ice and Unstable were reauthored with
-Core Distortion; their former multi-line shapes cannot be reproduced exactly.
-The other seventeen preset names retain their calibrated appearance and motion.
+Default construction uses Electric. The seven original presets were removed;
+there are no replacement aliases. AE-inspired recipes remain approximate;
+Glow calibration changes their brightness and overlap.
 
 ## Writing an effect
 

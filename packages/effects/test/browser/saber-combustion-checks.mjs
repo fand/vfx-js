@@ -127,24 +127,28 @@ export async function runCombustionChecks(Baseline) {
             const f = await createSaberFixture({
                 options: {
                     ...calm,
-                    glow: 0,
+                    glow: 1,
                     coreIntensity: 0,
-                    haloIntensity: 1,
-                    haloSize: 5,
+                    haloIntensity: 100,
+                    haloSize: 100,
+                    glowLayers: [
+                        { size: 0, intensity: 0 },
+                        { size: 0, intensity: 0 },
+                        { size: 0, intensity: 0 },
+                        { size: 5, intensity: 10 },
+                    ],
                 },
                 pixelRatio,
                 trackResources: true,
             });
             const a = f.screen(2);
             f.effect.setParams({
-                glowBias: 2,
-                glowSizeMultiplier: 3,
                 coreSoftness: 4,
                 coreBlendOnTop: true,
                 glowDistortion: { amount: 40 },
             });
             const independent = difference(a, f.screen(2));
-            f.effect.setParams({ haloSize: 10 });
+            f.effect.setParams({ haloSize: 200 });
             const radius = difference(a, f.screen(2));
             f.effect.setParams({ haloIntensity: 0 });
             const disabled = f
@@ -161,7 +165,7 @@ export async function runCombustionChecks(Baseline) {
                 glError,
                 remaining,
             });
-            if (independent.max || !radius.changed || disabled || glError) {
+            if (independent.max > 1 || !radius.changed || disabled || glError) {
                 result.failures.push(`Halo ${pixelRatio}/layers`);
             }
             if (

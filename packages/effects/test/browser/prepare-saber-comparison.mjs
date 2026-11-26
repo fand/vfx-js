@@ -59,6 +59,10 @@ await writeFile(
     ).replaceAll("../../src/saber-presets.ts", "./candidate/saber-presets.js"),
 );
 await cp(
+    path.join(here, "saber-noise-isolation-checks.mjs"),
+    path.join(destination, "saber-noise-isolation-checks.mjs"),
+);
+await cp(
     path.join(here, "saber-motion-checks.mjs"),
     path.join(destination, "saber-motion-checks.mjs"),
 );
@@ -70,6 +74,8 @@ for (const file of [
     "baseline/_saber-coverage.js",
     "baseline/_saber-flicker.js",
     "baseline/saber-presets.js",
+    "candidate/_saber-ae-presets.js",
+    "candidate/_saber-color.js",
     "candidate/saber.js",
     "candidate/_saber-glow.js",
     "candidate/_saber-blur.js",

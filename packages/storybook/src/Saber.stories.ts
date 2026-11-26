@@ -306,17 +306,10 @@ const PRESET_DESCRIPTIONS: Record<SaberPresetName, string> = {
         "AE Tractor Beam-inspired pale blue vertical streaks and fast upward flow.",
     windy: "AE Windy-inspired descending core deformation against rising blue haze.",
     wormhole: "AE Wormhole-inspired blue tangled edges and drifting wisps.",
-    neon: "A steady pink tube with a soft white center.",
     electric:
         "AE Electric-inspired cyan electrical edges with rising turbulent glow.",
     fire: "AE Fire-inspired rising fractal flames around a torn edge.",
-    plasma: "Violet fluid contours and turbulent energy.",
-    ice: "Crisp cool white edges with slowly shifting blue distortion.",
-    toxic: "Soft green light surrounded by drifting smoke.",
-    spectral: "A faint turquoise core with a broad flowing halo.",
     embers: "Alias of Burning: a steady outline with a rising warm fringe.",
-    laser: "A steady white core with a tight red glow. Static by default; animate start/end for a reveal.",
-    unstable: "Fast yellow contour distortion and strong brightness flicker.",
 };
 
 const AE_PRESETS: SaberPresetName[] = [

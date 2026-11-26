@@ -77,3 +77,48 @@ export function remainingBlurSigma(sigma: number, level: number): number {
         level > 0 ? (1.25 * (scale * scale - 1)) / 3 + (scale * scale) / 3 : 0;
     return Math.sqrt(Math.max(0, sigma * sigma - variance)) / scale;
 }
+
+/** AE core softness: two centered box filters of width softness + 1. */
+export function coreBlurSigma(softness: number): number {
+    const width = Math.max(1, softness + 1);
+    const whole = Math.floor((width - 1) / 2);
+    const edge = width / 2 - whole - 0.5;
+    const squares = (whole * (whole + 1) * (2 * whole + 1)) / 6;
+    return Math.sqrt((4 * (squares + edge * (whole + 1) ** 2)) / width);
+}
+
+export function coreBlurKernel(width: number): GaussianKernel {
+    width = Math.max(1, width);
+    const whole = Math.floor((width - 1) / 2);
+    const edge = width / 2 - whole - 0.5;
+    const end = whole + 1;
+    const samples = new Float64Array(13);
+    // Convolve the full texels and two fractional edge texels analytically.
+    // Constant CPU cost even when a wide blur reaches the final mip.
+    for (let i = 0; i <= 12; i++) {
+        let value = Math.max(0, 2 * whole + 1 - i);
+        if (Math.abs(i - end) <= whole) {
+            value += 2 * edge;
+        }
+        if (Math.abs(i + end) <= whole) {
+            value += 2 * edge;
+        }
+        if (i === 0) {
+            value += 2 * edge * edge;
+        }
+        if (i === 2 * end) {
+            value += edge * edge;
+        }
+        samples[i] = value / (width * width);
+    }
+    const weights = new Float32Array(7),
+        offsets = new Float32Array(6);
+    weights[0] = samples[0];
+    for (let i = 0; i < 6; i++) {
+        const a = i * 2 + 1,
+            pair = samples[a] + samples[a + 1];
+        weights[i + 1] = pair;
+        offsets[i] = a + (pair > 0 ? samples[a + 1] / pair : 0);
+    }
+    return { weights, offsets };
+}
