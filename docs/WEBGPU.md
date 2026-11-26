@@ -37,24 +37,29 @@ Not measured yet: Safari WebGPU, Windows.
 - **While a pipeline builds**: show the original element.
 - **Windows**: later.
 
-## Steps
+## Pull requests
 
-### 1. Backend interface (no behavior change)
+The work lands in three pull requests.
+The first two change nothing for current users: WebGPU stays opt-in until the third.
+
+### PR 1: Backend interface and opt-in WebGPU backend
+
+Backend interface:
 
 - `vfx-player`, `effect-host` and `effect-chain` stop using the `gl/` types directly.
   They talk to an internal `Backend` interface.
-- The WebGL backend learns uniform blocks.
-  naga's GLSL output puts all uniforms in one `std140` block.
-- Can ship alone.
+- The WebGL backend moves behind it with no behavior change.
 
-### 2. WebGPU backend, opt-in
+WebGPU backend:
 
 - `new VFX({ backend: "webgpu" })`, marked experimental.
 - Getting a device is async, so `add()` queues work until the device is ready.
 - Covers element shaders and post effects, written in WGSL.
 - Decide here how user WGSL gets `resolution`, `time` and `src`.
 
-### 3. Pipeline declaration in the Effect API
+### PR 2: Port shaders and effects
+
+Effect API:
 
 - An effect declares its pipelines in `init()`.
   The host builds them with `createRenderPipelineAsync`.
@@ -63,28 +68,35 @@ Not measured yet: Safari WebGPU, Windows.
 - `ctx.device` sits next to `ctx.gl` for low-level work.
 - Check Safari 26 before this API is fixed.
 
-### 4. Port Bubble and Glass
+Build:
 
-- These two are why we migrate, so they prove the API of step 3.
-- Write the WGSL by hand, built from template strings per mode and backdrop kind, as the GLSL is today.
-- The build lists every variant and runs naga to make the GLSL.
+- WGSL is the source. The build runs naga to make the GLSL.
+- The WebGL backend learns uniform blocks.
+  naga's GLSL output puts all uniforms in one `std140` block.
+- The build also writes the map from naga's sampler names to ours.
 - The generated GLSL goes in its own chunk, loaded only on the WebGL2 fallback.
   It is about 2.6 times the size of the hand-written GLSL (131 KB vs 50 KB for one Bubble variant, 28 KB vs 15 KB gzipped).
-- The build also writes the map from naga's sampler names to ours.
 
-To measure in this step:
+Bubble and Glass first:
+
+- These two are why we migrate, so they prove the Effect API.
+- Write the WGSL by hand, built from template strings per mode and backdrop kind, as the GLSL is today.
+- The build lists every variant and runs naga on each.
+
+To measure with them:
 
 - First-draw freeze of the generated GLSL in WebGL.
   The current GLSL is tuned by hand to compile fast, and naga's output may lose that.
 - Image and frame time of the generated GLSL.
 
-### 5. Port the other effects and presets
+Then the rest:
 
+- Shader presets and the other effects.
 - Effects that call `ctx.gl` directly need a rewrite: particle, swirl-particle, jpeg-glitch, bubble, `_scene3d`, `_holo`.
-- Move simulations to compute shaders here.
+- Move simulations to compute shaders.
   Each compute effect needs a WebGL2 answer: keep the old code, do nothing, or throw.
 
-### 6. Switch the default (major release)
+### PR 3: Switch the default (major release)
 
 - `@vfx-js/core` picks WebGPU when it is there, else WebGL2.
 - Add the `/webgl` and `/webgpu` subpaths.
