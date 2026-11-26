@@ -562,13 +562,27 @@ export class SaberGlowPasses {
         },
         flowDistance = 0,
         layerShares: readonly number[] = [1, 1, 1],
+        outputSize: readonly number[] = [src.width, src.height],
     ): EffectRenderTarget {
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
         }
         let target = kind !== "glow" ? this.#core : this.#distortedGlow;
+        if (
+            target &&
+            kind !== "core" &&
+            (target.width !== outputSize[0] || target.height !== outputSize[1])
+        ) {
+            target.dispose();
+            target = null;
+        }
         if (!target) {
-            target = ctx.createRenderTarget({ float: true });
+            target = ctx.createRenderTarget({
+                format: kind === "glow" ? "rgba16f" : "r16f",
+                ...(kind !== "core"
+                    ? { size: [outputSize[0], outputSize[1]] as const }
+                    : {}),
+            });
             if (kind !== "glow") {
                 this.#core = target;
             } else {
@@ -615,8 +629,8 @@ export class SaberGlowPasses {
             src,
             contentSize: [...ctx.dims.element],
             bufferSize: [
-                src.width / ctx.dims.pixelRatio,
-                src.height / ctx.dims.pixelRatio,
+                outputSize[0] / ctx.dims.pixelRatio,
+                outputSize[1] / ctx.dims.pixelRatio,
             ],
             noiseMargin: [
                 Math.max(
@@ -647,12 +661,12 @@ export class SaberGlowPasses {
                     Math.max(0, flowDistance) *
                     (params.windSpeed < 0 ? -1 : 1) *
                     ctx.dims.pixelRatio) /
-                    src.width,
+                    outputSize[0],
                 (Math.sin(angle) *
                     Math.max(0, flowDistance) *
                     (params.windSpeed < 0 ? -1 : 1) *
                     ctx.dims.pixelRatio) /
-                    src.height,
+                    outputSize[1],
             ],
             glowPass: kind === "glow" ? 1 : 0,
             haloPass: kind === "halo" ? 1 : 0,
@@ -737,27 +751,57 @@ export class SaberGlowPasses {
         noiseScale: number,
         coreSoftness = 0,
     ): EffectRenderTarget {
-        return this.combineLayers(
+        const prepared = this.prepareLayers(
             ctx,
-            this.prepareLayers(
-                ctx,
-                src,
-                layers,
-                sizeMultiplier,
-                noiseScale,
-                false,
-                false,
-                coreSoftness,
-            ),
+            src,
+            layers,
+            sizeMultiplier,
+            noiseScale,
+            false,
+            false,
+            coreSoftness,
         );
+        // Softness has one unit-weight scalar layer. At full resolution its
+        // vertical blur already is the final core; avoid another full-size copy.
+        if (
+            coreSoftness > 0 &&
+            prepared.weights[0] === 1 &&
+            prepared.weights.slice(1).every((weight) => weight === 0) &&
+            prepared.layerScales[0] === 1
+        ) {
+            this.#output?.dispose();
+            this.#output = null;
+            return prepared.layer0;
+        }
+        return this.combineLayers(ctx, prepared, -1, 1, coreSoftness > 0);
     }
 
     combineLayers(
         ctx: EffectContext,
         uniforms: SaberGlowLayers,
         distortionBrightness = -1,
+        resolutionScale = 1,
+        scalar = false,
     ): EffectRenderTarget {
-        this.#output ??= ctx.createRenderTarget({ float: true });
+        const width = Math.max(
+            1,
+            Math.ceil(uniforms.outputSize[0] * resolutionScale),
+        );
+        const height = Math.max(
+            1,
+            Math.ceil(uniforms.outputSize[1] * resolutionScale),
+        );
+        if (
+            this.#output &&
+            (this.#output.width !== width || this.#output.height !== height)
+        ) {
+            this.#output.dispose();
+            this.#output = null;
+        }
+        this.#output ??= ctx.createRenderTarget({
+            format: scalar ? "r16f" : "rgba16f",
+            size: [width, height],
+        });
         ctx.draw({
             frag: FRAG_SUM,
             uniforms: { ...uniforms, distortionBrightness },
@@ -811,7 +855,7 @@ export class SaberGlowPasses {
                         Math.max(1, Math.ceil(previous.width / 2)),
                         Math.max(1, Math.ceil(previous.height / 2)),
                     ],
-                    float: true,
+                    format: "r16f",
                 }),
             );
         }
@@ -889,11 +933,11 @@ export class SaberGlowPasses {
                 pair = [
                     ctx.createRenderTarget({
                         size: [input.width, input.height],
-                        float: true,
+                        format: "r16f",
                     }),
                     ctx.createRenderTarget({
                         size: [input.width, input.height],
-                        float: true,
+                        format: "r16f",
                     }),
                 ];
                 this.#layers[i] = pair;
@@ -992,6 +1036,9 @@ export class SaberGlowPasses {
         this.#noise.halo?.dispose();
         this.#noise.glow?.dispose();
         this.#noise = {};
+        this.#core?.dispose();
+        this.#output?.dispose();
+        this.#distortedGlow?.dispose();
         this.#core = null;
         this.#output = null;
         this.#distortedGlow = null;

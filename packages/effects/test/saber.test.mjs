@@ -1162,3 +1162,23 @@ test("only AE-inspired preset names and the Burning alias remain", () => {
         assert.deepEqual(effect.params, original);
     }
 });
+
+test("dynamic fields reuse flood scratch and release it when frozen", () => {
+    const effect = steadyEffect({ dynamic: true, glow: 0 });
+    const f = fixture();
+    effect.init(f.ctx);
+    f.render(effect);
+    const created = f.targets.length;
+    for (let i = 0; i < 10; i++) {
+        f.render(effect);
+    }
+    assert.equal(f.targets.length, created);
+    const live = f.targets.filter((t) => !t.disposed).length;
+    effect.params.dynamic = false;
+    f.render(effect);
+    assert.equal(f.targets.filter((t) => !t.disposed).length, live - 1);
+    effect.invalidate();
+    f.render(effect);
+    assert.equal(f.targets.filter((t) => !t.disposed).length, live - 1);
+    effect.dispose();
+});

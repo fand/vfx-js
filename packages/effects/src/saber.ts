@@ -654,9 +654,8 @@ const DEFAULT_PARAMS: SaberParams = {
 export class SaberEffect implements Effect {
     params: SaberParams;
 
-    #seedA: EffectRenderTarget | null = null;
-    #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
+    #floodScratch: EffectRenderTarget | null = null;
     #core: EffectRenderTarget | null = null;
     #region: EffectGeometry | undefined;
     #regionKey: readonly number[] = [];
@@ -747,15 +746,10 @@ export class SaberEffect implements Effect {
 
     init(ctx: EffectContext): void {
         this.#disposed = false;
-        // Flooding reads texelFetch, so linear filtering is safe. Once the field
-        // has been resolved, B holds the live core. Reusing this scratch image
-        // saves a full-size float buffer.
-        this.#seedA = ctx.createRenderTarget({ float: true });
-        this.#seedB = ctx.createRenderTarget({ float: true });
-        // The host only clears the stage output.
-        // So this keeps the field between frames without `persistent`.
+        // Scalar emission needs one half-float channel. Geometry keeps normals
+        // and validity in RGBA; flood scratch exists only while rebuilding it.
         this.#field = ctx.createRenderTarget({ float: true });
-        this.#core = this.#seedB;
+        this.#core = ctx.createRenderTarget({ format: "r16f" });
         this.#dirty = true;
         // Restored targets come back empty, so the cached field must be built again.
         ctx.onContextRestored(() => {
@@ -764,12 +758,16 @@ export class SaberEffect implements Effect {
     }
 
     render(ctx: EffectContext): void {
-        const field = this.#field;
+        let field = this.#field;
         const core = this.#core;
         if (!field || !core) {
             return;
         }
         const { edge, edgeThreshold, dynamic, start, end } = this.params;
+        if (!dynamic && this.#floodScratch) {
+            this.#floodScratch.dispose();
+            this.#floodScratch = null;
+        }
         const regionChanged = this.#updateRegion(ctx, field);
         // Equal-sized buffers can still have different mappings (notably a
         // moving element with fullscreen padding, or a DPR/layout change).
@@ -816,6 +814,7 @@ export class SaberEffect implements Effect {
             (usePayload && !this.#fieldHasPayload)
         ) {
             this.#buildField(ctx, usePayload);
+            field = this.#field as EffectRenderTarget;
             this.#builtLayout = layout;
             this.#builtGeometry = geometry;
         }
@@ -1006,6 +1005,7 @@ export class SaberEffect implements Effect {
                         distortGlow
                             ? outputParam(this.params.brightness, 0, 5)
                             : -1,
+                        1 / Math.max(1, ctx.dims.pixelRatio),
                     );
                 } else {
                     // Reconstruct the layers directly in the final composite when
@@ -1038,6 +1038,7 @@ export class SaberEffect implements Effect {
                     undefined,
                     this.params.glowFlow,
                     [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
+                    [core.width, core.height],
                 );
                 this.#glowResultKey = glowResultKey;
             }
@@ -1055,6 +1056,11 @@ export class SaberEffect implements Effect {
                         this.#glowBase,
                         this.params.coreDistortion,
                         "halo",
+                        false,
+                        undefined,
+                        0,
+                        [1, 1, 1],
+                        [core.width, core.height],
                     );
                     this.#haloResultKey = haloKey;
                 }
@@ -1147,8 +1153,8 @@ export class SaberEffect implements Effect {
         this.#traceStale = true;
         this.#payloadReady = false;
         this.#fieldHasPayload = false;
-        this.#seedA = null;
-        this.#seedB = null;
+        this.#floodScratch?.dispose();
+        this.#floodScratch = null;
         this.#field = null;
         this.#core = null;
         this.#region = undefined;
@@ -1353,10 +1359,8 @@ export class SaberEffect implements Effect {
     }
 
     #buildField(ctx: EffectContext, usePayload: boolean): void {
-        const seedA = this.#seedA;
-        const seedB = this.#seedB;
         const field = this.#field;
-        if (!seedA || !seedB || !field) {
+        if (!field) {
             return;
         }
         const { edge, edgeThreshold } = this.params;
@@ -1371,12 +1375,18 @@ export class SaberEffect implements Effect {
                 dst[3] / (field.height * Math.max(ctx.dims.srcRect[3], 1)),
             ),
         };
+        // The old distance field is invalid now; use it as flood scratch.
+        // Resolve into the unused ping-pong side and retain only that side.
+        const seedA = field;
+        const seedB =
+            this.#floodScratch ?? ctx.createRenderTarget({ float: true });
+        this.#floodScratch = null;
         if (this.#region) {
-            // The core pass reuses a seed target. Clear only when the
-            // field changes; untouched pixels then stay transparent throughout.
             ctx.clear(seedA);
             ctx.clear(seedB);
-            ctx.clear(field);
+            if (this.#core) {
+                ctx.clear(this.#core);
+            }
         }
 
         const payload = this.#payload;
@@ -1431,9 +1441,10 @@ export class SaberEffect implements Effect {
         ctx.draw({
             frag: FRAG_RESOLVE,
             uniforms: { ...maskUniforms, seed: read },
-            target: field,
+            target: write,
             geometry: this.#region,
         });
+        this.#field = write;
         if (withPayload && this.#arc) {
             if (this.#region) {
                 ctx.clear(this.#arc);
@@ -1444,6 +1455,13 @@ export class SaberEffect implements Effect {
                 target: this.#arc,
                 geometry: this.#region,
             });
+        }
+        if (this.params.dynamic) {
+            // A changing video/canvas reuses both sides instead of allocating
+            // a full-resolution texture every frame.
+            this.#floodScratch = read;
+        } else {
+            read.dispose();
         }
         this.#fieldHasPayload = withPayload;
         this.#fieldVersion++;

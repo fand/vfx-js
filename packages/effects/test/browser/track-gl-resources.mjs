@@ -62,7 +62,13 @@ export function trackGLResources(gl) {
         ) {
             const [, , format, width, height] = args;
             const stride =
-                format === gl.RGBA32F ? 16 : format === gl.RGBA16F ? 8 : 4;
+                format === gl.RGBA32F
+                    ? 16
+                    : format === gl.RGBA16F
+                      ? 8
+                      : format === gl.R16F
+                        ? 2
+                        : 4;
             const size = width * height * stride;
             textureBytes += size - (bytes.get(texture) ?? 0);
             bytes.set(texture, size);

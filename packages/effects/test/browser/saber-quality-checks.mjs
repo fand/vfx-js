@@ -909,3 +909,114 @@ window.saberQualityChecks = {
     contextRestoreChecks,
     resizeChecks,
 };
+
+// Freeze Stage17 as baseline. Tracks effect textures, not total driver VRAM.
+// Include invalidation/dynamic peaks: steady-state alone hides flood scratch.
+export async function memoryChecks({ paint } = {}) {
+    const rows = [];
+    for (const pixelRatio of [1, 2]) {
+        for (const preset of [
+            "arc-reactor",
+            "burning",
+            "energy",
+            "fog",
+            "kryptonite",
+            "torch",
+            "tractor-beam",
+            "windy",
+            "wormhole",
+            "electric",
+            "fire",
+            "embers",
+        ]) {
+            const captures = [];
+            const resources = [];
+            for (const Effect of [Baseline, undefined]) {
+                const f = await createSaberFixture({
+                    Effect,
+                    width: 960,
+                    height: 540,
+                    sourceWidth: 960,
+                    sourceHeight: 540,
+                    pixelRatio,
+                    trackResources: true,
+                    paint,
+                    options: {
+                        preset,
+                        pad: 320,
+                        edgeThreshold: preset === "wormhole" ? 1 : 0.5,
+                    },
+                });
+                const record = {};
+                try {
+                    captures.push([1, 1.5, 2].map((t) => f.screen(t)));
+                    record.static = f.resources.snapshot();
+                    f.effect.invalidate();
+                    f.render(2);
+                    record.rebuilt = f.resources.snapshot();
+                    f.effect.setParams({ dynamic: true });
+                    f.render(2);
+                    f.render(2.1);
+                    record.dynamic = f.resources.snapshot();
+                    f.effect.setParams({ dynamic: false });
+                    f.render(2.1);
+                    record.frozen = f.resources.snapshot();
+                    record.glError = f.gl.getError();
+                } finally {
+                    f.destroy();
+                    record.disposed = f.resources.snapshot();
+                }
+                resources.push(record);
+            }
+            const errors = captures[0].map((before, k) => {
+                const after = captures[1][k];
+                let sum = 0,
+                    squared = 0,
+                    energy = 0,
+                    max = 0,
+                    count = 0;
+                for (let i = 0; i < before.pixels.length; i++) {
+                    if (i % 4 === 3) {
+                        continue;
+                    }
+                    const delta = Math.abs(before.pixels[i] - after.pixels[i]);
+                    sum += delta;
+                    squared += delta * delta;
+                    energy += before.pixels[i];
+                    max = Math.max(max, delta);
+                    count++;
+                }
+                return {
+                    mae: sum / count,
+                    rms: Math.sqrt(squared / count),
+                    relativeL1: sum / Math.max(1, energy),
+                    max,
+                };
+            });
+            const candidate = resources[1];
+            const baseline = resources[0];
+            rows.push({
+                preset,
+                pixelRatio,
+                errors,
+                resources,
+                failed:
+                    errors.some((e) => e.relativeL1 > 0.01 || e.rms > 1) ||
+                    resources.some(
+                        (r) =>
+                            r.glError !== 0 ||
+                            Object.values(r.disposed.objects).some(
+                                (n) => n !== 0,
+                            ),
+                    ) ||
+                    candidate.frozen.textureBytes !==
+                        candidate.static.textureBytes ||
+                    candidate.static.textureBytes >
+                        baseline.static.textureBytes * 0.5 ||
+                    candidate.dynamic.peakTextureBytes >
+                        baseline.dynamic.peakTextureBytes * 0.65,
+            });
+        }
+    }
+    return rows;
+}

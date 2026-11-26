@@ -754,3 +754,55 @@ the per-instance footprint acceptable. User requires this fixed before release.
 Next work profiles targets, reduces formats/lifetimes/resolution where visual
 parity allows, using the frozen Stage17 output as the reference. No further
 artistic preset/noise tuning.
+
+
+## 19. Render-target memory reduction
+
+Frozen Stage17 appearance; no preset or noise retuning. Added explicit RGBA8,
+R16F, RG16F and RGBA16F color storage to EffectRenderTargetOpts. Existing float
+selection is unchanged when format is omitted. Saber uses R16F for scalar core,
+softness and blur intermediates; packed Glow uses RGBA16F. Geometry and noise
+remain32F on this GPU: reducing those to16F introduced visible contour errors.
+
+Flooding now reuses the invalid distance field as one ping-pong side, resolves
+into the other and retains only the resolved field. Dynamic sources retain one
+scratch side, avoiding allocation every frame; disabling dynamic releases it.
+Full-resolution, unit-weight core softness reuses its vertical blur directly.
+Only the smooth, pre-distortion Glow mixture is capped at1 physical pixel/CSS px.
+Core, warped Glow and warped Halo still render at full DPR. Capping the warped
+outputs caused large isolated highlight differences and was rejected.
+
+Tracked effect texture allocation, M4 Max/ANGLE Metal,960×540 source,pad320:
+
+| Preset | DPR | Stage17 | Stage19 steady | Stage19 rebuild/dynamic peak |
+|---|---:|---:|---:|---:|
+| Arc Reactor |1|349.21 MiB|102.30 MiB|131.11 MiB|
+| Arc Reactor |2|1242.27 MiB|289.56 MiB|404.79 MiB|
+| Fire |1|238.60 MiB|92.18 MiB|120.99 MiB|
+| Fire |2|872.39 MiB|257.83 MiB|373.07 MiB|
+
+Arc Reactor:76.7% less steady texture storage,67.4% less at rebuild/dynamic
+peak. These are traced allocations, not driver/process VRAM. The measurement
+uses full contours; additional reveal payload storage is not included in this
+budget.405MiB remains substantial; this does not establish a universal release
+budget or device compatibility.
+
+All12 presets × DPR1/2 × t=1,1.5,2: worst relative RGB L1 .4411%, RMS .562/255;
+worst isolated channel difference48/255. Thus visual parity is approximate,
+not byte-identical. Inspected DPR2 Torch/Kryptonite pairs and the Fire review.
+Core coverage, DPR, reveal, resize, context restoration, lifecycle, appearance,
+filter ordering and Glow resolution checks pass; disposal returns tracked
+objects to zero. Memory checks include static invalidation and dynamic→static
+transitions and enforce both steady and peak allocation ratios.
+
+Core676 tests, effects41 tests, TypeScript/builds and118-export docs checks pass.
+Real GPU readback: all4 new formats × ordinary/persistent/mipmap/MSAA paths
+preserve expected RGBA values, GL errors0, complete disposal. Review regenerated:
+12×72 unique frames, GL errors0. Artifacts are under ignored results/stage19-evidence/.
+Review: http://127.0.0.1:6040/stage19.html?before=stage17-presets#fire
+
+Timing: six presets × DPR1/2 × two alternating orders,60 GPU samples after15
+warmup frames,batch2, GL errors0. DPR2 paired mean ratios ranged .63–.97.
+The initial DPR1 Arc +34% did not reproduce:100 samples after40 warmup,batch4,
+four alternating runs gave baseline2.37–2.79ms and candidate2.36–2.46ms.
+No clear sustained slowdown; do not extrapolate these load-sensitive numbers.
