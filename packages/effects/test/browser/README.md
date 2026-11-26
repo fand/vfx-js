@@ -440,3 +440,7 @@ signed displacement from orthogonal ramps and independently validates it against
 Multiply output (numpy/scipy/pypng required). `analyze-saber-fire-noise.py` also
 reports vertical gradients for aspect sweeps. GPU regressions:
 `runNoiseTailChecks()` and `runNoiseAspectChecks()` in the isolation module.
+
+`resizeChecks()` in `saber-quality-checks.mjs` exercises actual CSS size changes
+for Fire/Arc Reactor/Windy/Torch at DPR1/2. It checks round-trip pixels, updated
+effect dimensions, stable repeated allocations and complete resource disposal.

@@ -728,3 +728,29 @@ negative tails, aspect, lattice/DPR, native temporal correlations), all pass.
 All12×72 review frames regenerated. Raw native16-bit frames, JSX, inversions,
 rejected fits and final checks are archived under ignored results/stage17-evidence/.
 Review: http://127.0.0.1:6040/stage17.html?before=stage16-presets#fire
+
+## 18. Acceptance checks and memory blocker
+
+Stage17: straight0.25–2px Core at0/22.5/45 degrees has at most .252% energy
+variation over four subpixel positions. DPR2 versus DPR1 core relativeL1 is
+1.13% (DPR3:1.02%). Appearance, Core filter order, odd-padding and wind-blur
+checks pass. Actual CSS resize round trips across Fire/Arc/Windy/Torch at DPR1/2
+restore pixels exactly; tracked allocations stabilize and all objects release.
+A radius2px/.25px circular line still has8.15% subpixel energy swing at DPR1,
+1.75% at DPR2. This is identical to Stage16, not a new regression.
+
+M4 Max/ANGLE Metal,960×540 source, pad320. Six presets, DPR1/2, two alternating
+orders,60 samples after15 warmup frames, batch2. All GPU errors0. Timings are
+load-sensitive: initial Fire +12–16% did not reproduce consistently. A longer
+Fire check (120 samples,60 warmup,batch4) gave DPR1 means2.62→2.56ms; DPR2
+medians drifted5.11→9.82ms baseline and5.16→11.90ms candidate across repeats.
+Do not claim a precise regression or speedup from these noisy timing runs.
+
+The deterministic blocker is memory: Arc Reactor peaks at~1.21GiB tracked
+texture storage at DPR2. The padded surface is3200×2360 physical pixels,
+~115MiB per RGBA32F image. This is estimated texture allocation, not total driver
+VRAM. It also existed in Stage16; lifetime/disposal correctness does not make
+the per-instance footprint acceptable. User requires this fixed before release.
+Next work profiles targets, reduces formats/lifetimes/resolution where visual
+parity allows, using the frozen Stage17 output as the reference. No further
+artistic preset/noise tuning.

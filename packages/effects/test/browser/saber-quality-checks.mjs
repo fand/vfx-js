@@ -796,6 +796,105 @@ export async function contextRestoreChecks() {
     return result;
 }
 
+// Exercise actual CSS element resizes, not just padding/uniform changes.
+// A round trip at fixed time must restore pixels and allocated texture bytes.
+export async function resizeChecks() {
+    const rows = [];
+    for (const pixelRatio of [1, 2]) {
+        for (const preset of ["fire", "arc-reactor", "windy", "torch"]) {
+            const fixture = await createSaberFixture({
+                pixelRatio,
+                trackResources: true,
+                options: { preset, pad: 160 },
+            });
+            const row = { pixelRatio, preset, rounds: [], failures: [] };
+            try {
+                const initial = fixture.screen(2);
+                for (let round = 0; round < 2; round++) {
+                    for (const [width, height] of [
+                        [240, 112],
+                        [420, 196],
+                        [300, 140],
+                    ]) {
+                        Object.assign(fixture.input.style, {
+                            width: `${width}px`,
+                            height: `${height}px`,
+                            left: `${(640 - width) / 2}px`,
+                            top: `${(400 - height) / 2}px`,
+                        });
+                        await new Promise(requestAnimationFrame);
+                        fixture.render(2);
+                        await new Promise(requestAnimationFrame);
+                        const shot = fixture.screen(2);
+                        if (
+                            fixture.dims.element[0] !== width ||
+                            fixture.dims.element[1] !== height
+                        ) {
+                            row.failures.push({
+                                width,
+                                height,
+                                error: "stale dimensions",
+                                dims: fixture.dims.element,
+                            });
+                        }
+                        if (
+                            !shot.pixels.some(
+                                (value, i) => i % 4 !== 3 && value > 0,
+                            )
+                        ) {
+                            row.failures.push({
+                                width,
+                                height,
+                                error: "empty output",
+                            });
+                        }
+                    }
+                    const restored = fixture.screen(2);
+                    let peak = 0,
+                        square = 0;
+                    for (let i = 0; i < initial.pixels.length; i++) {
+                        const delta = Math.abs(
+                            initial.pixels[i] - restored.pixels[i],
+                        );
+                        peak = Math.max(peak, delta);
+                        square += delta * delta;
+                    }
+                    const state = {
+                        peak,
+                        rms: Math.sqrt(square / initial.pixels.length),
+                        textureBytes: fixture.resources.snapshot().textureBytes,
+                    };
+                    row.rounds.push(state);
+                    if (peak > 1) {
+                        row.failures.push({
+                            round,
+                            error: "round-trip pixels",
+                            ...state,
+                        });
+                    }
+                }
+                row.glError = fixture.gl.getError();
+                if (row.glError) {
+                    row.failures.push({ error: "WebGL" });
+                }
+                if (row.rounds[0].textureBytes !== row.rounds[1].textureBytes) {
+                    row.failures.push({ error: "texture allocation grew" });
+                }
+            } finally {
+                fixture.destroy();
+            }
+            row.disposed = fixture.resources.snapshot();
+            if (
+                Object.values(row.disposed.objects).some((count) => count !== 0)
+            ) {
+                row.failures.push({ error: "resources not released" });
+            }
+            rows.push(row);
+        }
+    }
+    return rows;
+}
+
 window.saberQualityChecks = {
     run,
     difference,
@@ -808,4 +907,5 @@ window.saberQualityChecks = {
     curvedCoreChecks,
     regionChecks,
     contextRestoreChecks,
+    resizeChecks,
 };
