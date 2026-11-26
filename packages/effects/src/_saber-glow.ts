@@ -34,7 +34,7 @@ export type SaberDistortionParams = {
     noiseDetail: number;
     /** Turbulent transport, 0..1. Separates octave wind speeds; Smoke/Energy also gain domain warping. */
     noiseTurbulence: number;
-    /** Horizontal wavelength multiplier, positive. */
+    /** Horizontal frequency multiplier, positive. Above1 compresses X, as in AE. */
     noiseAspectRatio: number;
     /** Constrain displacement to the wind axis: 0 = free, 1 = along wind only. */
     directionality: number;
@@ -167,12 +167,15 @@ vec2 fractalDensity(vec3 p
         vec2 value = noisePair(position);
         vec2 signal = noiseType == 1
             ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
-            : pow(max(vec2(0.0), 1.0 - 0.94 * abs(value)), vec2(2.0));
+            // The native signed-vector distribution has broad dark valleys.
+            // A squared ridge matches the mean but loses almost all <-0.9
+            // excursions after four octaves, especially visible at Bias3.
+            : pow(max(vec2(0.0), 1.0 - 1.2 * abs(value)), vec2(1.5));
         total += weight * signal * feedback;
         // AE's isolated 1→4 octave increments retain fine ridges even where
         // the first octave is weak. Clamp the accumulated feedback so a later
         // ridge can recover; multiplying clamped factors only loses detail.
-        if (noiseType != 1) feedback = clamp(1.7 * signal * feedback, 0.0, 1.0);
+        if (noiseType != 1) feedback = clamp(2.0 * signal * feedback, 0.0, 1.0);
         p = p * lacunarity + vec3(17.1, 9.2, 13.7);
         // Octaves refine space, not the rate of evolution. Retain the seeded
         // phase offsets while keeping the same clock speed at every octave.
@@ -223,9 +226,11 @@ vec2 distortionAt(float offset) {
     float sampleClock = clock;
     vec2 position = noiseGridOrigin() + floor(gl_FragCoord.xy) * 2.0;
     vec2 q = (position - wind - windVelocity * offset) / noiseScale;
-    q.x /= aspect;
+    // Native aspect sweeps keep Y unchanged and multiply X frequency.
+    // Dividing X inverted the elongation of flames and vortices.
+    q.x *= aspect;
     // One type-specific wavelength conversion, fitted to isolated AE fields.
-    float frequency = noiseType == 1 ? 1.15 : 1.0;
+    float frequency = noiseType == 1 ? 1.15 : 0.625;
     q *= frequency;
     vec3 p = vec3(q, sampleClock) + vec3(seed * 0.123, seed * 0.719, seed * 0.317);
     if (noiseType == 0) {
@@ -233,7 +238,7 @@ vec2 distortionAt(float offset) {
     }
 #ifdef TURBULENT_NOISE
     vec2 transport = (wind + windVelocity * offset) / noiseScale * frequency;
-    transport.x /= aspect;
+    transport.x *= aspect;
     if (noiseType != 0 && noiseTurbulence > 0.0) {
         p.xy += 0.2 * noiseTurbulence
             * vec2(snoise(p + 3.1), snoise(p + 19.7));
@@ -658,7 +663,11 @@ export class SaberGlowPasses {
             clock:
                 ctx.time *
                 params.noiseSpeed *
-                (params.type === "smoke" ? 1 : 0.75),
+                (params.type === "smoke"
+                    ? 1
+                    : params.type === "fluid"
+                      ? 0.5
+                      : 0.75),
             amount: params.amount,
             noiseScale: Math.max(params.noiseScale, 0.1),
             noiseBias: Math.max(params.noiseBias, 0.05),

@@ -1,11 +1,12 @@
-// AE: isolated Fluid/Energy density at two scales and seeds, with 1–4 octaves.
+// AE: isolated density, displacement vectors, or aspect sweeps.
 // batches of 24, 16-bit PNG. Restores bit depth and existing queue flags.
 (function () {
     // Run once at1, then at2. The even samples reveal native interpolation.
     var renderScale = 1;
+    var probe = "density"; // density | vectors | aspect
     var root = new Folder(
         ($.os.indexOf("Mac") >= 0 ? "/private/tmp" : Folder.temp.fsName) +
-            "/vfx-js-saber-fire-fields16" + (renderScale === 1 ? "" : "-x2")
+            "/vfx-js-saber-fire-fields17-" + probe + (renderScale === 1 ? "" : "-x2")
     );
     if (!root.exists && !root.create()) throw new Error(root.error);
     if (!app.project) app.newProject();
@@ -58,10 +59,33 @@
     base[33]=100; base[34]=2; base[35]=2; base[36]=0;
     base[37]=0; base[38]=0; base[39]=0; base[40]=178;
     base[41]=1; base[42]=4; base[43]=1.29; base[44]=0; base[45]=5000; base[46]=0;
-    add('base',2,{33:0,71:100});
-    var scales=[25,178], complexities=[1,2,3,4];
-    for(var type=2;type<=3;type++)for(var si=0;si<2;si++)for(var ci=0;ci<complexities.length;ci++)for(var seed=0;seed<2;seed++){
-        add('t'+type+'-s'+scales[si]+'-c'+complexities[ci]+'-seed'+seed,2,{34:type,40:scales[si] * renderScale,42:complexities[ci],45:5000+100*seed,71:100});
+    if (probe === "vectors") {
+        // Two known orthogonal light ramps identify both displacement axes.
+        // Invert them jointly: the broad blur has finite-comp edge falloff.
+        base[4]=50; base[71]=10; base[33]=8; base[35]=1; base[40]=25;
+        for(var axis=0;axis<2;axis++) {
+            var start=axis===0?[256,-1024]:[-1024,256];
+            var end=axis===0?[256,1536]:[1536,256];
+            add('base-a'+axis,2,{33:0,71:10,8:start,9:end});
+            for(var type=2;type<=3;type++)for(var c=1;c<=4;c++)for(var seed=0;seed<2;seed++) {
+                add('t'+type+'-c'+c+'-seed'+seed+'-a'+axis,2,{34:type,42:c,45:5000+100*seed,71:10,8:start,9:end});
+            }
+        }
+    } else if (probe === "aspect") {
+        add('base',2,{33:0,71:100});
+        var aspects=[0.5,1,1.29,2];
+        for(var type=1;type<=3;type++)for(var ai=0;ai<aspects.length;ai++)for(var seed=0;seed<2;seed++) {
+            add('t'+type+'-a'+aspects[ai]+'-seed'+seed,2,{34:type,40:25,42:1,43:aspects[ai],45:5000+100*seed,71:100});
+        }
+    } else if (probe === "density") {
+        add('base',2,{33:0,71:100});
+        var scales=[25,178], complexities=[1,2,3,4];
+        for(var type=2;type<=3;type++)for(var si=0;si<2;si++)for(var ci=0;ci<complexities.length;ci++)for(var seed=0;seed<2;seed++) {
+            add('t'+type+'-s'+scales[si]+'-c'+complexities[ci]+'-seed'+seed,2,{34:type,40:scales[si] * renderScale,42:complexities[ci],45:5000+100*seed,71:100});
+        }
+    } else {
+        log.close();
+        throw new Error("Unknown probe: " + probe);
     }
     var oldDepth = app.project.bitsPerChannel,
         prior = [],

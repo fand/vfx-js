@@ -431,3 +431,12 @@ DPR1/2. `runGlowResolutionChecks()` now checks odd-padding invariance of the
 whole effect, including steep Core folds; the old adaptive-resolution comparison
 was superseded by the measured native grid. Wind-blur checks use spatial samples
 of the current field instead of independently re-evaluating future time.
+
+Fire noise isolation: `ae-saber-fire-noise-fields.jsx` has `density`, `vectors`
+and `aspect` modes. Each changes one group of native parameters and restores
+AE's bit depth and render queue. Run at renderScale1 for vector inversion.
+`analyze-saber-noise-vectors.py <vectors-dir> --density <density-dir>` recovers
+signed displacement from orthogonal ramps and independently validates it against
+Multiply output (numpy/scipy/pypng required). `analyze-saber-fire-noise.py` also
+reports vertical gradients for aspect sweeps. GPU regressions:
+`runNoiseTailChecks()` and `runNoiseAspectChecks()` in the isolation module.

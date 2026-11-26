@@ -170,7 +170,8 @@ independent `windSpeed` (CSS px/s), `windDirection` (degrees, 0 right / 90 up),
 `noiseSpeed` (AE-calibrated evolution rate), `noiseScale` (CSS px), `noiseBias` (positive contrast
 control), `noiseComplexity` (1..8), `noiseDetail` (0..1, default 0),
 `noiseTurbulence` (0..1, default 0; scale-dependent transport),
-`noiseAspectRatio` (horizontal stretch),
+`noiseAspectRatio` (horizontal frequency multiplier; above1 compresses X,
+matching AE rather than stretching X),
 `directionality` (0..1, default 0; constrain displacement to the wind axis),
 and deterministic `seed`. Noise is anchored to the element. These clocks use VFX
 time independently for core and glow; set wind and noise speeds to zero in each
@@ -186,7 +187,7 @@ components, then interpolates from no modulation using Amount / 100.
 
 `noiseDetail` raises octave frequency spacing from 2 to about 4.49; octave gain
 halves at every level. Spatial frequency increases per octave; evolution speed
-does not. The shared time conversion is 1 for Smoke and 0.75 for Fluid/Energy,
+does not. The shared time conversion is 1 for Smoke, 0.5 for Fluid and 0.75 for Energy,
 fitted to isolated temporal correlations rather than individual preset motion.
 Noise is evaluated on a two-CSS-pixel content-aligned grid, then bilinearly
 interpolated after signed Bias. Octaves are not dropped as pixel ratio changes.

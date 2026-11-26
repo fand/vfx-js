@@ -27,11 +27,12 @@ for path in sorted(args.directory.glob("t*.png")):
         "mean": float(crop.mean()),
         "std": float(crop.std()),
         "gradient": float(np.sqrt(np.mean((crop - image[32:480, 33:225]) ** 2))),
+        "gradientY": float(np.sqrt(np.mean((crop - image[33:481, 32:224]) ** 2))),
         "correlation": [float(np.corrcoef(crop.ravel(), image[32:480, 32+d:224+d].ravel())[0, 1])
                         for d in [1, 2, 4, 8, 16, 32]],
     })
-if len(rows) not in (16, 32):
-    raise ValueError(f"Expected 16 or 32 isolated fields, got {len(rows)}")
+if len(rows) not in (16, 24, 32):
+    raise ValueError(f"Expected 16, 24 or 32 isolated fields, got {len(rows)}")
 output = json.dumps(rows, indent=2) + "\n"
 if args.out:
     args.out.write_text(output)

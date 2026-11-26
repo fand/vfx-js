@@ -680,3 +680,51 @@ increments, density, lattice, Amount/Invert, wind blur, evolution, Core filter
 ordering and odd-padding stability. All pass. Review snapshots include all
 12 presets ×72 frames. Evidence: ignored results/stage16-evidence/.
 Review: http://127.0.0.1:6040/stage16.html?before=stage15-presets#fire
+
+## 17. Signed tails, aspect direction, and Fluid evolution
+
+34 new native renders distort two orthogonal, unsaturated Glow ramps. Jointly
+invert their 2D baselines (finite-comp falloff prevents a 1D inversion) to recover
+both signed components. Predicting the separately rendered Multiply field gives
+RMS .0017–.0026. A zero inverse-solver residual alone would not validate this.
+
+The averaged mask concealed missing negative excursions:
+
+| Four-octave components below -.9 | Native | Stage16 | Stage17 |
+| --- | --- | --- | --- |
+| Energy | 4.10% | .40% | ~3.3% |
+| Fluid | 4.01% | .44% | ~3.3% |
+
+Fit the single-octave distribution with `max(0,1-1.2*abs(n))^1.5`, and accumulated
+feedback gain2. This is a measured simplex approximation, not a claim about
+Saber's source. The old squared primitive had the right mean and almost no
+strong negative tail after four octaves. Bias3 made the Core discrepancy worse.
+The new regression measures actual signed fields after Bias3, not averaged masks.
+
+25 aspect-only renders confirm that AE multiplies X frequency; Y stays fixed.
+Our division stretched X instead. For Energy, aspect .5/1/2 gives X/Y gradient
+ratios ~.51/1.02/1.92. Fix both the base coordinate and optional turbulent
+transport. Refitting the common Fluid/Energy wavelength conversion to .625
+retains the measured horizontal gradients while correcting vertical wavelength.
+This changes the documented aspect semantics to match AE; recipes stay untouched.
+
+Recheck motion after changing the primitive. Fluid's old .75 time conversion
+became too fast (correlation RMSE .164); .5 gives .041 on starts3/4. Separate
+native probes at complexity1/2/4 and starts0/.5/1/2 also improve versus .75
+(RMSE .097/.082/.094, formerly .206/.108/.127). Energy remains .75, Smoke1.
+Wind transport and six-tap spatial shutter stay unchanged.
+
+Rejected experiments: larger/global/recursive/3D or independent warps,
+normalized warp sums, and cubic-gradient primitives did not consistently improve
+native statistics and topology together. No such algorithm replacement landed.
+The gradient-noise experiments used independent hashing/gradients; public
+background references: https://cs.nyu.edu/~perlin/noise/ and
+https://libnoise.sourceforge.net/docs/group__libnoise.html . These do not establish
+which algorithm the proprietary plug-in uses. Random phase/topology remains an
+approximation; do not present this as pixel parity.
+
+Validation:40 node tests and six focused GPU suites (octave increments, density,
+negative tails, aspect, lattice/DPR, native temporal correlations), all pass.
+All12×72 review frames regenerated. Raw native16-bit frames, JSX, inversions,
+rejected fits and final checks are archived under ignored results/stage17-evidence/.
+Review: http://127.0.0.1:6040/stage17.html?before=stage16-presets#fire

@@ -651,6 +651,163 @@ export async function runRidgeOctaveChecks() {
     return { rows, failures };
 }
 
+// Native displacement recovered by jointly inverting two orthogonal Glow
+// ramps. The averaged Multiply mask hid this missing negative tail. At Bias3,
+// n < -.9 becomes n^3 < -.729; these samples produce strong Core excursions.
+export async function runNoiseTailChecks() {
+    const rows = [],
+        failures = [];
+    for (const type of ["energy", "fluid"]) {
+        for (const complexity of [1, 4]) {
+            let tail = 0,
+                count = 0;
+            for (const seed of [0, 100]) {
+                const f = await createSaberFixture({
+                    Effect: DistortionProbe,
+                    width: 512,
+                    height: 512,
+                    sourceWidth: 512,
+                    sourceHeight: 512,
+                    pixelRatio: 1,
+                    options: {
+                        type,
+                        amount: 100,
+                        noiseScale: 25,
+                        noiseComplexity: complexity,
+                        noiseDetail: 0,
+                        noiseAspectRatio: 1.29,
+                        noiseBias: 3,
+                        seed,
+                    },
+                });
+                try {
+                    const shot = await f.capture("noise-field", 0);
+                    for (let y = 2; y < shot.height - 2; y++) {
+                        for (let x = 2; x < shot.width - 2; x++) {
+                            for (let c = 0; c < 2; c++) {
+                                const v =
+                                    shot.pixels[(y * shot.width + x) * 4 + c];
+                                if (!Number.isFinite(v)) {
+                                    failures.push({
+                                        type,
+                                        complexity,
+                                        seed,
+                                        error: "nonfinite",
+                                    });
+                                }
+                                if (v < -0.729) {
+                                    tail++;
+                                }
+                                count++;
+                            }
+                        }
+                    }
+                    if (f.gl.getError()) {
+                        failures.push({
+                            type,
+                            complexity,
+                            seed,
+                            error: "WebGL",
+                        });
+                    }
+                } finally {
+                    f.destroy();
+                }
+            }
+            const reference = complexity === 1 ? 0.064 : 0.0405;
+            const row = { type, complexity, fraction: tail / count, reference };
+            rows.push(row);
+            if (Math.abs(row.fraction - reference) > 0.015) {
+                failures.push(row);
+            }
+        }
+    }
+    return { rows, failures };
+}
+
+// AE aspect-only sweeps: X frequency multiplies, Y frequency stays fixed.
+// Ratio at aspect2 falls below2 when the native2px lattice undersamples Fluid.
+export async function runNoiseAspectChecks() {
+    const references = {
+        smoke: [0.505, 1.005, 1.872],
+        fluid: [0.551, 0.991, 1.522],
+        energy: [0.509, 1.019, 1.921],
+    };
+    const rows = [],
+        failures = [];
+    for (const type of ["smoke", "fluid", "energy"]) {
+        const samples = [[], [], []];
+        for (const seed of [0, 100]) {
+            const f = await createSaberFixture({
+                Effect: DistortionProbe,
+                width: 512,
+                height: 512,
+                sourceWidth: 512,
+                sourceHeight: 512,
+                pixelRatio: 1,
+                options: {
+                    type,
+                    amount: 100,
+                    noiseScale: 25,
+                    noiseComplexity: 1,
+                    noiseDetail: 0,
+                    noiseBias: 1,
+                    seed,
+                },
+            });
+            try {
+                for (const [j, aspect] of [0.5, 1, 2].entries()) {
+                    f.effect.params.noiseAspectRatio = aspect;
+                    const shot = await f.capture("core-distortion", 0);
+                    let dx = 0,
+                        dy = 0,
+                        count = 0;
+                    for (let y = 32; y < 479; y++) {
+                        for (let x = 32; x < 223; x++) {
+                            const i = ((511 - y) * shot.width + x) * 4;
+                            const v = shot.pixels[i];
+                            dx += (v - shot.pixels[i + 4]) ** 2;
+                            dy += (v - shot.pixels[i - shot.width * 4]) ** 2;
+                            count++;
+                        }
+                    }
+                    samples[j].push({
+                        gx: Math.sqrt(dx / count),
+                        gy: Math.sqrt(dy / count),
+                    });
+                }
+                if (f.gl.getError()) {
+                    failures.push({ type, seed, error: "WebGL" });
+                }
+            } finally {
+                f.destroy();
+            }
+        }
+        const average = (j, key) =>
+            samples[j].reduce((sum, s) => sum + s[key], 0) / samples[j].length;
+        for (const [j, aspect] of [0.5, 1, 2].entries()) {
+            const ratio = average(j, "gx") / average(j, "gy");
+            const yRatio = average(j, "gy") / average(1, "gy");
+            const row = {
+                type,
+                aspect,
+                ratio,
+                yRatio,
+                reference: references[type][j],
+            };
+            rows.push(row);
+            if (
+                Math.abs(ratio - row.reference) >
+                    (type === "fluid" ? 0.25 : 0.15) ||
+                Math.abs(yRatio - 1) > 0.15
+            ) {
+                failures.push(row);
+            }
+        }
+    }
+    return { rows, failures };
+}
+
 // Native 16-bit masks are linear between even-pixel samples, including Bias3.
 // At twice the render resolution, even samples agree to <2e-6: the field is
 // sampled, not pixel-area filtered. Core light itself remains full resolution.
