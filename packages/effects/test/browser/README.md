@@ -398,3 +398,15 @@ Glow, not each layer independently. `runGlowMaskOrderingChecks()` covers one
 and three saturated layers at DPR1/2 and the identity of partial protection.
 Layer capture RGB now packs combined affected light in R, protected light in G,
 zero in B; A remains Halo. This layout applies when distortion/flow is active.
+
+
+### Core/Halo filter ordering
+
+`ae-saber-core-filter-order.jsx` renders60 native Core width samples plus
+steady/warped Halo and Softness25. Recover the native absolute warped distance
+from the width coverage sweep, then sample the steady filtered profile through
+that field: Halo/Softness follow blur-before-warp, not blur-after-warp.
+Raw evidence and analysis are retained under local `results/stage13-evidence/`.
+`runCoreFilterOrderingChecks()` checks production Core and Halo under an affine
+2× pullback at DPR1/2: width halves while peak intensity remains constant.
+Both Core Softness and Halo reuse the original-source blur across animation.

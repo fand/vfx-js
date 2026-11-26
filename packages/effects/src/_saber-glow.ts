@@ -44,7 +44,7 @@ export type SaberDistortionParams = {
     seed: number;
 };
 
-/** One of four blurred layers. Layer 4 is the undistorted Halo. */
+/** One of four blurred layers. Layer 4 follows Core Distortion, bypassing Glow Distortion. */
 export type SaberGlowLayer = {
     /** Approximate blur radius (Gaussian sigma) in CSS px. 0 disables the layer. */
     size: number;
@@ -88,6 +88,7 @@ uniform float motionBlur;
 uniform vec2 flowDirection;
 uniform vec2 flowOffset;
 uniform int glowPass;
+uniform int haloPass;
 uniform int layered;
 uniform vec3 layerShares;
 uniform float clock;
@@ -195,7 +196,8 @@ vec3 lightAt(vec2 p) {
     vec2 size = vec2(textureSize(src, 0));
     vec2 inside = clamp(p * size + 0.5, 0.0, 1.0)
         * clamp((1.0 - p) * size + 0.5, 0.0, 1.0);
-    vec3 light = texture(src, clamp(p, 0.0, 1.0)).rgb;
+    vec4 sampled = texture(src, clamp(p, 0.0, 1.0));
+    vec3 light = haloPass == 1 ? vec3(sampled.a) : sampled.rgb;
     return (layered == 1 ? light * layerShares : vec3(light.r)) * inside.x * inside.y;
 }
 
@@ -520,7 +522,7 @@ export class SaberGlowPasses {
     #core: EffectRenderTarget | null = null;
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
-    #noise: Partial<Record<"core" | "glow", EffectRenderTarget>> = {};
+    #noise: Partial<Record<"core" | "glow" | "halo", EffectRenderTarget>> = {};
     #down: EffectRenderTarget[] = [];
     #layers: ([EffectRenderTarget, EffectRenderTarget] | null)[] = [];
     #kernels: {
@@ -532,7 +534,7 @@ export class SaberGlowPasses {
         ctx: EffectContext,
         src: EffectRenderTarget,
         params: SaberDistortionParams,
-        kind: "core" | "glow",
+        kind: "core" | "glow" | "halo",
         layered = false,
         bounds?: {
             field: EffectRenderTarget;
@@ -546,10 +548,10 @@ export class SaberGlowPasses {
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
         }
-        let target = kind === "core" ? this.#core : this.#distortedGlow;
+        let target = kind !== "glow" ? this.#core : this.#distortedGlow;
         if (!target) {
             target = ctx.createRenderTarget({ float: true });
-            if (kind === "core") {
+            if (kind !== "glow") {
                 this.#core = target;
             } else {
                 this.#distortedGlow = target;
@@ -621,6 +623,7 @@ export class SaberGlowPasses {
                     src.height,
             ],
             glowPass: kind === "glow" ? 1 : 0,
+            haloPass: kind === "halo" ? 1 : 0,
             layered: layered ? 1 : 0,
             layerShares: layerShares.slice(0, 3),
             // Isolated temporal correlations: ridged fields use a slower
@@ -938,6 +941,7 @@ export class SaberGlowPasses {
     dispose(): void {
         this.releaseLayers();
         this.#noise.core?.dispose();
+        this.#noise.halo?.dispose();
         this.#noise.glow?.dispose();
         this.#noise = {};
         this.#core = null;

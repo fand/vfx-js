@@ -110,16 +110,16 @@ both as **Noise octaves** under Core Distortion / Glow Distortion.
 
 `coreIntensity` (Electric default 1) scales visible core brightness independently of
 glow. `coreWhiteness` (0..1, Electric default 0) mixes its tint toward white.
-`coreSoftness` (Electric default 25; two centered box filters of width `softness + 1` CSS px) softens only the visible core
-after core distortion; Glow layers 1–3 use the original sharp core, while Halo follows the sharp distorted core. Zero
+`coreSoftness` (Electric default 25; two centered box filters of width `softness + 1` CSS px) filters the original core
+before Core Distortion; Glow layers 1–3 use the original sharp core. Halo is also
+blurred/amplified from the original core, then warped with Core Distortion. Zero
 bypasses the blur. Nonzero softness adds cached blur work and render targets;
-an animated core must update that blur each frame.
+Core animation reuses the cached soft source, updating only deformation.
 `coreBlendOnTop` (Electric default true) Screens the original core light into the scalar result before colorization
 and output grading when both Glow and nonzero Core Distortion are active.
 Both outlines respect `coreSoftness`. The original outline's blur is cached
 separately from animated distortion. Overlay does not alter either Glow input.
-`glowWhiteness` (0..1, named recipes use 0) controls glow tint independently of core and
-halo. Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
+`glowWhiteness` (0..1, named recipes use 0) controls Glow/Halo tint independently of Core. Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
 `saturation` (0..2). Each is neutral at 1; named recipes may override them.
 The order is brightness multiplication, scalar Screen combination, measured hue/radiance colorization,
 saturation about the RGB mean, then `pow(rgb, gamma)` and display clipping.

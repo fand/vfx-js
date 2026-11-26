@@ -504,3 +504,49 @@ transfer test's sampled channel to packed R; nonlinear boost7.29 remains.
 Partial-protection identity error0 at DPR1/2. 40 Node tests, CJS build,
 API/skill checks and whitespace checks pass. Raw evidence is in ignored
 `results/stage12-evidence/`.
+
+
+## 13. Filter Core/Halo before deformation
+
+28 component probes compare Arc Reactor, Electric, Windy and Fire, including
+native versus four octaves. Extra octaves barely change the principal defects;
+four remains the default and recipe setting. Undistorted Core profiles agree,
+but warped Halo pools into smooth blobs in the old implementation.
+
+`ae-saber-core-filter-order.jsx` reconstructs native absolute warped distance
+from60 Core Size coverage samples (Smoke, Amount150, Scale200, complexity4).
+Use that field to pull back the steady Halo profile: RMSE .00383 versus .03692
+for Gaussian blur of the deformed native core. Native Halo is blurred before
+Core deformation. Core Softness25 gives the same result: .00094 for a warped
+steady profile, .01164 for post-deformation filtering. These numbers use8-bit
+PNG decoding and exclude clipped Core, endpoints and unresolved distances.
+
+Production now caches the softened original Core and warps it for display.
+Halo is blurred/amplified from the original Core, then separately warped with
+Core Distortion, including its shutter. It bypasses Glow Distortion. The final
+compositor reads that Halo only when Core Distortion and Halo are enabled.
+Original-Core overlay shares the cached soft source. Animated Core no longer
+rebuilds a Halo or Softness blur pyramid. The Halo warp adds sampling/noise
+work; full performance optimization is intentionally deferred.
+
+This supersedes the earlier inference that Halo must be blurred from the
+already-deformed core. Coupling tests established dependency, not order.
+Affine GPU checks at DPR1/2 give width ratios .50006–.50055, peak ratios
+.996–.999 for Core Softness and Halo. Core/Glow/Halo cache and resource tests
+cover switching, animation, and disposal. No preset parameter changes.
+
+Stage13 review: `http://127.0.0.1:6040/stage13.html?before=stage10-presets#arc-reactor`.
+All12 presets ×72 distinct frames captured, GL errors0. Ten existing GPU suites
+and the new affine filter-order suite pass. Halo boundary regression now allows
+native saturated light near the original contour and rejects saturation beyond
+half Core width +3 Halo sigma; all18 cases have zero distant saturated pixels.
+The old blanket no-saturation assertion was incompatible with measured native
+Halo. Raw evidence/analysis are under ignored `results/stage13-evidence/`;
+`analyze-saber-core-filter-order.py` reproduces the order metrics.
+
+40 Node tests pass, including cached Halo shutter-field disposal across resize
+and context restore; ESM/CJS builds, API/skill coverage and formatting pass.
+Fire Bias3 small-point probes give signed-cube displacement RMSE .0186px;
+this does not support an arbitrary new Bias law. Residual native noise patterns,
+wide-Core support and detailed fire motion remain approximate. This stage does
+not claim pixel parity or a GPU speedup.

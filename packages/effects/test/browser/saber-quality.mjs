@@ -67,6 +67,9 @@ function passName({ uniforms: u = {} }) {
     if (u.noiseFieldPass) {
         return "noise-field";
     }
+    if (u.haloPass === 1) {
+        return "halo-distortion";
+    }
     if (u.noiseType !== undefined) {
         return u.glowPass ? "glow-distortion" : "core-distortion";
     }

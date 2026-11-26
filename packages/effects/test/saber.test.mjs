@@ -358,7 +358,10 @@ test("soft original overlay stays soft and cached while distorted core animates"
     const animated = f.render(effect);
     assert.equal(animated.uniforms.originalCore, original);
     assert.ok(!f.draws.some((d) => d.target === original));
-    assert.ok(f.draws.some((d) => d.uniforms.axis));
+    assert.ok(
+        !f.draws.some((d) => d.uniforms.axis),
+        "animation reuses the softened source",
+    );
     effect.params.coreSoftness = 0;
     const sharp = f.render(effect);
     assert.notEqual(sharp.uniforms.originalCore, original);
@@ -751,10 +754,11 @@ test("static light is reused while glow distortion and composition stay live", (
     f.render(effect);
     assert.ok(f.draws.some((d) => d.uniforms.glowPass === 0));
     assert.ok(
-        f.draws.some((d) => d.uniforms.axis),
-        "animated core distortion refreshes only the Halo pyramid",
+        !f.draws.some((d) => d.uniforms.axis),
+        "animated Core and Halo reuse their original blur pyramid",
     );
     assert.ok(!f.draws.some((d) => isCore(d)));
+    assert.ok(f.draws.some((d) => d.uniforms.haloPass === 1));
     effect.setParams({ haloIntensity: 0 });
     f.render(effect);
     f.render(effect);
@@ -1050,11 +1054,17 @@ test("glow protects wide halos by effective radius, independent of layer order",
 test("resize, layer changes and disposal release explicit targets without feedback", () => {
     const f = fixture();
     const effect = steadyEffect({
-        coreDistortion: { amount: 8 },
+        coreSoftness: 12,
+        coreDistortion: { amount: 8, windSpeed: 100, motionBlur: 0.05 },
         glowDistortion: { amount: 20 },
     });
     effect.init(f.ctx);
     f.render(effect);
+    assert.ok(
+        f.draws.some(
+            (d) => d.uniforms.haloPass === 1 && d.uniforms.noiseFieldPass === 1,
+        ),
+    );
     const first = f.targets.filter((t) => t.explicit);
     f.resize();
     f.render(effect);

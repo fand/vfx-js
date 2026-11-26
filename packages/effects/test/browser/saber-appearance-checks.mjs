@@ -7,7 +7,8 @@ import {
     STEADY_OPTIONS,
 } from "./saber-quality.mjs";
 
-// Broad preset Halos must not become flat saturated disks on a text source.
+// Saturation beside a contour is native behavior. Reject broad flat disks
+// away from the original contour before Halo deformation, not bright outlines.
 export async function runHaloBoundaryChecks({ Effect, paint } = {}) {
     const result = { rows: [], failures: [] };
     for (const pixelRatio of [1, 2]) {
@@ -36,7 +37,17 @@ export async function runHaloBoundaryChecks({ Effect, paint } = {}) {
                     // capture reads the final cached glow, not that earlier pass.
                     f.render(time);
                     const image = await f.capture("layers", time);
+                    const field = await f.capture("field", time);
                     const p = f.effect.params;
+                    const reach =
+                        (p.thickness / 2 +
+                            (3 *
+                                p.glowLayers[3].size *
+                                p.glowSizeMultiplier *
+                                p.haloSize) /
+                                100) *
+                        pixelRatio;
+                    let farSaturatedPixels = 0;
                     let peak = 0;
                     let saturatedPixels = 0;
                     for (let i = 3; i < image.pixels.length; i += 4) {
@@ -44,6 +55,13 @@ export async function runHaloBoundaryChecks({ Effect, paint } = {}) {
                             image.pixels[i] * p.intensity * p.brightness;
                         peak = Math.max(peak, halo);
                         saturatedPixels += halo >= 1 ? 1 : 0;
+                        if (
+                            halo >= 1 &&
+                            (field.pixels[i] < 0.5 ||
+                                Math.abs(field.pixels[i - 3]) > reach)
+                        ) {
+                            farSaturatedPixels++;
+                        }
                     }
                     const row = {
                         preset,
@@ -51,13 +69,14 @@ export async function runHaloBoundaryChecks({ Effect, paint } = {}) {
                         time,
                         peak,
                         saturatedPixels,
+                        farSaturatedPixels,
                         glError: f.gl.getError(),
                     };
                     result.rows.push(row);
                     if (
                         !(peak > 0) ||
                         !Number.isFinite(peak) ||
-                        saturatedPixels ||
+                        farSaturatedPixels ||
                         row.glError
                     ) {
                         result.failures.push(row);
@@ -850,6 +869,108 @@ export async function runGlowResolutionChecks() {
             }
         } finally {
             f.destroy();
+        }
+    }
+    return { rows, failures };
+}
+
+// AE width-sweep reconstruction: Core Softness and Halo are filtered before
+// Core Distortion. An affine pullback must compress their profiles together,
+// retaining peak light rather than pooling energy after the deformation.
+export async function runCoreFilterOrderingChecks() {
+    const rows = [],
+        failures = [];
+    for (const pixelRatio of [1, 2]) {
+        for (const kind of ["soft-core", "halo"]) {
+            let stretch = false,
+                target,
+                context;
+            const f = await createSaberFixture({
+                width: 256,
+                height: 256,
+                sourceWidth: 256,
+                sourceHeight: 256,
+                pixelRatio,
+                options: {
+                    ...STEADY_OPTIONS,
+                    pad: 80,
+                    color: "#ffffff",
+                    coreSoftness: kind === "soft-core" ? 24 : 0,
+                    coreIntensity: kind === "soft-core" ? 1 : 0,
+                    coreWhiteness: 0,
+                    glowWhiteness: 0,
+                    coreBlendOnTop: false,
+                    glow: kind === "halo" ? 1 : 0,
+                    glowLayers: [
+                        { size: 0, intensity: 0 },
+                        { size: 0, intensity: 0 },
+                        { size: 0, intensity: 0 },
+                        { size: 16, intensity: 1 },
+                    ],
+                    coreDistortion: {
+                        ...STEADY_OPTIONS.coreDistortion,
+                        amount: 1,
+                        windSpeed: 0,
+                        noiseSpeed: 0,
+                    },
+                },
+                paint: (c) => c.fillRect(127, 0, 2, 256),
+                transformDraw(draw, ctx) {
+                    if (draw.uniforms?.coreGain !== undefined) {
+                        target =
+                            kind === "halo"
+                                ? draw.uniforms.haloTex
+                                : draw.uniforms.core;
+                        context = ctx;
+                    }
+                    if (draw.uniforms?.glowPass === 0) {
+                        return {
+                            ...draw,
+                            frag: draw.frag.replace(
+                                "vec2 n = distortionAt(0.0);",
+                                stretch
+                                    ? "vec2 n = vec2((uv.x - 0.5) * bufferSize.x / amount, 0.0);"
+                                    : "vec2 n = vec2(0.0);",
+                            ),
+                        };
+                    }
+                    return draw;
+                },
+            });
+            try {
+                const read = async () => {
+                    f.render(2);
+                    if (!target) {
+                        throw new Error(`Missing ${kind} output`);
+                    }
+                    return imageStats(
+                        await context.readPixels(target),
+                        target.width,
+                        target.height,
+                    );
+                };
+                const steady = await read();
+                stretch = true;
+                f.effect.setParams({ coreDistortion: { seed: 1 } });
+                const warped = await read();
+                const row = {
+                    pixelRatio,
+                    kind,
+                    widthRatio: warped.sigmaX / steady.sigmaX,
+                    peakRatio: warped.peak / steady.peak,
+                    glError: f.gl.getError(),
+                };
+                rows.push(row);
+                if (
+                    Math.abs(row.widthRatio - 0.5) > 0.03 ||
+                    Math.abs(row.peakRatio - 1) > 0.08 ||
+                    row.glError
+                ) {
+                    failures.push(row);
+                }
+            } finally {
+                f.destroy();
+            }
         }
     }
     return { rows, failures };
