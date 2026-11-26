@@ -404,25 +404,29 @@ void main() {
 #ifdef CORE_TINT
     coreWhite = coreWhiteness;
 #endif
-    // Halo retains the measured extra Brightness factor before shared core
-    // grading. Colorization operates on brightness-scaled radiance, then
-    // Saturation/Gamma apply per layer before Screen.
+    // AE combines scalar light before colorization, Saturation and Gamma.
+    // Halo retains its measured extra Brightness factor inside core coverage.
     float haloLight = clamp(lights.a * outputBrightness, 0.0, 1.0);
     float haloContribution = haloLight * (1.0 - clamp(coreLight, 0.0, 1.0));
-    float coreAndHalo = max(coreLight + haloContribution, 0.0);
-    float whiteness = coreAndHalo > 0.0 ? coreWhite * coreLight / coreAndHalo : 0.0;
-    vec3 rgb = gradeLight(tintLight(coreAndHalo * outputBrightness, whiteness));
-    rgb = vec3(1.0) - (vec3(1.0) - rgb)
-        * (vec3(1.0) - gradeLight(tintLight(lights.r * glowOutputBrightness, whiteMix)))
-        * (vec3(1.0) - gradeLight(tintLight(lights.g * glowOutputBrightness, whiteMix)))
-        * (vec3(1.0) - gradeLight(tintLight(lights.b * glowOutputBrightness, whiteMix)));
+    float coreAndHalo = clamp((coreLight + haloContribution) * outputBrightness, 0.0, 1.0);
+    vec3 glowLight = clamp(lights.rgb * glowOutputBrightness, 0.0, 1.0);
+    float light = 1.0 - (1.0 - coreAndHalo)
+        * (1.0 - glowLight.r) * (1.0 - glowLight.g) * (1.0 - glowLight.b);
+    // Whiteness is an extension to the native colorizer. Weight the separate
+    // Core/Glow controls by their input light; native presets leave both zero.
+    float coreWeight = max(coreLight * outputBrightness, 0.0);
+    float glowWeight = haloContribution * outputBrightness
+        + glowLight.r + glowLight.g + glowLight.b;
 #ifdef CORE_OVERLAY
-    // Native Blend on Top screens the independently graded original core
-    // over the finished effect. It is bypassed without Glow or core distortion.
-    vec3 overlay = gradeLight(tintLight(texture(originalCore, uv).r
-        * coreGain * outputBrightness, coreWhite));
-    rgb = vec3(1.0) - (vec3(1.0) - rgb) * (vec3(1.0) - overlay);
+    // Blend on Top participates in scalar Screen, before the shared grade.
+    float overlay = clamp(texture(originalCore, uv).r * coreGain * outputBrightness, 0.0, 1.0);
+    light = 1.0 - (1.0 - light) * (1.0 - overlay);
+    coreWeight += overlay;
 #endif
+    float weight = coreWeight + glowWeight;
+    float whiteness = weight > 0.0
+        ? (coreWhite * coreWeight + whiteMix * glowWeight) / weight : 0.0;
+    vec3 rgb = gradeLight(tintLight(light, whiteness));
     // TPDF dither, faded out where there is no light.
     vec2 p = gl_FragCoord.xy;
     vec3 noise = vec3(ign(p), ign(p + 17.0), ign(p + 41.0))
@@ -486,7 +490,7 @@ export type SaberParams = {
     thickness: number;
     /** Input glow gain, before per-layer Pre Gamma and nonlinear amplification. */
     glow: number;
-    /** Mix glow toward white independently of the core and colored halo, 0..1. */
+    /** Mix Glow/Halo toward white independently of the core, 0..1. */
     glowWhiteness: number;
     /** Four independent size/intensity pairs. Each size is in CSS px. */
     glowLayers: [

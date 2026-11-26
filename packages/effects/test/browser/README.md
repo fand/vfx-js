@@ -372,3 +372,21 @@ Spatial lacunarity must not multiply the evolution clock at each octave.
 `runSmokeDensityChecks()` compares single-/four-octave Smoke field mean,
 standard deviation and spatial-gradient RMS with AE saturated white probes.
 It catches low-contrast fields without requiring identical random patterns.
+
+
+### Colored composition order
+
+`ae-saber-color-composition.jsx` isolates colored layers at Saturation1/2;
+`ae-saber-color-boundaries.jsx` isolates Core/Glow/Halo and Blend on Top at
+Gamma .5/1/2. They export to `/private/tmp/vfx-js-saber-color-*11`.
+The installed plugin combines scalar light before colorization, Saturation and
+Gamma, including the original-Core overlay. White-only Gamma1 probes cannot
+distinguish scalar Screen from RGB Screen.
+
+`runColorCompositionChecks()` in `saber-color-composition-checks.mjs` injects
+measured scalar texture inputs into the production GPU compositor and compares
+51 samples against native RGB in `saber-color-composition.json`. References
+use x264/272/288/312 at y256 from the four-layer probe, and x256/258/260 at y256
+from the overlay probe. Values are 8-bit decoded PNG/255; each reference is
+named by hue, Saturation or Gamma, and x. The 0.025 bound accommodates input
+quantization near the empirical color curve's knees and output dithering.

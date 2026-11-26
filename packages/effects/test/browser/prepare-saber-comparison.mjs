@@ -66,6 +66,12 @@ await cp(
     path.join(here, "saber-motion-checks.mjs"),
     path.join(destination, "saber-motion-checks.mjs"),
 );
+for (const file of [
+    "saber-color-composition-checks.mjs",
+    "saber-color-composition.json",
+]) {
+    await cp(path.join(here, file), path.join(destination, file));
+}
 const hashes = {};
 for (const file of [
     "baseline/saber.js",

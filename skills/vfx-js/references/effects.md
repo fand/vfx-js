@@ -114,21 +114,22 @@ glow. `coreWhiteness` (0..1, Electric default 0) mixes its tint toward white.
 after core distortion; Glow layers 1–3 use the original sharp core, while Halo follows the sharp distorted core. Zero
 bypasses the blur. Nonzero softness adds cached blur work and render targets;
 an animated core must update that blur each frame.
-`coreBlendOnTop` (Electric default true) Screens the independently graded original
-core over the result when both Glow and nonzero Core Distortion are active.
+`coreBlendOnTop` (Electric default true) Screens the original core light into the scalar result before colorization
+and output grading when both Glow and nonzero Core Distortion are active.
 Both outlines respect `coreSoftness`. The original outline's blur is cached
 separately from animated distortion. Overlay does not alter either Glow input.
 `glowWhiteness` (0..1, named recipes use 0) controls glow tint independently of core and
 halo. Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
 `saturation` (0..2). Each is neutral at 1; named recipes may override them.
-The order is brightness multiplication, measured hue/radiance colorization,
+The order is brightness multiplication, scalar Screen combination, measured hue/radiance colorization,
 saturation about the RGB mean, then `pow(rgb, gamma)` and display clipping.
 The colorizer uses 36 measured hue curves with 33 luminance knots, interpolated
 on color changes without another texture or render pass. Gamma below 1 lifts midtones; above 1
 darkens them. Saturation 0 makes grayscale; brightness 0 hides the effect.
 These directions, ranges and ordering were checked against installed AE Saber.
-The three glow layers are graded separately, then Screen-composited with the
-graded core/Halo. Source composition comes last. Grading leaves cached shapes
+The three glow layers, core/Halo and original-core overlay combine as scalar
+light, then share colorization and grading. Whiteness controls use input-light
+weights for the Core and Glow contributions. Source composition comes last. Grading leaves cached shapes
 and source pixels unchanged; it adds no render pass.
 When Glow Distortion or flow is active, each scalar Glow layer is multiplied by
 Brightness and clipped to 0..1 **before** distortion/masking, then colorized and
@@ -254,7 +255,7 @@ Below 1 broadens dim tails; above 1 narrows them. Isolated AE gain sweeps are
 approximated by `f(x) = x * (0.34 + x * (0.18 + 0.48*x))`; Layer 1 uses
 `(x + f(x))/2`, Layers 2–4 use `f(x)`. This is an empirical fit, not AE source.
 The shader preserves four independent channels through composition; distortion
-changes only the first three. Output grading precedes Screen combination.
+changes only the first three. Scalar Screen combination precedes colorization and output grading.
 
 `glowBias` (0..5, neutral 1) approximates AE's layer balance with relative
 input gains `[b, (1+2b)/3, (3+2b)/5, (4+b)/5]` before Pre Gamma.

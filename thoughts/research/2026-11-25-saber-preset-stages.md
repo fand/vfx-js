@@ -446,3 +446,27 @@ The diagnostic also combines the original-Core overlay before colorization,
 which remains a hypothesis. Do not promote that overlay behavior without a
 colored independent probe. Native preset base colors are already imported;
 manual per-preset hue corrections would obscure these renderer discrepancies.
+
+
+### Stage11 implementation
+
+36 additional native boundary probes resolve the remaining Gamma/overlay order:
+Gamma .5/1/2 follows combined colorization. Original-Core Blend on Top is part
+of scalar Screen before colorization/grade too. For blue, overlay RGB Screen
+has RMSE .0195/.0550/.0764 at Gamma1/.5/2; scalar composition gives
+.0031/.0029/.0041. The larger dark Gamma .5 error on orange when predicting
+from 8-bit colored Gamma1 is quantization amplification, not evidence for a
+separate per-layer grade.
+
+Production now combines Core/Halo, Glow1–3 and original Core as scalar light,
+then colorizes and grades once. The Halo extra Brightness factor remains.
+Custom Core/Glow Whiteness uses input-light weights; native recipes use zero.
+No preset parameter or noise changes in this stage. The GPU color regression
+uses51 native samples (maximum error4/255); the previous compositor is also
+checked as a negative control. All ten GPU suites pass, including output,
+transfer, overlay, noise, and all-preset switching.
+
+Stage11 review: `http://127.0.0.1:6040/stage11.html?before=stage10-presets#arc-reactor`.
+All12 presets ×72 frames captured, GL errors0. Negative control: Stage10
+fails31/51 color cases, maximum49/255; Stage11 passes51/51, maximum4/255.
+40 Node tests, CJS build, API/skill checks and whitespace checks pass.
