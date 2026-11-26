@@ -132,7 +132,7 @@ light, then share colorization and grading. Whiteness controls use input-light
 weights for the Core and Glow contributions. Source composition comes last. Grading leaves cached shapes
 and source pixels unchanged; it adds no render pass.
 When Glow Distortion or flow is active, each scalar Glow layer is multiplied by
-Brightness and clipped to 0..1 **before** distortion/masking, then colorized and
+Brightness and clipped to 0..1 **before** scalar Screen and distortion/masking, then colorized and
 graded without a second Brightness multiplication. This preserves dark noise
 inside otherwise saturated light. Brightness changes rerun layer composition
 and distortion, reusing the blur pyramid; Gamma/Saturation only affect output.
@@ -254,8 +254,10 @@ keeping full-size glow/distortion outputs.
 Below 1 broadens dim tails; above 1 narrows them. Isolated AE gain sweeps are
 approximated by `f(x) = x * (0.34 + x * (0.18 + 0.48*x))`; Layer 1 uses
 `(x + f(x))/2`, Layers 2–4 use `f(x)`. This is an empirical fit, not AE source.
-The shader preserves four independent channels through composition; distortion
-changes only the first three. Scalar Screen combination precedes colorization and output grading.
+The shader Screens Glow layers1–3 together before noise; the same Multiply
+mask or warped/shutter sample acts on their combined light. Halo bypasses Glow
+distortion. Protected Glow layers split transmission into moving and stationary
+groups so zero deformation preserves their scalar Screen result. Scalar Screen combination precedes colorization and output grading.
 
 `glowBias` (0..5, neutral 1) approximates AE's layer balance with relative
 input gains `[b, (1+2b)/3, (3+2b)/5, (4+b)/5]` before Pre Gamma.

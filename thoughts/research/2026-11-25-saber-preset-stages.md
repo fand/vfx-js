@@ -470,3 +470,37 @@ Stage11 review: `http://127.0.0.1:6040/stage11.html?before=stage10-presets#arc-r
 All12 presets ×72 frames captured, GL errors0. Negative control: Stage10
 fails31/51 color cases, maximum49/255; Stage11 passes51/51, maximum4/255.
 40 Node tests, CJS build, API/skill checks and whitespace checks pass.
+
+
+## 12. Combine Glow before noise
+
+40 native white/blue probes isolate layers1/2/3 and their combination with
+Multiply normal/inverted, Multiply with wind blur, and Distort with wind blur.
+A further20 weak-input white probes test below saturation. `ae-saber-layer-noise.jsx`
+reproduces the high-input sweep. Parenthesize nested ternaries in ExtendScript:
+its legacy evaluation differs from modern JavaScript. Discarded initial probes
+had incorrect Amount0; the retained final manifests verify0/100/40 explicitly.
+
+Native Multiply acts on the already Screen-combined scalar Glow. In saturated
+regions, Screen after per-layer masks has RMSE .271/.276/.286 for normal,
+inverted and blurred masks; Screen before masking matches at 8-bit precision.
+At weak input, the corresponding wrong-order errors are .0252/.0253/.0275;
+correct-order errors are .00179/.00173/.00178. This is a second independent
+ordering error, explaining excess bright fill after the Stage11 color fix.
+
+Production now packs combined affected light into R, stationary bypass into G,
+and keeps Halo in A. Partial protection splits transmission rather than adding
+half-light copies, preserving the original Screen result at zero deformation.
+The effect applies noise and shutter integration to the combined affected group.
+No preset tuning, extra blur, or new render pass. Native noise patterns remain
+approximate; native/current Core geometry still differs visibly.
+
+The GPU ordering regression now tests one and three saturated layers at DPR1/2.
+Both must yield .5 under a half mask; old order incorrectly yields .875 for three.
+
+Stage12 review: `http://127.0.0.1:6040/stage12.html?before=stage11-presets#arc-reactor`.
+All12×72 frames captured, GL errors0. Ten GPU suites pass after updating the
+transfer test's sampled channel to packed R; nonlinear boost7.29 remains.
+Partial-protection identity error0 at DPR1/2. 40 Node tests, CJS build,
+API/skill checks and whitespace checks pass. Raw evidence is in ignored
+`results/stage12-evidence/`.

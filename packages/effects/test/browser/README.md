@@ -390,3 +390,11 @@ use x264/272/288/312 at y256 from the four-layer probe, and x256/258/260 at y256
 from the overlay probe. Values are 8-bit decoded PNG/255; each reference is
 named by hue, Saturation or Gamma, and x. The 0.025 bound accommodates input
 quantization near the empirical color curve's knees and output dithering.
+
+
+`ae-saber-layer-noise.jsx` isolates three-layer Screen versus Multiply/Distort,
+including inverted noise and wind blur. Native Multiply masks the combined
+Glow, not each layer independently. `runGlowMaskOrderingChecks()` covers one
+and three saturated layers at DPR1/2 and the identity of partial protection.
+Layer capture RGB now packs combined affected light in R, protected light in G,
+zero in B; A remains Halo. This layout applies when distortion/flow is active.

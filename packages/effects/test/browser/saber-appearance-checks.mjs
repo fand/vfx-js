@@ -349,7 +349,7 @@ export async function runGlowTransferChecks() {
             const peak = (p) =>
                 p.reduce(
                     (max, value, i) =>
-                        i % 4 === 1 ? Math.max(max, value) : max,
+                        i % 4 === 0 ? Math.max(max, value) : max,
                     0,
                 );
             const boost = peak(high.pixels) / peak(low.pixels);

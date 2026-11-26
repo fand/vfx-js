@@ -1106,7 +1106,7 @@ export class SaberEffect implements Effect {
                     true,
                     undefined,
                     this.params.glowFlow,
-                    this.#preparedGlowLayers?.nearShares,
+                    [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
                     glowNoiseResolution(
                         this.params.glowDistortion,
                         effectiveLayers,

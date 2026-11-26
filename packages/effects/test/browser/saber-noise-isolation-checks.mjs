@@ -10,6 +10,7 @@ export async function runGlowMaskOrderingChecks() {
     const rows = [],
         failures = [];
     for (const pixelRatio of [1, 2]) {
+        let halfMask = true;
         const f = await createSaberFixture({
             width: 256,
             height: 256,
@@ -45,35 +46,86 @@ export async function runGlowMaskOrderingChecks() {
                           ...draw,
                           frag: draw.frag.replace(
                               "vec2 n = distortionAt(0.0);",
-                              "vec2 n = vec2(1.0, -1.0);",
+                              halfMask
+                                  ? "vec2 n = vec2(1.0, -1.0);"
+                                  : "vec2 n = vec2(1.0);",
                           ),
                       }
                     : draw,
         });
         try {
-            for (const brightness of [0.25, 1, 0.0001, 1]) {
-                f.effect.setParams({ brightness });
-                const s = f.screen(2);
-                const i =
-                    ((s.height - 1 - 128 * pixelRatio) * s.width +
-                        128 * pixelRatio) *
-                    4;
-                const value = s.pixels[i] / 255;
-                const row = {
-                    pixelRatio,
-                    brightness,
-                    value,
-                    glError: f.gl.getError(),
-                };
-                rows.push(row);
-                if (
-                    row.glError ||
-                    (brightness >= 0.25
-                        ? Math.abs(value - 0.5) > 2 / 255
-                        : !(value > 0 && value < 0.49))
-                ) {
-                    failures.push(row);
+            // One and three saturated layers must both become half light.
+            // Masking each layer before Screen incorrectly produces 0.875.
+            for (const layerCount of [1, 3]) {
+                f.effect.setParams({
+                    glowLayers: [
+                        { size: 20, intensity: layerCount === 3 ? 1 : 0 },
+                        { size: 20, intensity: 1 },
+                        { size: 20, intensity: layerCount === 3 ? 1 : 0 },
+                        { size: 0, intensity: 0 },
+                    ],
+                });
+                for (const brightness of [0.25, 1, 0.0001, 1]) {
+                    f.effect.setParams({ brightness });
+                    const s = f.screen(2);
+                    const i =
+                        ((s.height - 1 - 128 * pixelRatio) * s.width +
+                            128 * pixelRatio) *
+                        4;
+                    const value = s.pixels[i] / 255;
+                    const row = {
+                        pixelRatio,
+                        layerCount,
+                        brightness,
+                        value,
+                        glError: f.gl.getError(),
+                    };
+                    rows.push(row);
+                    if (
+                        row.glError ||
+                        (brightness >= 0.25
+                            ? Math.abs(value - 0.5) > 2 / 255
+                            : !(value > 0 && value < 0.49))
+                    ) {
+                        failures.push(row);
+                    }
                 }
+            }
+            // Partial layer protection must not change the unmasked image.
+            halfMask = false;
+            f.effect.setParams({
+                brightness: 1,
+                glow: 1,
+                glowDistortAllLayers: false,
+                glowLayers: [
+                    { size: 8, intensity: 1 },
+                    { size: 40, intensity: 1 },
+                    { size: 80, intensity: 1 },
+                    { size: 0, intensity: 0 },
+                ],
+            });
+            const identity = f.screen(2);
+            f.effect.setParams({ glowDistortion: { amount: 0 } });
+            const bypass = f.screen(2);
+            let maximum = 0;
+            for (let y = 32 * pixelRatio; y < 224 * pixelRatio; y++) {
+                for (let x = 32 * pixelRatio; x < 224 * pixelRatio; x++) {
+                    const i =
+                        ((identity.height - 1 - y) * identity.width + x) * 4;
+                    maximum = Math.max(
+                        maximum,
+                        Math.abs(identity.pixels[i] - bypass.pixels[i]),
+                    );
+                }
+            }
+            const protection = {
+                pixelRatio,
+                protectionIdentity: maximum,
+                glError: f.gl.getError(),
+            };
+            rows.push(protection);
+            if (maximum > 2 || protection.glError) {
+                failures.push(protection);
             }
         } finally {
             f.destroy();

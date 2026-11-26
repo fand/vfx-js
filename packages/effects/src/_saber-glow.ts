@@ -313,7 +313,7 @@ void main() {
             light /= 6.0;
         }
     }
-    // RGB retain the three glow layers; A is the undistorted Halo layer.
+    // RGB retain the distorted/bypass groups; A is the undistorted Halo layer.
     vec4 original = texture(src, uv);
     if (layered == 1) light += original.rgb * (vec3(1.0) - layerShares);
     outColor = vec4(light, layered == 1 ? original.a : 1.0);
@@ -488,13 +488,27 @@ in vec2 uv;
 out vec4 outColor;
 ${GLSL_SABER_LAYERS}
 uniform float distortionBrightness;
+float sharedLight(float light, float share) {
+    if (share <= 0.0) return 0.0;
+    if (share >= 1.0) return light;
+    // Split transmission so Screen(active, bypass) preserves the original
+    // light even for partially protected layers.
+    return 1.0 - pow(max(1.0 - light, 0.0), share);
+}
 void main() {
     outColor = sampleLayeredGlow();
-    // AE stores display-bounded scalar Glow before distortion. Multiplying
-    // HDR radiance instead leaves intense regions white even under dark noise.
-    // Halo bypasses Glow Distortion and retains its separate grading path.
+    // AE Screens the three bounded scalar layers before applying Glow noise.
+    // R carries the combined distorted group, G its stationary bypass, A Halo.
+    // Core softening uses response=0 and keeps its linear sum unchanged.
     if (distortionBrightness >= 0.0) {
-        outColor.rgb = clamp(outColor.rgb * distortionBrightness, 0.0, 1.0);
+        vec3 light = clamp(outColor.rgb * distortionBrightness, 0.0, 1.0);
+        vec3 affected = vec3(sharedLight(light.r, nearShares.r),
+            sharedLight(light.g, nearShares.g), sharedLight(light.b, nearShares.b));
+        vec3 bypass = vec3(sharedLight(light.r, 1.0 - nearShares.r),
+            sharedLight(light.g, 1.0 - nearShares.g), sharedLight(light.b, 1.0 - nearShares.b));
+        outColor.rgb = vec3(
+            1.0 - (1.0 - affected.r) * (1.0 - affected.g) * (1.0 - affected.b),
+            1.0 - (1.0 - bypass.r) * (1.0 - bypass.g) * (1.0 - bypass.b), 0.0);
     }
 }
 `;
