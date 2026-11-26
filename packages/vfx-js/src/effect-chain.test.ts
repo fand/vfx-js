@@ -146,6 +146,7 @@ vi.mock("./gl/framebuffer.js", () => {
 
 // Imports MUST come after vi.mock calls.
 import { type ChainFrameInput, EffectChain } from "./effect-chain.js";
+import { WebGLBackend } from "./gl/backend.js";
 import { ProgramCache } from "./program-cache.js";
 
 // ---------------------------------------------------------------------------
@@ -164,16 +165,15 @@ function makeChain(
     effects: readonly Effect[],
     isPostEffect = false,
 ): EffectChain {
-    const glCtx = {} as GLContext;
+    const backend = new WebGLBackend({} as GLContext, {} as Quad);
     return new EffectChain(
-        glCtx,
-        {} as Quad,
+        backend,
         2,
         effects,
         { autoCrop: true, glslVersion: "300 es" },
         makeCapture(),
         isPostEffect,
-        new ProgramCache(glCtx),
+        new ProgramCache(backend),
     );
 }
 

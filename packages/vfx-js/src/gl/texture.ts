@@ -1,31 +1,10 @@
+import type {
+    BackendTexture,
+    TextureFilter,
+    TextureSource,
+    TextureWrap,
+} from "../backend.js";
 import type { GLContext, Restorable } from "./context.js";
-
-/**
- * Texture wrapper over a WebGL2 `TEXTURE_2D`.
- *
- * Matches the behaviour of the Three.js texture types previously used
- * by VFX-JS: Y-flipped unpack, non-premultiplied alpha (unless
- * {@link premultiplyAlpha}), linear filter,
- * and RGBA format. Use {@link needsUpdate} to re-upload from a live
- * canvas/video source on the next bind.
- *
- * Self-registers with {@link GLContext} unless `autoRegister: false` is
- * passed — opt out when the Texture is owned by a {@link Framebuffer}
- * (its storage is managed by the FBO's own `restore()`).
- * @internal
- */
-export type TextureWrap = "clamp" | "repeat" | "mirror";
-
-/** @internal */
-export type TextureFilter = "nearest" | "linear";
-
-/** @internal */
-export type TextureSource =
-    | HTMLImageElement
-    | HTMLVideoElement
-    | HTMLCanvasElement
-    | OffscreenCanvas
-    | ImageBitmap;
 
 /** @internal */
 export type TextureOpts = {
@@ -41,8 +20,21 @@ export type TextureOpts = {
     externalHandle?: WebGLTexture;
 };
 
-/** @internal */
-export class Texture implements Restorable {
+/**
+ * Texture wrapper over a WebGL2 `TEXTURE_2D`.
+ *
+ * Matches the behaviour of the Three.js texture types previously used
+ * by VFX-JS: Y-flipped unpack, non-premultiplied alpha (unless
+ * {@link premultiplyAlpha}), linear filter,
+ * and RGBA format. Use {@link needsUpdate} to re-upload from a live
+ * canvas/video source on the next bind.
+ *
+ * Self-registers with {@link GLContext} unless `autoRegister: false` is
+ * passed — opt out when the Texture is owned by a {@link Framebuffer}
+ * (its storage is managed by the FBO's own `restore()`).
+ * @internal
+ */
+export class Texture implements BackendTexture, Restorable {
     gl: WebGL2RenderingContext;
     texture!: WebGLTexture;
     wrapS: TextureWrap = "clamp";
@@ -217,15 +209,4 @@ function wrapEnum(gl: WebGL2RenderingContext, w: TextureWrap): number {
 
 function filterEnum(gl: WebGL2RenderingContext, f: TextureFilter): number {
     return f === "nearest" ? gl.NEAREST : gl.LINEAR;
-}
-
-/** Load an image from URL with CORS enabled. @internal */
-export function loadImage(url: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = url;
-    });
 }

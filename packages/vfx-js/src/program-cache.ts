@@ -1,11 +1,11 @@
-import type { GLContext } from "./gl/context.js";
-import { type GlslVersion, Program } from "./gl/program.js";
+import type { Backend, BackendProgram } from "./backend.js";
+import type { GlslVersion } from "./glsl-version.js";
 
 /**
- * VFX-instance-scoped cache of compiled {@link Program}s keyed by
+ * VFX-instance-scoped cache of compiled GLSL programs keyed by
  * `${frag}\0${vert}\0${glslVersion}`. Lifted out of {@link EffectHost}
  * so multiple hosts (one per attached Effect instance) sharing the
- * same `GLContext` compile each unique shader triple exactly once.
+ * same backend compile each unique shader triple exactly once.
  *
  * Lifetime: programs live until {@link dispose} is called by the
  * owning `VFXPlayer`.
@@ -13,18 +13,23 @@ import { type GlslVersion, Program } from "./gl/program.js";
  * @internal
  */
 export class ProgramCache {
-    #glCtx: GLContext;
-    #programs = new Map<string, Program>();
+    #backend: Backend;
+    #programs = new Map<string, BackendProgram>();
 
-    constructor(glCtx: GLContext) {
-        this.#glCtx = glCtx;
+    constructor(backend: Backend) {
+        this.#backend = backend;
     }
 
-    get(vert: string, frag: string, glslVersion?: GlslVersion): Program {
+    get(vert: string, frag: string, glslVersion?: GlslVersion): BackendProgram {
         const key = `${frag}\0${vert}\0${glslVersion ?? ""}`;
         let p = this.#programs.get(key);
         if (!p) {
-            p = new Program(this.#glCtx, vert, frag, glslVersion);
+            p = this.#backend.createProgram({
+                language: "glsl",
+                vert,
+                frag,
+                glslVersion,
+            });
             this.#programs.set(key, p);
         }
         return p;

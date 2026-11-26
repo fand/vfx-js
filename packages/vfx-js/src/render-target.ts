@@ -1,27 +1,52 @@
+import type {
+    Backend,
+    BackendProgram,
+    BackendRenderTarget,
+    BlendMode,
+    ShaderSource,
+    Uniforms,
+} from "./backend.js";
 import {
     DEFAULT_VERTEX_SHADER,
     DEFAULT_VERTEX_SHADER_100,
 } from "./constants.js";
-import type { GLContext } from "./gl/context.js";
-import { Framebuffer } from "./gl/framebuffer.js";
-import { type BlendMode, Pass } from "./gl/pass.js";
-import {
-    detectGlslVersion,
-    type GlslVersion,
-    type Uniforms,
-} from "./gl/program.js";
+import { detectGlslVersion, type GlslVersion } from "./glsl-version.js";
+
+/**
+ * A fullscreen shader pass: program, uniforms and blend mode.
+ * @internal
+ */
+export type Pass = {
+    program: BackendProgram;
+    uniforms: Uniforms;
+    blend: BlendMode;
+    dispose(): void;
+};
+
+/** @internal */
+export function createPass(
+    backend: Backend,
+    source: ShaderSource,
+    uniforms: Uniforms,
+    blend: BlendMode,
+): Pass {
+    const program = backend.createProgram(source);
+    return { program, uniforms, blend, dispose: () => program.dispose() };
+}
 
 /**
  * Create a framebuffer matching the options passed to element/post-effect passes.
  * @internal
  */
 export function createRenderTarget(
-    ctx: GLContext,
+    backend: Backend,
     width: number,
     height: number,
     opts: { float?: boolean } = {},
-): Framebuffer {
-    return new Framebuffer(ctx, width, height, { float: opts.float ?? false });
+): BackendRenderTarget {
+    return backend.createRenderTarget(width, height, {
+        float: opts.float ?? false,
+    });
 }
 
 /**
@@ -33,7 +58,7 @@ export function createRenderTarget(
  * @internal
  */
 export function createPassMaterial(
-    ctx: GLContext,
+    backend: Backend,
     opts: {
         vertexShader?: string;
         fragmentShader: string;
@@ -54,6 +79,19 @@ export function createPassMaterial(
     } else {
         blend = "normal";
     }
+    if (backend.shaderLanguage === "wgsl") {
+        if (opts.vertexShader !== undefined) {
+            throw new Error(
+                "[VFX-JS] `vert` is not supported on the WebGPU backend yet.",
+            );
+        }
+        return createPass(
+            backend,
+            { language: "wgsl", frag: opts.fragmentShader },
+            opts.uniforms,
+            blend,
+        );
+    }
     const glslVersion =
         opts.glslVersion ?? detectGlslVersion(opts.fragmentShader);
     const vertexShader =
@@ -61,12 +99,15 @@ export function createPassMaterial(
         (glslVersion === "100"
             ? DEFAULT_VERTEX_SHADER_100
             : DEFAULT_VERTEX_SHADER);
-    return new Pass(
-        ctx,
-        vertexShader,
-        opts.fragmentShader,
+    return createPass(
+        backend,
+        {
+            language: "glsl",
+            vert: vertexShader,
+            frag: opts.fragmentShader,
+            glslVersion,
+        },
         opts.uniforms,
         blend,
-        glslVersion,
     );
 }

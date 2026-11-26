@@ -1,14 +1,17 @@
 import type { Backbuffer } from "./backbuffer.js";
+import type {
+    BackendRenderTarget,
+    BackendTexture,
+    Uniforms,
+} from "./backend.js";
 import type { ShaderPreset } from "./constants.js";
 import type { EffectChain } from "./effect-chain.js";
-import type { Framebuffer } from "./gl/framebuffer.js";
-import type { Pass } from "./gl/pass.js";
-import type { GlslVersion, Uniforms } from "./gl/program.js";
-import type { Texture } from "./gl/texture.js";
+import type { GlslVersion } from "./glsl-version.js";
 import type { IntersectionState } from "./intersection-state.js";
 import type { ElementRect, Margin, MarginOpts } from "./rect.js";
+import type { Pass } from "./render-target.js";
 
-export type { GlslVersion } from "./gl/program.js";
+export type { GlslVersion } from "./glsl-version.js";
 
 /**
  * @deprecated Use `float?: boolean` instead.
@@ -31,7 +34,8 @@ export type VFXTextureFormat = "RGBA" | "Float";
  * `src` after the first pass) cover the whole buffer.
  * Read them with `(uv * resolution + offset - viewport.xy) / viewport.zw`.
  *
- * Note: auto-bind matches only `uniform sampler2D <name>;` declarations.
+ * Note: auto-bind matches only `uniform sampler2D <name>;` declarations
+ * (`var <name>: texture_2d<f32>;` in WGSL).
  * `isampler2D` / `usampler2D` are not supported yet.
  */
 export type VFXPass = {
@@ -41,8 +45,26 @@ export type VFXPass = {
      */
     vert?: string;
 
-    /** Fragment shader code. */
-    frag: string;
+    /**
+     * Fragment shader code (GLSL), used by the WebGL backend.
+     * Optional when only `wgsl` is given.
+     */
+    frag?: string;
+
+    /**
+     * Fragment shader code (WGSL), used by the `"webgpu"` backend.
+     * Give both `frag` and `wgsl` to run on either backend.
+     *
+     * Write one `@fragment` entry point. VFX-JS supplies the vertex stage.
+     * Its inputs are `@builtin(position)` (same as `gl_FragCoord`) and
+     * `@location(0) uv: vec2f`.
+     * Put the uniforms in one struct bound as `var<uniform>` at group 0;
+     * fields are filled by name. Read a texture `<name>` as
+     * `var <name>: texture_2d<f32>` with `var <name>Sampler: sampler`.
+     *
+     * @experimental
+     */
+    wgsl?: string;
 
     /**
      * Name of the buffer to write this pass's output to.
@@ -180,6 +202,19 @@ export type VFXOpts = {
      * deterministic snapshots).
      */
     timeScale?: number;
+
+    /**
+     * GPU API to render with. (Default: `"webgl"`)
+     *
+     * `"webgpu"` is experimental. It runs element shaders and post
+     * effects written in WGSL (`VFXPass.wgsl`). Effects, shader presets,
+     * transitions and `capture()` need `"webgl"` for now.
+     * It throws when WebGPU is missing, and `add()` rejects when no GPU
+     * device can be created.
+     *
+     * @experimental
+     */
+    backend?: "webgl" | "webgpu";
 };
 
 /** @internal */
@@ -193,6 +228,7 @@ export type VFXOptsInner = {
     postEffects: (VFXPostEffect | VFXPass)[];
     preserveDrawingBuffer: boolean;
     timeScale: number;
+    backend: "webgl" | "webgpu";
 };
 
 /**
@@ -236,6 +272,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         postEffects,
         preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
         timeScale: opts.timeScale ?? 1,
+        backend: opts.backend ?? "webgl",
     };
 }
 
@@ -479,7 +516,7 @@ export type VFXElement = {
     width: number;
     height: number;
     passes: VFXElementPass[];
-    bufferTargets: Map<string, Framebuffer>;
+    bufferTargets: Map<string, BackendRenderTarget>;
     startTime: number;
     enterTime: number;
     leaveTime: number;
@@ -489,13 +526,19 @@ export type VFXElement = {
     overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
-    srcTexture: Texture;
+    srcTexture: BackendTexture;
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
 
     /** Skipped by render while a transition holds its plain content. */
     frozen?: boolean;
+
+    /**
+     * Opacity to hide the element with once its shaders are built.
+     * Set while they build; the element shows as plain HTML until then.
+     */
+    pendingOpacity?: string | null;
 
     /** Rendered even when off screen, so a transition can finish. */
     forceRender?: boolean;

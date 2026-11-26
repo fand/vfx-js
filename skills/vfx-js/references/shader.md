@@ -142,7 +142,8 @@ vfx.add(el, {
 
 ```ts
 type VFXPass = {
-    frag: string;             // fragment shader (required)
+    frag?: string;            // GLSL fragment shader (WebGL backend)
+    wgsl?: string;            // WGSL fragment shader (WebGPU backend, experimental)
     vert?: string;            // vertex shader
     target?: string;          // buffer name; omitted on a middle pass = "pass0", "pass1", ...
     persistent?: boolean;     // keep across frames; read last frame by the target name
@@ -204,3 +205,39 @@ const vfx2 = new VFX({
 ```
 
 Post effect options: `shader`, `uniforms`, `persistent` (previous frame as `backbuffer`), `float`, `effect`.
+
+## WebGPU (experimental)
+
+`new VFX({ backend: "webgpu" })` renders with WebGPU.
+It runs element shaders and post effects written in WGSL, passed as `VFXPass.wgsl`.
+Give both `frag` and `wgsl` to run on either backend.
+
+```ts
+const vfx = new VFX({ backend: "webgpu" });
+await vfx.add(img, { shader: [{ frag: glslCode, wgsl: wgslCode }] });
+```
+
+```wgsl
+struct Uniforms {
+    resolution: vec2f,
+    offset: vec2f,
+    time: f32,
+};
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var src: texture_2d<f32>;
+@group(0) @binding(2) var srcSampler: sampler;
+
+@fragment
+fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+    let uv = (pos.xy - u.offset) / u.resolution;  // same as gl_FragCoord
+    let color = textureSample(src, srcSampler, uv);
+    return color * (0.5 + 0.5 * sin(u.time));
+}
+```
+
+- Write one `@fragment` entry point. VFX-JS supplies the vertex stage. Inputs: `@builtin(position)` (bottom-left origin, like `gl_FragCoord`) and `@location(0) uv: vec2f`.
+- Uniforms: one struct bound with `var<uniform>` at group 0. Fields are filled by name from the built-in uniforms and your `uniforms`. Missing fields read 0. Use `f32`/`i32`/`u32`, vectors, matrices, and `array<vec4f, N>`; no `bool` (pass `autoCrop` as `f32`).
+- Textures: `var <name>: texture_2d<f32>` reads `src`, `backbuffer` or a pass target. Pair it with `var <name>Sampler: sampler`; wrap and filter come from the texture.
+- Output is the same as GLSL: straight (not premultiplied) alpha on elements.
+- Everything stays group 0. Custom `vert`, shader presets, effects, transitions and `capture()` need the WebGL backend for now and throw on WebGPU.
+- Device creation is async: `add()` waits for it, and rejects when no GPU device is available. While an element's shaders compile, the original element stays visible.

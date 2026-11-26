@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { BackendTexture } from "./backend";
 import { type CaptureDeps, type CaptureDom, createCapture } from "./capture";
 import { resolveTexture } from "./effect-host";
-import type { Texture } from "./gl/texture";
 
 class FakeElement {
     style = Object.assign(
@@ -70,11 +70,11 @@ class FakeOffscreen {
     ) {}
 }
 
-type FakeTexture = Texture & { dispose: ReturnType<typeof vi.fn> };
+type FakeTexture = BackendTexture & { dispose: ReturnType<typeof vi.fn> };
 
 function fakeDeps(dom?: Partial<CaptureDom>) {
     const made: FakeTexture[] = [];
-    const emptyTexture = { dispose: vi.fn() } as unknown as Texture;
+    const emptyTexture = { dispose: vi.fn() } as unknown as BackendTexture;
     const createTexture = (source: unknown) => {
         const texture = {
             source,
@@ -84,7 +84,7 @@ function fakeDeps(dom?: Partial<CaptureDom>) {
         made.push(texture);
         return texture;
     };
-    const uploadTexture = vi.fn((_: Texture) => {});
+    const uploadTexture = vi.fn((_: BackendTexture) => {});
     const deps = {
         createTexture,
         uploadTexture,

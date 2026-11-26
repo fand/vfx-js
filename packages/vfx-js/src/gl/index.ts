@@ -1,12 +1,10 @@
+export { createWebGLBackend, WebGLBackend } from "./backend.js";
 export type { Restorable } from "./context.js";
 export { GLContext } from "./context.js";
 export { Framebuffer } from "./framebuffer.js";
+export { CompiledGeometry } from "./geometry.js";
 export { MultiFramebuffer } from "./multi-framebuffer.js";
-export type { BlendMode } from "./pass.js";
-export { applyBlend, Pass, renderPass } from "./pass.js";
-export type { Uniform, Uniforms, UniformValue } from "./program.js";
+export { applyBlend } from "./pass.js";
 export { Program } from "./program.js";
 export { Quad } from "./quad.js";
-export type { TextureFilter, TextureSource, TextureWrap } from "./texture.js";
-export { loadImage, Texture } from "./texture.js";
-export { Vec2, Vec4 } from "./vec.js";
+export { Texture } from "./texture.js";

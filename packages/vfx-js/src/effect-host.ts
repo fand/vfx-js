@@ -1,22 +1,24 @@
 import { Backbuffer } from "./backbuffer.js";
+import type {
+    Backend,
+    BackendProgram,
+    BackendRenderTarget,
+    BackendTargetGroup,
+    BackendTexture,
+    BlendMode,
+    DrawState,
+    PendingRead,
+    PixelRect,
+    TextureWrap,
+    Uniform,
+    Uniforms,
+} from "./backend.js";
 import {
     EFFECT_QUAD_TOKEN,
     EffectGeometryCache,
     isEffectQuad,
 } from "./effect-geometry.js";
-import type { GLContext } from "./gl/context.js";
-import { Framebuffer } from "./gl/framebuffer.js";
-import { MultiFramebuffer } from "./gl/multi-framebuffer.js";
-import {
-    applyBlend,
-    applyDrawState,
-    type DrawState,
-    resetDrawState,
-} from "./gl/pass.js";
-import type { Program, Uniform, Uniforms } from "./gl/program.js";
-import type { Quad } from "./gl/quad.js";
-import { PixelRead } from "./gl/read-pixels.js";
-import { Texture, type TextureWrap } from "./gl/texture.js";
+import { detectGlslVersion } from "./glsl-version.js";
 import type { ProgramCache } from "./program-cache.js";
 import type {
     Effect,
@@ -48,7 +50,7 @@ const RESOLVE_RT = Symbol.for("@vfx-js/effect.resolve-rt");
 
 /** @internal */
 export type EffectTextureInternal = EffectTexture & {
-    readonly [RESOLVE_TEXTURE]: () => Texture;
+    readonly [RESOLVE_TEXTURE]: () => BackendTexture;
 };
 
 /** @internal */
@@ -62,19 +64,19 @@ type RenderTargetResolver = {
      * Current read texture (for sampling the RT as a uniform).
      * May resolve multisampled pixels, which changes framebuffer bindings.
      */
-    getReadTexture(): Texture;
+    getReadTexture(): BackendTexture;
 
-    /** Current write target (for `bindFramebuffer`). */
-    getWriteFbo(): Framebuffer;
+    /** Current write target (the draw target). */
+    getWriteFbo(): BackendRenderTarget;
 
     /** Framebuffer behind {@link getReadTexture}: the side last written. */
-    getReadFbo(): Framebuffer;
+    getReadFbo(): BackendRenderTarget;
 
     /** Every framebuffer the RT owns: both sides for `persistent: true`. */
-    getFramebuffers?: () => readonly Framebuffer[];
+    getFramebuffers?: () => readonly BackendRenderTarget[];
 
     /** Current read-side depth texture. Present only for RTs with depth. */
-    getDepthTexture?: () => Texture;
+    getDepthTexture?: () => BackendTexture;
 
     /** Called after a draw that wrote to the RT. `persistent: true` only. */
     swap?: () => void;
@@ -97,7 +99,7 @@ type RenderTargetResolver = {
     mipmapAutoRegen?: boolean;
 };
 
-function resolveTexture(h: EffectTexture): Texture {
+function resolveTexture(h: EffectTexture): BackendTexture {
     return (h as EffectTextureInternal)[RESOLVE_TEXTURE]();
 }
 
@@ -111,10 +113,10 @@ function isTargetList(
     return Array.isArray(target);
 }
 
-const framebufferIds = new WeakMap<Framebuffer, number>();
+const framebufferIds = new WeakMap<BackendRenderTarget, number>();
 let nextFramebufferId = 0;
 
-function framebufferId(framebuffer: Framebuffer): number {
+function framebufferId(framebuffer: BackendRenderTarget): number {
     let id = framebufferIds.get(framebuffer);
     if (id === undefined) {
         id = nextFramebufferId++;
@@ -280,36 +282,33 @@ type OwnedRT = {
  * The orchestrator ({@link EffectChain}) mutates fields on `ctx` each
  * frame (time / src / output / etc.) for reference stability and to
  * reduce allocations. Owns:
- * - Managed Framebuffer / Backbuffer / Texture / VAO entries
+ * - Managed render target / Backbuffer / texture / geometry entries
  * - Phase flag for `ctx.draw()` suppression in the update phase
  *
- * Compiled {@link Program}s are not owned here — they live in the
+ * Compiled programs are not owned here — they live in the
  * VFX-scoped {@link ProgramCache} and are shared across hosts.
  *
  * See plan.md "effect-host.ts" for the full behavior spec.
  * @internal
  */
 export class EffectHost {
-    #glCtx: GLContext;
-    #gl: WebGL2RenderingContext;
+    #backend: Backend;
     #pixelRatio: number;
     #programCache: ProgramCache;
     #geometries: EffectGeometryCache;
-    #ownedTextures: Texture[] = [];
+    #ownedTextures: BackendTexture[] = [];
     #ownedRTs: OwnedRT[] = [];
     #autoResizeRTs: OwnedRT[] = [];
     #restoredUnsubs: (() => void)[] = [];
-    #pendingReads = new Set<PixelRead>();
+    #pendingReads = new Set<PendingRead>();
     #lostUnsub: (() => void) | null = null;
     #phase: Phase = "init";
     #warnedDrawInUpdate = false;
     #warnedDepthWithoutBuffer = false;
     #warnedInvalidSamples = false;
     #warnedDrawKeys = new Set<string>();
-    #textureUnitCount: number | undefined;
-    #maxDrawBuffers: number | undefined;
     /** Keyed by the ids of the write framebuffers, in order. */
-    #multiFramebuffers = new Map<string, MultiFramebuffer>();
+    #multiFramebuffers = new Map<string, BackendTargetGroup>();
     #dims: HostFrameDims;
 
     /**
@@ -320,18 +319,16 @@ export class EffectHost {
     #mutCtx: Mutable<EffectContext>;
 
     constructor(
-        glCtx: GLContext,
-        quad: Quad,
+        backend: Backend,
         pixelRatio: number,
         initialSrc: EffectTexture,
         initialVfxProps: EffectVFXProps,
         programCache: ProgramCache,
     ) {
-        this.#glCtx = glCtx;
-        this.#gl = glCtx.gl;
+        this.#backend = backend;
         this.#pixelRatio = pixelRatio;
         this.#programCache = programCache;
-        this.#geometries = new EffectGeometryCache(glCtx, quad);
+        this.#geometries = new EffectGeometryCache(backend);
         this.#dims = {
             outputBufferW: 1,
             outputBufferH: 1,
@@ -370,7 +367,8 @@ export class EffectHost {
             vfxProps: initialVfxProps,
             dims: initialDims,
             quad: EFFECT_QUAD_TOKEN,
-            gl: this.#gl,
+            // Public API is WebGL-only for now.
+            gl: backend.webgl?.gl as WebGL2RenderingContext,
             createRenderTarget: (opts) => this.#createRenderTarget(opts),
             releaseGeometry: (geo) => this.#geometries.release(geo),
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
@@ -380,7 +378,7 @@ export class EffectHost {
             readPixels: (target, opts) => this.#readPixels(target, opts),
             resetState: () => this.#resetState(),
             onContextRestored: (cb) => {
-                const unsub = this.#glCtx.onContextRestored(cb);
+                const unsub = this.#backend.onRestored(cb);
                 this.#restoredUnsubs.push(unsub);
                 return unsub;
             },
@@ -487,14 +485,11 @@ export class EffectHost {
 
     /** Clears the given RT with `(0, 0, 0, 0)`. Device-px target. */
     clearRt(rt: EffectRenderTarget): void {
-        const gl = this.#gl;
-        const resolver = resolveRt(rt);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, resolver.getWriteFbo().fbo);
-        gl.viewport(0, 0, rt.width, rt.height);
-        gl.clearColor(0, 0, 0, 0);
-        gl.disable(gl.SCISSOR_TEST);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.#backend.clear({
+            target: resolveRt(rt).getWriteFbo(),
+            color: true,
+            depth: false,
+        });
     }
 
     // -- createRenderTarget -------------------------------------------------
@@ -521,7 +516,7 @@ export class EffectHost {
             const pr = explicitSize ? 1 : this.#pixelRatio;
             const cssW = explicitSize ? sizeW : sizeW / pr;
             const cssH = explicitSize ? sizeH : sizeH / pr;
-            const bb = new Backbuffer(this.#glCtx, cssW, cssH, pr, float, {
+            const bb = new Backbuffer(this.#backend, cssW, cssH, pr, float, {
                 wrap,
                 filter,
                 mipmap,
@@ -555,13 +550,13 @@ export class EffectHost {
                 // Each side owns a depth texture; return the read side's.
                 resolver.getDepthTexture = () => {
                     bb.read.resolveDepth();
-                    return bb.read.depthTexture as Texture;
+                    return bb.read.depthTexture as BackendTexture;
                 };
             }
             getW = () => bb.target.width;
             getH = () => bb.target.height;
         } else {
-            const fb = new Framebuffer(this.#glCtx, sizeW, sizeH, {
+            const fb = this.#backend.createRenderTarget(sizeW, sizeH, {
                 float,
                 wrap,
                 filter,
@@ -654,7 +649,7 @@ export class EffectHost {
                 ),
             );
         }
-        if (this.#glCtx.isContextLost) {
+        if (this.#backend.isLost) {
             return Promise.reject(
                 new Error(
                     "[VFX-JS] readPixels() was called while the WebGL context is lost.",
@@ -662,13 +657,13 @@ export class EffectHost {
             );
         }
         // A lost context kills the buffer and the fence: reject what is pending.
-        this.#lostUnsub ??= this.#glCtx.onContextLost(() =>
+        this.#lostUnsub ??= this.#backend.onLost(() =>
             this.#cancelReads(
                 "[VFX-JS] readPixels() was cancelled: the WebGL context was lost.",
             ),
         );
         const fb = resolveRt(target).getReadFbo();
-        const read = new PixelRead(this.#gl, fb, opts, (r) =>
+        const read = this.#backend.readPixels(fb, opts, (r) =>
             this.#pendingReads.delete(r),
         );
         if (!read.settled) {
@@ -700,7 +695,7 @@ export class EffectHost {
     ): EffectTexture {
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
-        let texture: Texture;
+        let texture: BackendTexture;
         let getW: () => number;
         let getH: () => number;
         let autoUpdateFn: (() => void) | null = null;
@@ -713,11 +708,14 @@ export class EffectHost {
                     "[VFX-JS] wrapTexture(WebGLTexture) requires opts.size",
                 );
             }
+            const webgl = this.#backend.webgl;
+            if (!webgl) {
+                throw new Error(
+                    "[VFX-JS] wrapTexture(WebGLTexture) needs the WebGL backend",
+                );
+            }
             const [sw, sh] = opts.size;
-            texture = new Texture(this.#glCtx, undefined, {
-                autoRegister: false,
-                externalHandle: source,
-            });
+            texture = webgl.wrapTexture(source);
             getW = () => sw;
             getH = () => sh;
         } else {
@@ -730,7 +728,7 @@ export class EffectHost {
                 | HTMLVideoElement
                 | ImageBitmap
                 | OffscreenCanvas;
-            texture = new Texture(this.#glCtx, domSource);
+            texture = this.#backend.createTexture(domSource);
             const explicitSize = opts?.size;
             const readDim = (axis: "w" | "h"): number => {
                 if (explicitSize) {
@@ -883,52 +881,38 @@ export class EffectHost {
             return;
         }
 
-        const gl = this.#gl;
         const ctxOutput = this.#mutCtx.target;
         const rawTarget =
             target === undefined || target === null ? ctxOutput : target;
         const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
         const resolver = rawTarget === null ? null : resolveRt(rawTarget);
         const hasDepth = !isStageOutput && !!resolver?.getDepthTexture;
-        const clearColor = opts?.color ?? true;
-        const clearDepth = (opts?.depth ?? true) && hasDepth;
-        if (!clearColor && !clearDepth) {
+        const color = opts?.color ?? true;
+        const depth = (opts?.depth ?? true) && hasDepth;
+        if (!color && !depth) {
             return;
-        }
-
-        let bits = 0;
-        if (clearColor) {
-            gl.clearColor(0, 0, 0, 0);
-            bits |= gl.COLOR_BUFFER_BIT;
-        }
-        if (clearDepth) {
-            gl.clearDepth(1);
-            bits |= gl.DEPTH_BUFFER_BIT;
         }
 
         if (isStageOutput || resolver === null) {
             // Stage output (canvas or intermediate RT). Scissor to this
             // stage's viewport so we don't wipe neighbors sharing the FB.
-            const fbo = resolver === null ? null : resolver.getWriteFbo().fbo;
-            const vp = this.#dims.outputViewport;
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-            gl.enable(gl.SCISSOR_TEST);
-            gl.scissor(vp.x, vp.y, vp.w, vp.h);
-            gl.clear(bits);
-            resolver?.getWriteFbo().markDirty();
-            gl.disable(gl.SCISSOR_TEST);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            this.#backend.clear({
+                target: resolver === null ? null : resolver.getWriteFbo(),
+                color,
+                depth,
+                scissor: this.#dims.outputViewport,
+            });
             return;
         }
 
         // User RT: clear the whole buffer. Zero both sides of a ping-pong
         // so the next read side is cleared too.
-        gl.disable(gl.SCISSOR_TEST);
         const clearWrite = () => {
-            const writeFb = resolver.getWriteFbo();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb.fbo);
-            gl.clear(bits);
-            writeFb.markDirty();
+            this.#backend.clear({
+                target: resolver.getWriteFbo(),
+                color,
+                depth,
+            });
         };
         clearWrite();
         if (resolver.swap) {
@@ -936,103 +920,14 @@ export class EffectHost {
             clearWrite();
             resolver.swap();
         }
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
-    /**
-     * Write the GL baseline the pipeline assumes (see
-     * `EffectContext.resetState`). Write-only: no `getParameter` per
-     * call. VFX-JS keeps no GL state cache, so there is nothing else to
-     * invalidate.
-     */
+    /** See `EffectContext.resetState`. No-op off WebGL. */
     #resetState(): void {
-        if (this.#phase === "disposed" || this.#glCtx.isContextLost) {
+        if (this.#phase === "disposed" || this.#backend.isLost) {
             return;
         }
-        const gl = this.#gl;
-
-        // Framebuffer + viewport.
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.drawBuffers([gl.BACK]);
-        gl.readBuffer(gl.BACK);
-        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-
-        // Capabilities.
-        gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.CULL_FACE);
-        gl.disable(gl.STENCIL_TEST);
-        gl.disable(gl.SCISSOR_TEST);
-        gl.disable(gl.BLEND);
-        gl.disable(gl.POLYGON_OFFSET_FILL);
-        gl.disable(gl.RASTERIZER_DISCARD);
-        gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-        gl.disable(gl.SAMPLE_COVERAGE);
-
-        // Masks and fixed-function settings. The player's per-frame
-        // clears rely on clearColor without setting it.
-        gl.depthMask(true);
-        gl.clearColor(0, 0, 0, 0);
-        gl.depthFunc(gl.LESS);
-        gl.colorMask(true, true, true, true);
-        gl.stencilMask(0xffffffff);
-        gl.frontFace(gl.CCW);
-        gl.cullFace(gl.BACK);
-
-        // Program, VAO and buffer bindings.
-        gl.useProgram(null);
-        gl.bindVertexArray(null);
-        gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
-        gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-        gl.bindBuffer(gl.COPY_READ_BUFFER, null);
-        gl.bindBuffer(gl.COPY_WRITE_BUFFER, null);
-
-        // Samplers override texture params, so unbind them on every unit.
-        const units = this.#getTextureUnitCount();
-        for (let i = 0; i < units; i++) {
-            gl.bindSampler(i, null);
-        }
-        gl.activeTexture(gl.TEXTURE0);
-
-        // Pixel store (WebGL defaults).
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.pixelStorei(
-            gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,
-            gl.BROWSER_DEFAULT_WEBGL,
-        );
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
-        gl.pixelStorei(gl.UNPACK_IMAGE_HEIGHT, 0);
-        gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
-        gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
-        gl.pixelStorei(gl.UNPACK_SKIP_IMAGES, 0);
-        gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
-        gl.pixelStorei(gl.PACK_ROW_LENGTH, 0);
-        gl.pixelStorei(gl.PACK_SKIP_PIXELS, 0);
-        gl.pixelStorei(gl.PACK_SKIP_ROWS, 0);
-    }
-
-    /** `MAX_COMBINED_TEXTURE_IMAGE_UNITS`, queried once. */
-    #getTextureUnitCount(): number {
-        if (this.#textureUnitCount === undefined) {
-            const gl = this.#gl;
-            const n = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-            this.#textureUnitCount = typeof n === "number" && n > 0 ? n : 16;
-        }
-        return this.#textureUnitCount;
-    }
-
-    /** `MAX_DRAW_BUFFERS`, queried once. */
-    #getMaxDrawBuffers(): number {
-        if (this.#maxDrawBuffers === undefined) {
-            const gl = this.#gl;
-            const n = gl.getParameter(gl.MAX_DRAW_BUFFERS);
-            this.#maxDrawBuffers = typeof n === "number" && n > 0 ? n : 4;
-        }
-        return this.#maxDrawBuffers;
+        this.#backend.webgl?.resetState();
     }
 
     #warnOnce(key: string, message: string): void {
@@ -1043,7 +938,7 @@ export class EffectHost {
         console.warn(message);
     }
 
-    #getProgram(opts: EffectDrawOpts): Program {
+    #getProgram(opts: EffectDrawOpts): BackendProgram {
         const vert =
             opts.vert ??
             (this.#mutCtx.vfxProps.glslVersion === "100"
@@ -1071,7 +966,6 @@ export class EffectHost {
         opts: EffectDrawOpts,
         target: EffectRenderTarget | null | undefined,
     ): void {
-        const gl = this.#gl;
         const program = this.#getProgram(opts);
 
         const ctxOutput = this.#mutCtx.target;
@@ -1086,7 +980,7 @@ export class EffectHost {
         // So build uniforms before binding the draw target.
         const uniforms = this.#buildUniforms(opts.uniforms);
 
-        let writeFb: Framebuffer | null = null;
+        let writeFb: BackendRenderTarget | null = null;
         let vpX: number;
         let vpY: number;
         let vpW: number;
@@ -1120,14 +1014,17 @@ export class EffectHost {
             }
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb ? writeFb.fbo : null);
-        gl.viewport(vpX, vpY, vpW, vpH);
-        gl.disable(gl.SCISSOR_TEST);
         const blend =
             opts.blend ?? (rawTarget === null ? "premultiplied" : "none");
-        applyBlend(gl, blend);
-        this.#submitDraw(opts, program, uniforms, hasDepth);
-        writeFb?.markDirty();
+        this.#submitDraw(
+            opts,
+            program,
+            uniforms,
+            writeFb,
+            { x: vpX, y: vpY, w: vpW, h: vpH },
+            blend,
+            hasDepth,
+        );
 
         // Regen pre-swap: getWriteFbo() returned the buffer we just
         // drew to. After swap, that buffer rotates to the read side
@@ -1147,7 +1044,9 @@ export class EffectHost {
             return;
         }
         const program = this.#getProgram(opts);
-        if (program.glslVersion === "100") {
+        const glslVersion =
+            this.#mutCtx.vfxProps.glslVersion ?? detectGlslVersion(opts.frag);
+        if (glslVersion === "100") {
             this.#warnOnce(
                 "glsl100",
                 "[VFX-JS] ctx.draw() with several targets needs a GLSL 300 es shader; draw skipped.",
@@ -1155,7 +1054,6 @@ export class EffectHost {
             return;
         }
 
-        const gl = this.#gl;
         // Sampling a multisampled RT resolves it, which rebinds framebuffers.
         // So build uniforms before binding the draw target.
         const uniforms = this.#buildUniforms(opts.uniforms);
@@ -1177,15 +1075,16 @@ export class EffectHost {
             depthIndices.length > 0 ? members[depthIndices[0]] : null;
         const multi = this.#getMultiFramebuffer(members, depthSource);
 
-        multi.bind();
-        gl.viewport(0, 0, multi.width, multi.height);
-        gl.disable(gl.SCISSOR_TEST);
-        applyBlend(gl, opts.blend ?? "none");
-        this.#submitDraw(opts, program, uniforms, depthSource !== null);
+        this.#submitDraw(
+            opts,
+            program,
+            uniforms,
+            multi,
+            { x: 0, y: 0, w: multi.width, h: multi.height },
+            opts.blend ?? "none",
+            depthSource !== null,
+        );
 
-        for (const member of members) {
-            member.markDirty();
-        }
         // Regen pre-swap, as in the single-target path.
         for (const resolver of resolvers) {
             if (resolver.mipmapAutoRegen) {
@@ -1253,7 +1152,7 @@ export class EffectHost {
             );
             return null;
         }
-        const maxDrawBuffers = this.#getMaxDrawBuffers();
+        const maxDrawBuffers = this.#backend.maxDrawTargets;
         if (targets.length > maxDrawBuffers) {
             this.#warnOnce(
                 "count",
@@ -1265,42 +1164,42 @@ export class EffectHost {
     }
 
     #getMultiFramebuffer(
-        members: readonly Framebuffer[],
-        depthSource: Framebuffer | null,
-    ): MultiFramebuffer {
+        members: readonly BackendRenderTarget[],
+        depthSource: BackendRenderTarget | null,
+    ): BackendTargetGroup {
         const key = members.map((m) => framebufferId(m)).join(",");
         let multi = this.#multiFramebuffers.get(key);
         if (!multi) {
-            multi = new MultiFramebuffer(this.#glCtx, members, depthSource);
+            multi = this.#backend.createTargetGroup(members, depthSource);
             this.#multiFramebuffers.set(key, multi);
         }
         return multi;
     }
 
-    /** Upload uniforms and draw the geometry with its depth and cull state. */
+    /** Draw the geometry with its depth and cull state. */
     #submitDraw(
         opts: EffectDrawOpts,
-        program: Program,
+        program: BackendProgram,
         uniforms: Uniforms,
+        target: BackendRenderTarget | BackendTargetGroup | null,
+        viewport: PixelRect,
+        blend: BlendMode,
         hasDepth: boolean,
     ): void {
-        const gl = this.#gl;
         const drawState = this.#resolveDrawState(opts, hasDepth);
-
-        program.use();
-        program.uploadUniforms(uniforms);
-
         const geometry = opts.geometry ?? EFFECT_QUAD_TOKEN;
         const compiled = isEffectQuad(geometry)
             ? this.#geometries.quad
             : this.#geometries.resolve(geometry as EffectGeometry, program);
-        if (drawState) {
-            applyDrawState(gl, drawState);
-        }
-        compiled.draw();
-        if (drawState) {
-            resetDrawState(gl);
-        }
+        this.#backend.draw({
+            program,
+            uniforms,
+            target,
+            viewport,
+            blend,
+            drawState,
+            geometry: compiled,
+        });
     }
 
     /** Depth and cull state for a draw, or null when it needs none. */
@@ -1341,7 +1240,7 @@ export class EffectHost {
             return out;
         }
         for (const [name, value] of Object.entries(userUniforms)) {
-            out[name] = toInternalUniform(value, this.#gl);
+            out[name] = toInternalUniform(value, this.#backend);
         }
         return out;
     }
@@ -1430,14 +1329,14 @@ function normalizeWrap(
 
 function toInternalUniform(
     value: EffectUniformValue,
-    gl: WebGL2RenderingContext,
+    backend: Backend,
 ): Uniform {
     if (typeof value === "object" && value !== null && "__brand" in value) {
         if (value.__brand === "EffectRenderTarget") {
             return { value: resolveRt(value).getReadTexture() };
         }
         const texture = resolveTexture(value);
-        if (texture && texture.gl !== gl) {
+        if (texture && !backend.ownsTexture(texture)) {
             throw new Error(
                 "[VFX-JS] This texture belongs to another VFX instance.",
             );
@@ -1454,7 +1353,7 @@ function toInternalUniform(
  * @internal
  */
 export function makeEffectTexture(
-    resolve: () => Texture,
+    resolve: () => BackendTexture,
     width: () => number,
     height: () => number,
     dispose?: () => void,
@@ -1520,7 +1419,7 @@ export function makeEffectRenderTarget(
  * @internal
  */
 export function makeEffectRenderTargetFromFb(
-    fb: Framebuffer,
+    fb: BackendRenderTarget,
 ): EffectRenderTarget {
     const resolver: RenderTargetResolver = {
         getReadTexture: () => fb.texture,

@@ -1,3 +1,4 @@
+import type { BackendTargetGroup } from "../backend.js";
 import type { GLContext, Restorable } from "./context.js";
 import type { Framebuffer } from "./framebuffer.js";
 
@@ -6,7 +7,7 @@ import type { Framebuffer } from "./framebuffer.js";
  * Members stay owned by the caller.
  * @internal
  */
-export class MultiFramebuffer implements Restorable {
+export class MultiFramebuffer implements BackendTargetGroup, Restorable {
     gl: WebGL2RenderingContext;
     fbo: WebGLFramebuffer;
     readonly members: readonly Framebuffer[];

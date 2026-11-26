@@ -91,6 +91,7 @@ export class VFX {
     #transitions = new Set<TransitionHandle>();
     #captures = new Map<HTMLElement, CaptureRecord>();
     #reducedMotion: boolean;
+    #webgpu: boolean;
     #destroyed = false;
 
     /**
@@ -113,13 +114,20 @@ export class VFX {
     constructor(options: VFXOpts = {}) {
         checkEnvironment();
 
-        if (!isWebGLAvailable()) {
+        const opts = getVFXOpts(options);
+        this.#webgpu = opts.backend === "webgpu";
+        if (this.#webgpu) {
+            if (!navigator.gpu) {
+                throw new Error(
+                    "[VFX-JS] WebGPU is not available in this environment.",
+                );
+            }
+        } else if (!isWebGLAvailable()) {
             throw new Error(
                 "[VFX-JS] WebGL is not available in this environment.",
             );
         }
 
-        const opts = getVFXOpts(options);
         this.#reducedMotion = prefersReducedMotion();
 
         // Setup canvas
@@ -461,6 +469,11 @@ export class VFX {
         element: HTMLElement,
         opts: AddTransitionOpts<T> = {},
     ): TransitionHandle {
+        if (this.#webgpu) {
+            throw new Error(
+                "[VFX-JS] Transitions are not supported on the WebGPU backend yet.",
+            );
+        }
         const transition = new TransitionController(this, element, opts, () =>
             this.#transitions.delete(transition),
         );

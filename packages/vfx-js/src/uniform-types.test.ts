@@ -25,7 +25,7 @@ describe("skipTextureHandle", () => {
     test("keeps other values", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const { skipTextureHandle } = await import("./gl/program");
-        const { Vec2 } = await import("./gl/vec");
+        const { Vec2 } = await import("./vec");
         const values = [
             1,
             true,

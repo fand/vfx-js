@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import type { Uniforms } from "./gl/program";
+import type { Uniforms } from "./backend";
 import { createIntersectionState } from "./intersection-state";
 import { RECT_ZERO } from "./rect";
 import {

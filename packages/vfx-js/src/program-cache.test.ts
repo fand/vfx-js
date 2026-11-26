@@ -34,11 +34,14 @@ vi.mock("./gl/program.js", () => {
     return { Program };
 });
 
+import type { Backend } from "./backend.js";
+import { WebGLBackend } from "./gl/backend.js";
 import type { GLContext } from "./gl/context.js";
+import type { Quad } from "./gl/quad.js";
 import { ProgramCache } from "./program-cache.js";
 
-function makeCtx(): GLContext {
-    return {} as unknown as GLContext;
+function makeCtx(): Backend {
+    return new WebGLBackend({} as unknown as GLContext, {} as Quad);
 }
 
 describe("ProgramCache", () => {

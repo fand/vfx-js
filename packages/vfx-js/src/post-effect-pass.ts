@@ -1,12 +1,10 @@
 import { Backbuffer } from "./backbuffer.js";
-import type { GLContext } from "./gl/context.js";
-import type { Pass } from "./gl/pass.js";
-import type { GlslVersion, Uniforms } from "./gl/program.js";
-import type { Texture } from "./gl/texture.js";
-import { Vec2, Vec4 } from "./gl/vec.js";
+import type { Backend, BackendTexture, Uniforms } from "./backend.js";
 import type { GLRect } from "./gl-rect.js";
-import { createPassMaterial } from "./render-target.js";
+import type { GlslVersion } from "./glsl-version.js";
+import { createPassMaterial, type Pass } from "./render-target.js";
 import type { VFXUniforms, VFXUniformValue } from "./types.js";
+import { Vec2, Vec4 } from "./vec.js";
 
 /**
  * A single post-effect pass. Owns its shader program, uniforms, and
@@ -23,7 +21,7 @@ export class PostEffectPass {
     #size?: [number, number];
 
     constructor(
-        ctx: GLContext,
+        backend: Backend,
         fragmentShader: string,
         uniforms?: VFXUniforms,
         persistent?: boolean,
@@ -57,7 +55,7 @@ export class PostEffectPass {
             }
         }
 
-        this.pass = createPassMaterial(ctx, {
+        this.pass = createPassMaterial(backend, {
             fragmentShader,
             uniforms: this.#uniforms,
             renderingToBuffer: hasBufferTarget ?? false,
@@ -71,7 +69,7 @@ export class PostEffectPass {
     }
 
     setUniforms(
-        tex: Texture,
+        tex: BackendTexture,
         pixelRatio: number,
         xywh: GLRect,
         time: number,
@@ -114,7 +112,7 @@ export class PostEffectPass {
     }
 
     initializeBackbuffer(
-        ctx: GLContext,
+        backend: Backend,
         width: number,
         height: number,
         pixelRatio: number,
@@ -122,7 +120,7 @@ export class PostEffectPass {
         if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
                 this.#backbuffer = new Backbuffer(
-                    ctx,
+                    backend,
                     this.#size[0],
                     this.#size[1],
                     1,
@@ -130,7 +128,7 @@ export class PostEffectPass {
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
-                    ctx,
+                    backend,
                     width,
                     height,
                     pixelRatio,

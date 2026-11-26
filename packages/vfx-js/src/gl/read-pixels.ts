@@ -1,9 +1,5 @@
+import type { PendingRead, PixelReadOpts } from "../backend.js";
 import type { Framebuffer } from "./framebuffer.js";
-
-/** Options for {@link PixelRead}. Mirrors `EffectReadPixelsOpts`. @internal */
-export type PixelReadOpts = {
-    flipY?: boolean;
-};
 
 /** How often a pending read checks its fence, in ms. */
 const POLL_MS = 4;
@@ -14,7 +10,7 @@ const POLL_MS = 4;
  * read starts, so the result is the framebuffer's content at that time.
  * @internal
  */
-export class PixelRead {
+export class PixelRead implements PendingRead {
     readonly promise: Promise<Uint8Array | Float32Array>;
 
     #gl: WebGL2RenderingContext;
