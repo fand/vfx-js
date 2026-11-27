@@ -1254,3 +1254,32 @@ test("noise grids retain precision with RG32F and fall back without float extens
         assert.ok(grids.every((d) => d.target.disposed));
     }
 });
+
+test("scalar glow switches between warped, flow-only and unwarped composition", () => {
+    const f = fixture({ width: 256, height: 192, pixelRatio: 2 });
+    const effect = steadyEffect({ glowDistortion: { amount: 20 } });
+    effect.init(f.ctx);
+    const warped = f.render(effect);
+    assert.equal(warped.uniforms.glowTex.format, "r16f");
+    assert.equal(warped.uniforms.glowTex.width, 256);
+    assert.equal(warped.uniforms.glowBase.format, "rgba16f");
+    assert.equal(warped.uniforms.glowBase.width, 128);
+    assert.ok(warped.frag.includes("#define SCALAR_GLOW"));
+    effect.setParams({ glowDistortion: { amount: 0 }, glowFlow: 40 });
+    const flow = f.render(effect);
+    assert.equal(flow.uniforms.glowTex, warped.uniforms.glowTex);
+    assert.ok(flow.frag.includes("#define SCALAR_GLOW"));
+    effect.setParams({ glowFlow: 0, coreDistortion: { amount: 5 } });
+    const halo = f.render(effect);
+    assert.equal(halo.uniforms.glowTex.format, "rgba16f");
+    assert.ok(!halo.frag.includes("#define SCALAR_GLOW"));
+    assert.ok(halo.frag.includes("#define WARPED_HALO"));
+    effect.setParams({ coreDistortion: { amount: 0 } });
+    assert.ok(f.render(effect).frag.includes("#define LAYERED_GLOW"));
+    effect.setParams({ glowDistortion: { amount: 20 } });
+    assert.equal(f.render(effect).uniforms.glowTex, warped.uniforms.glowTex);
+    effect.setParams({ glow: 0 });
+    assert.ok(!f.render(effect).frag.includes("#define SCALAR_GLOW"));
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});

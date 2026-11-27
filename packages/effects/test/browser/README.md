@@ -335,6 +335,13 @@ A completed manifest, 72 PNGs per preset, and zero GL errors are required before
 sharing a stage. `prepare-saber-comparison.mjs` also hashes the native preset data
 and empirical color-response helper in the candidate build.
 
+For storage-only changes, also run
+`await (await import('./saber-storage-checks.mjs')).storageChecks()` from the
+frozen harness. It compares custom Glow bypass/Halo/flow settings, HDR grading,
+Reveal transitions, source composition and dynamic inputs at DPR1/1.5/2,
+including forced legacy float fallback. It requires zero changed screen bytes,
+zero GL errors and complete resource disposal. Progress: `window.saberStorageJob`.
+
 `ae-saber-color-palette.jsx` exports 185 isolated color/radiance cases.
 `analyze-saber-color-palette.py <export directory> <output.json>` regenerates the
 36 hue curves (requires NumPy and pypng). Values in `_saber-color.ts` are rounded

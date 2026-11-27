@@ -355,6 +355,9 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D core;
 uniform sampler2D glowTex;
+#ifdef SCALAR_GLOW
+uniform sampler2D glowBase;
+#endif
 #ifdef WARPED_HALO
 uniform sampler2D haloTex;
 #endif
@@ -403,6 +406,12 @@ void main() {
         lights = sampleLayeredGlow();
 #else
         lights = texture(glowTex, uv);
+#ifdef SCALAR_GLOW
+        // Only the active group is warped. Reconstruct the stationary bypass
+        // and Halo from their cached base, preserving the former 16F store.
+        vec2 stationary = unpackHalf2x16(packHalf2x16(texture(glowBase, uv).ga));
+        lights = vec4(lights.r, stationary.x, 0.0, stationary.y);
+#endif
 #endif
 #ifdef WARPED_HALO
         lights.a = texture(haloTex, uv).r;
@@ -461,11 +470,17 @@ void main() {
 `;
 
 // Optional samplers/branches disappear entirely when their feature is off.
-const COMPOSITE_SHADERS = Array.from({ length: 16 }, (_, flags) =>
+const COMPOSITE_SHADERS = Array.from({ length: 32 }, (_, flags) =>
     FRAG_COMPOSITE.replace(
         "#version 300 es",
         "#version 300 es" +
-            ["LAYERED_GLOW", "CORE_TINT", "CORE_OVERLAY", "WARPED_HALO"]
+            [
+                "LAYERED_GLOW",
+                "CORE_TINT",
+                "CORE_OVERLAY",
+                "WARPED_HALO",
+                "SCALAR_GLOW",
+            ]
                 .map((name, bit) =>
                     flags & (1 << bit) ? `\n#define ${name}` : "",
                 )
@@ -1080,6 +1095,7 @@ export class SaberEffect implements Effect {
                     this.params.glowFlow,
                     [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
                     [core.width, core.height],
+                    true,
                 );
                 this.#glowResultKey = glowResultKey;
             }
@@ -1128,6 +1144,10 @@ export class SaberEffect implements Effect {
             this.params.flickerSpeed,
             this.params.flickerSeed,
         );
+        const scalarGlowBase =
+            glowEnabled && !glowLayers && glowTex !== this.#glowBase
+                ? this.#glowBase
+                : null;
         ctx.draw({
             frag: COMPOSITE_SHADERS[
                 (glowLayers ? 1 : 0) |
@@ -1137,7 +1157,8 @@ export class SaberEffect implements Effect {
                     this.params.coreDistortion.amount > 0
                         ? 4
                         : 0) |
-                    (haloTex ? 8 : 0)
+                    (haloTex ? 8 : 0) |
+                    (scalarGlowBase ? 16 : 0)
             ],
             uniforms: {
                 ...glowLayers,
@@ -1145,6 +1166,7 @@ export class SaberEffect implements Effect {
                 core: displayedCore,
                 originalCore,
                 glowTex,
+                ...(scalarGlowBase ? { glowBase: scalarGlowBase } : {}),
                 ...(haloTex ? { haloTex } : {}),
                 colorRamp: this.#colorRamp,
                 coreGain:

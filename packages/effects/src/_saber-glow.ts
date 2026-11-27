@@ -312,9 +312,13 @@ void main() {
 #endif
     if (amount <= 0.0) {
         vec3 light = sampleLight(uv);
+#ifdef SCALAR_GLOW
+        outColor = vec4(light.r, 0.0, 0.0, 1.0);
+#else
         vec4 original = texture(src, uv);
         if (layered == 1) light += original.rgb * (vec3(1.0) - layerShares);
         outColor = vec4(light, layered == 1 ? original.a : 1.0);
+#endif
         return;
     }
     vec2 n = distortionAt(0.0);
@@ -342,9 +346,14 @@ void main() {
         }
     }
     // RGB retain the distorted/bypass groups; A is the undistorted Halo layer.
+#ifdef SCALAR_GLOW
+    // The final composite reads stationary channels; no need to sample them here.
+    outColor = vec4(light.r, 0.0, 0.0, 1.0);
+#else
     vec4 original = texture(src, uv);
     if (layered == 1) light += original.rgb * (vec3(1.0) - layerShares);
     outColor = vec4(light, layered == 1 ? original.a : 1.0);
+#endif
 }
 `;
 
@@ -367,6 +376,11 @@ function turbulentFragment(fragment: string): string {
     );
 }
 const FRAG_DISTORT_TURBULENT = turbulentFragment(FRAG_DISTORT);
+const FRAG_DISTORT_SCALAR = FRAG_DISTORT.replace(
+    "#version 300 es",
+    "#version 300 es\n#define SCALAR_GLOW",
+);
+const FRAG_DISTORT_SCALAR_TURBULENT = turbulentFragment(FRAG_DISTORT_SCALAR);
 const FRAG_DISTORT_BOUNDED_TURBULENT = turbulentFragment(FRAG_DISTORT_BOUNDED);
 const FRAG_DISTORT_CONTOUR_TURBULENT = turbulentFragment(FRAG_DISTORT_CONTOUR);
 
@@ -543,6 +557,7 @@ export class SaberGlowPasses {
     #core: EffectRenderTarget | null = null;
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
+    #scalarGlow = false;
     #noise: Partial<Record<"core" | "glow" | "halo", EffectRenderTarget>> = {};
     #down: EffectRenderTarget[] = [];
     #layers: ([EffectRenderTarget, EffectRenderTarget] | null)[] = [];
@@ -566,6 +581,9 @@ export class SaberGlowPasses {
         flowDistance = 0,
         layerShares: readonly number[] = [1, 1, 1],
         outputSize: readonly number[] = [src.width, src.height],
+        // Packed Saber glow: only R moves; the final composite reads the
+        // stationary channels from src. General layered probes keep RGBA.
+        scalarGlow = false,
     ): EffectRenderTarget {
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
@@ -574,14 +592,16 @@ export class SaberGlowPasses {
         if (
             target &&
             kind !== "core" &&
-            (target.width !== outputSize[0] || target.height !== outputSize[1])
+            (target.width !== outputSize[0] ||
+                target.height !== outputSize[1] ||
+                (kind === "glow" && scalarGlow !== this.#scalarGlow))
         ) {
             target.dispose();
             target = null;
         }
         if (!target) {
             target = ctx.createRenderTarget({
-                format: kind === "glow" ? "rgba16f" : "r16f",
+                format: kind === "glow" && !scalarGlow ? "rgba16f" : "r16f",
                 ...(kind !== "core"
                     ? { size: [outputSize[0], outputSize[1]] as const }
                     : {}),
@@ -590,22 +610,27 @@ export class SaberGlowPasses {
                 this.#core = target;
             } else {
                 this.#distortedGlow = target;
+                this.#scalarGlow = scalarGlow;
             }
         }
         const angle = (params.windDirection * Math.PI) / 180;
         const distance = ctx.time * params.windSpeed;
         const fragment =
-            bounds?.lineWidth && params.composite === "distort"
+            scalarGlow && kind === "glow"
                 ? params.noiseTurbulence > 0
-                    ? FRAG_DISTORT_CONTOUR_TURBULENT
-                    : FRAG_DISTORT_CONTOUR
-                : bounds
+                    ? FRAG_DISTORT_SCALAR_TURBULENT
+                    : FRAG_DISTORT_SCALAR
+                : bounds?.lineWidth && params.composite === "distort"
                   ? params.noiseTurbulence > 0
-                      ? FRAG_DISTORT_BOUNDED_TURBULENT
-                      : FRAG_DISTORT_BOUNDED
-                  : params.noiseTurbulence > 0
-                    ? FRAG_DISTORT_TURBULENT
-                    : FRAG_DISTORT;
+                      ? FRAG_DISTORT_CONTOUR_TURBULENT
+                      : FRAG_DISTORT_CONTOUR
+                  : bounds
+                    ? params.noiseTurbulence > 0
+                        ? FRAG_DISTORT_BOUNDED_TURBULENT
+                        : FRAG_DISTORT_BOUNDED
+                    : params.noiseTurbulence > 0
+                      ? FRAG_DISTORT_TURBULENT
+                      : FRAG_DISTORT;
         const uniforms = {
             ...(bounds
                 ? {

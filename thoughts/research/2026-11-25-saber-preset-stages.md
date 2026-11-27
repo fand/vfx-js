@@ -877,3 +877,48 @@ Full-contour and Reveal context restoration, resize, dynamic/static transitions
 and lifecycle checks pass; disposal releases every tracked object. GL errors0.
 Artifacts: ignored results/stage21-evidence/ (qa.json, frame-diff.json, timing.json).
 Review: http://127.0.0.1:6040/stage21.html?before=stage20-presets#fire
+
+## 22. Scalar warped Glow
+
+Stage21 baseline. The packed Glow path writes only its active component to a
+full-resolution R16F target. Stationary bypass and unwarped Halo are sampled
+from the cached RGBA16F base in the final composite. Explicit half-float packing
+retains the former intermediate store's rounding. Warped Halo, no-distortion
+composition and general multi-channel distortion probes retain their paths.
+The scalar warp shader also skips the redundant stationary-channel read.
+No preset, noise, sampling-resolution or color-response changes.
+
+960×540 source,DPR2,pad320, full contours, tracked texture storage (MiB):
+
+| Preset | Stage20 steady | Stage21 steady | Stage22 steady | Stage22 rebuild/dynamic peak |
+|---|---:|---:|---:|---:|
+| Arc Reactor |231.94|221.06|177.85|235.47|
+| Fire |200.22|189.28|146.06|203.68|
+| Torch |184.81|181.19|137.97|195.59|
+
+The full-resolution Glow target alone saves43.21MiB vs Stage21. These are
+texture allocations, not total process/driver VRAM, and exclude active Reveal
+payload storage. Stage21+22 save54.09MiB for Arc Reactor and54.15MiB for Fire.
+
+All12 presets × DPR1/2 × t=1,1.5,2 have zero screen-pixel difference.
+All864 review PNGs are byte-identical to Stage21 (and Stage20).
+The90 custom storage checks cover partial bypass, HDR/tint, shutter/flow,
+Multiply, unwarped/disabled Halo, no distortion, Reveal/full transitions,
+disabled Glow, all-layer distortion, preset changes and dynamic sources at
+DPR1/1.5/2, including forced legacy float storage. Every screen byte matches.
+Full-contour/Reveal context restore, resize, lifecycle and disposal checks pass;
+GL errors0.45 effects tests and ESM/CJS builds pass.
+
+Artifacts: ignored results/stage22-evidence/ (qa.json, frame-diff.json,
+timing.json and benchmark-storage.mjs). Review:
+http://127.0.0.1:6040/stage22.html?before=stage20-presets#fire
+
+Timing: six presets × DPR1/2 × two alternating orders,80 GPU samples after30
+warmup frames,batch3. DPR2 paired median means ranged0.884–1.050× baseline.
+Initial DPR1 Fire/Torch slowdowns did not reproduce with60 warmup frames,
+120 samples,batch4 and reversed starting order: Fire2.530→2.315ms,
+Torch1.313→1.302ms, Windy2.175→2.170ms, Electric2.210→2.197ms,
+Energy2.217→2.200ms. Arc Reactor2.210→2.392ms (+0.182ms,8.2%); this phase
+does not guarantee faster rendering at low DPR. Memory reduction and captured
+pixel parity are deterministic; timings remain device/load dependent. All GL
+errors0. Confirmation evidence: timing-confirm.json and confirm-storage.mjs.
