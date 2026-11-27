@@ -342,6 +342,32 @@ Reveal transitions, source composition and dynamic inputs at DPR1/1.5/2,
 including forced legacy float fallback. It requires zero changed screen bytes,
 zero GL errors and complete resource disposal. Progress: `window.saberStorageJob`.
 
+### Per-pass GPU timing
+
+From a frozen harness containing `ae-source.png` in its parent directory, run
+`await (await import('./saber-pass-profile.mjs')).runPassProfile()`.
+The server must accept POST under `/results/`. The default matrix covers the
+eleven distinct presets at DPR1/2, forty warmup frames and two rounds of48
+samples per pass. Embers aliases Burning. Results (including raw samples,
+renderer hashes and hardware) go to `results/stage22-pass-profile/profile.json`;
+progress is in `window.saberPassProfile`. `destination` overrides the result folder.
+
+On the measured ANGLE/Metal backend, inline queries grew with the pass's position
+in the frame, including after a preceding `gl.finish()`. The default profiler
+therefore records the real draw commands/textures and replays only the selected
+draw during each timed frame. It drains GPU work outside the measured interval,
+uses non-nested `EXT_disjoint_timer_query_webgl2` queries, reads results
+asynchronously and discards disjoint intervals. Pass medians are isolated replay
+costs, **not additive in-frame attribution**. Full VFX frames are also timed
+separately with ordinary uninterrupted rendering (batch3,60 samples).
+Initialization, field rebuilds and Blur cache regeneration are outside this
+steady animation matrix. Final composition includes the host's target setup.
+
+The profiler checks equal Core/Halo noise samples, query errors, sample counts,
+and exact screen-byte parity after restoring normal rendering. It changes only
+the diagnostic subclass, never the shipped renderer. Keep the tab open until
+`window.saberPassProfile.done` is true; an `error` means results are incomplete.
+
 `ae-saber-color-palette.jsx` exports 185 isolated color/radiance cases.
 `analyze-saber-color-palette.py <export directory> <output.json>` regenerates the
 36 hue curves (requires NumPy and pypng). Values in `_saber-color.ts` are rounded

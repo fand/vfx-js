@@ -69,6 +69,7 @@ await cp(
 for (const file of [
     "saber-field-checks.mjs",
     "saber-storage-checks.mjs",
+    "saber-pass-profile.mjs",
     "saber-color-composition-checks.mjs",
     "saber-color-composition.json",
 ]) {
