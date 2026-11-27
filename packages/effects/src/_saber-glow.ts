@@ -558,7 +558,16 @@ export class SaberGlowPasses {
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
     #scalarGlow = false;
-    #noise: Partial<Record<"core" | "glow" | "halo", EffectRenderTarget>> = {};
+    #noise: Partial<
+        Record<
+            "core" | "glow" | "halo",
+            {
+                target: EffectRenderTarget;
+                key: readonly number[];
+                gl: WebGL2RenderingContext;
+            }
+        >
+    > = {};
     #down: EffectRenderTarget[] = [];
     #layers: ([EffectRenderTarget, EffectRenderTarget] | null)[] = [];
     #kernels: {
@@ -584,6 +593,9 @@ export class SaberGlowPasses {
         // Packed Saber glow: only R moves; the final composite reads the
         // stationary channels from src. General layered probes keep RGBA.
         scalarGlow = false,
+        // Halo may borrow Core's grid. Ownership stays with the Core passes;
+        // different coordinates, evolution or noise settings fall back below.
+        coreNoise?: SaberGlowPasses,
     ): EffectRenderTarget {
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
@@ -743,34 +755,77 @@ export class SaberGlowPasses {
                             uniforms.motionBlur) /
                         2,
                 ) + 2;
-            let field = this.#noise[kind];
-            if (field && (field.width !== width || field.height !== height)) {
-                field.dispose();
-                field = undefined;
-            }
-            field ??= ctx.createRenderTarget({
-                // Only RG carries the displacement. Keep 32-bit precision and
-                // the existing float fallback on devices without linear 32F.
-                ...(ctx.gl.getExtension("OES_texture_float_linear") &&
-                ctx.gl.getExtension("EXT_float_blend")
-                    ? { format: "rg32f" as const }
-                    : { float: true }),
-                size: [width, height],
-            });
-            this.#noise[kind] = field;
+            // Capture all inputs to distortionAt(0) and noiseGridOrigin(),
+            // including the host's content mapping. Light/coverage controls
+            // (amount, composite, directionality) do not change the grid.
+            const key = [
+                width,
+                height,
+                ctx.dims.pixelRatio,
+                ...ctx.dims.element,
+                ...ctx.dims.contentRect,
+                ...uniforms.bufferSize,
+                ...uniforms.noiseMargin,
+                ...uniforms.wind,
+                ...uniforms.windVelocity,
+                uniforms.clock,
+                uniforms.noiseScale,
+                uniforms.noiseBias,
+                uniforms.noiseDetail,
+                uniforms.noiseTurbulence,
+                uniforms.aspect,
+                uniforms.seed,
+                uniforms.complexity,
+                uniforms.noiseType,
+                uniforms.polarity,
+            ];
+            const shared =
+                kind === "halo" && coreNoise
+                    ? coreNoise.#noise.core
+                    : undefined;
+            const reusable =
+                shared?.gl === ctx.gl &&
+                shared.key.length === key.length &&
+                key.every((value, i) => value === shared.key[i]);
             const shaders = noiseShaders(fragment);
-            ctx.draw({
-                frag: shaders.field,
-                uniforms: { ...uniforms, noiseFieldPass: 1 },
-                target: field,
-            });
+            let field: EffectRenderTarget;
+            if (reusable) {
+                this.#noise[kind]?.target.dispose();
+                delete this.#noise[kind];
+                field = shared.target;
+            } else {
+                let owned = this.#noise[kind]?.target;
+                if (
+                    owned &&
+                    (owned.width !== width || owned.height !== height)
+                ) {
+                    owned.dispose();
+                    owned = undefined;
+                }
+                owned ??= ctx.createRenderTarget({
+                    // Only RG carries the displacement. Keep 32-bit precision and
+                    // the existing float fallback without linear 32F support.
+                    ...(ctx.gl.getExtension("OES_texture_float_linear") &&
+                    ctx.gl.getExtension("EXT_float_blend")
+                        ? { format: "rg32f" as const }
+                        : { float: true }),
+                    size: [width, height],
+                });
+                this.#noise[kind] = { target: owned, key, gl: ctx.gl };
+                field = owned;
+                ctx.draw({
+                    frag: shaders.field,
+                    uniforms: { ...uniforms, noiseFieldPass: 1 },
+                    target: field,
+                });
+            }
             ctx.draw({
                 frag: shaders.cached,
                 uniforms: { ...uniforms, noiseField: field },
                 target,
             });
         } else {
-            this.#noise[kind]?.dispose();
+            this.#noise[kind]?.target.dispose();
             delete this.#noise[kind];
             ctx.draw({ frag: fragment, uniforms, target });
         }
@@ -1066,9 +1121,9 @@ export class SaberGlowPasses {
 
     dispose(): void {
         this.releaseLayers();
-        this.#noise.core?.dispose();
-        this.#noise.halo?.dispose();
-        this.#noise.glow?.dispose();
+        this.#noise.core?.target.dispose();
+        this.#noise.halo?.target.dispose();
+        this.#noise.glow?.target.dispose();
         this.#noise = {};
         this.#core?.dispose();
         this.#output?.dispose();

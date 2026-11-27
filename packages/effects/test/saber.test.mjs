@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { saberColorRamp } from "../lib/esm/_saber-color.js";
 import { saberFlickerGain } from "../lib/esm/_saber-flicker.js";
-import { DEFAULT_DISTORTION } from "../lib/esm/_saber-glow.js";
+import { DEFAULT_DISTORTION, SaberGlowPasses } from "../lib/esm/_saber-glow.js";
 import { SaberEffect } from "../lib/esm/saber.js";
 import { SABER_PRESETS } from "../lib/esm/saber-presets.js";
 
@@ -1066,9 +1066,7 @@ test("resize, layer changes and disposal release explicit targets without feedba
     effect.init(f.ctx);
     f.render(effect);
     assert.ok(
-        f.draws.some(
-            (d) => d.uniforms.haloPass === 1 && d.uniforms.noiseFieldPass === 1,
-        ),
+        f.draws.some((d) => d.uniforms.haloPass === 1 && d.uniforms.noiseField),
     );
     const first = f.targets.filter((t) => t.explicit);
     f.resize();
@@ -1243,7 +1241,14 @@ test("noise grids retain precision with RG32F and fall back without float extens
         effect.init(f.ctx);
         f.render(effect);
         const grids = f.draws.filter((d) => d.uniforms.noiseFieldPass === 1);
-        assert.equal(grids.length, 3);
+        assert.equal(grids.length, 2);
+        const warps = f.draws.filter((d) => d.uniforms.noiseField);
+        assert.equal(
+            warps.find((d) => d.uniforms.haloPass === 1).uniforms.noiseField,
+            warps.find(
+                (d) => d.uniforms.haloPass === 0 && d.uniforms.glowPass === 0,
+            ).uniforms.noiseField,
+        );
         for (const { target } of grids) {
             assert.equal(target.format, missing ? undefined : "rg32f");
         }
@@ -1282,4 +1287,130 @@ test("scalar glow switches between warped, flow-only and unwarped composition", 
     assert.ok(!f.render(effect).frag.includes("#define SCALAR_GLOW"));
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("Halo borrows matching Core noise without owning it; stale grids fall back", () => {
+    const f = fixture();
+    const core = new SaberGlowPasses();
+    const halo = new SaberGlowPasses();
+    const params = { ...DEFAULT_DISTORTION, amount: 20 };
+    const renderCore = () => core.distort(f.ctx, f.ctx.src, params, "core");
+    const renderHalo = (overrides = {}) =>
+        halo.distort(
+            f.ctx,
+            f.ctx.src,
+            { ...params, ...overrides },
+            "halo",
+            false,
+            undefined,
+            0,
+            [1, 1, 1],
+            [128, 96],
+            false,
+            core,
+        );
+    const field = () => f.draws.at(-1).uniforms.noiseField;
+    renderCore();
+    const shared = field();
+    renderHalo();
+    assert.equal(field(), shared);
+    // Light controls do not affect the noise grid.
+    renderHalo({ amount: 40, composite: "multiply", directionality: 1 });
+    assert.equal(field(), shared);
+    for (const overrides of [
+        { noiseScale: params.noiseScale + 1 },
+        { noiseBias: 2 },
+        { noiseDetail: 1 },
+        { noiseTurbulence: 1 },
+        { noiseAspectRatio: 2 },
+        { noiseComplexity: 7 },
+        { type: "energy" },
+        { invert: true },
+        { seed: 21 },
+        { windSpeed: 88 },
+        { noiseSpeed: 7 },
+        { motionBlur: 0.2 },
+    ]) {
+        renderHalo(overrides);
+        const fallback = field();
+        assert.notEqual(fallback, shared, JSON.stringify(overrides));
+        renderHalo();
+        assert.equal(field(), shared);
+        assert.ok(fallback.disposed);
+    }
+    f.ctx.time += 1;
+    renderHalo();
+    assert.notEqual(field(), shared, "older evolution cannot be shared");
+    renderCore();
+    renderHalo();
+    assert.equal(field(), shared);
+    f.ctx.dims.contentRect[0] += 1;
+    renderHalo();
+    assert.notEqual(field(), shared, "content mapping is part of the key");
+    renderCore();
+    renderHalo();
+    assert.equal(field(), shared);
+    halo.dispose();
+    assert.equal(shared.disposed, false, "borrower never releases Core's grid");
+    core.dispose();
+    assert.ok(f.targets.every((target) => target.disposed));
+});
+
+test("frozen Core shares its cached grid when only Halo light changes", () => {
+    const f = fixture();
+    const effect = steadyEffect({
+        coreDistortion: { amount: 20, windSpeed: 0, noiseSpeed: 0 },
+    });
+    effect.init(f.ctx);
+    f.render(effect);
+    const shared = f.draws.find((d) => d.uniforms.noiseField)?.uniforms
+        .noiseField;
+    effect.setParams({ haloSize: 80 });
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.uniforms.noiseFieldPass === 1));
+    assert.equal(
+        f.draws.find((d) => d.uniforms.haloPass === 1).uniforms.noiseField,
+        shared,
+    );
+    effect.dispose();
+});
+
+test("every active preset Core/Halo pair shares one noise grid; Torch skips both", () => {
+    for (const preset of Object.keys(SABER_PRESETS)) {
+        const f = fixture();
+        const effect = new SaberEffect({ preset });
+        effect.init(f.ctx);
+        for (let frame = 0; frame < 2; frame++) {
+            f.render(effect);
+            const grids = f.draws.filter(
+                (d) => d.uniforms.noiseFieldPass === 1,
+            );
+            assert.equal(grids.length, preset === "torch" ? 1 : 2, preset);
+            assert.ok(
+                grids.every((d) => d.uniforms.haloPass === 0),
+                preset,
+            );
+            if (preset !== "torch") {
+                const core = f.draws.find(
+                    (d) =>
+                        d.uniforms.noiseField &&
+                        d.uniforms.glowPass === 0 &&
+                        d.uniforms.haloPass === 0,
+                );
+                const halo = f.draws.find(
+                    (d) => d.uniforms.noiseField && d.uniforms.haloPass === 1,
+                );
+                assert.equal(
+                    core.uniforms.noiseField,
+                    halo.uniforms.noiseField,
+                    preset,
+                );
+            }
+        }
+        effect.dispose();
+        assert.ok(
+            f.targets.filter((t) => t.explicit).every((t) => t.disposed),
+            preset,
+        );
+    }
 });

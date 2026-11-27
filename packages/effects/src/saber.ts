@@ -1118,6 +1118,8 @@ export class SaberEffect implements Effect {
                         0,
                         [1, 1, 1],
                         [core.width, core.height],
+                        false,
+                        this.#glowPasses,
                     );
                     this.#haloResultKey = haloKey;
                 }

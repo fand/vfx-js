@@ -922,3 +922,48 @@ Energy2.217→2.200ms. Arc Reactor2.210→2.392ms (+0.182ms,8.2%); this phase
 does not guarantee faster rendering at low DPR. Memory reduction and captured
 pixel parity are deterministic; timings remain device/load dependent. All GL
 errors0. Confirmation evidence: timing-confirm.json and confirm-storage.mjs.
+
+
+## 23. Shared Core/Halo noise
+
+Stage22 baseline (`ba7e8914`). Halo borrows the Core distortion noise grid
+when its effective inputs, content mapping, dimensions, time and GL context
+match. The Core passes retain ownership. A mismatched grid falls back to an
+independent allocation; returning to shared mode releases the fallback.
+Frozen Core noise can also be reused when only Halo light changes.
+Halo's light warp remains independent. No preset, shader arithmetic, sampling
+resolution or public parameter changes. Ten native presets eliminate one noise
+generation draw and one texture/framebuffer; Torch still has only Glow noise.
+
+960×540 source, DPR2, pad320, full contours, tracked texture storage (MiB):
+
+| Preset | Stage22 steady | Stage23 steady | Stage23 rebuild/dynamic peak |
+|---|---:|---:|---:|
+| Arc Reactor |177.85|174.23|231.84|
+| Fire |146.06|142.41|200.03|
+| Tractor Beam |146.03|142.31|199.93|
+| Torch |137.97|137.97|195.59|
+
+Savings3.62–3.71MiB per active Core/Halo pair, independent of DPR because the
+noise grid uses content pixels. These are tracked texture allocations, not
+total driver/process VRAM; active Reveal payloads are excluded from this table.
+
+All12 presets × DPR1/2 × t=1,1.5,2 have zero screen-pixel difference.
+All864 review PNGs are byte-identical to Stage22. The90 custom storage checks
+also match every screen byte, including forced legacy storage, fractional DPR,
+shutter/flow, Multiply, Reveal, dynamic sources and parameter transitions.
+Full-contour/Reveal context restoration, resize, lifecycle and disposal checks
+pass; GL errors0.48 effects tests and ESM/CJS builds pass. Whole-repo test run
+also passed17 tasks, including public API/skill checks.
+
+Artifacts: ignored results/stage23-evidence/ (qa.json, frame-diff.json,
+timing.json, timing-confirm.json), stage23-noise-share-renderer/manifest.json.
+Review: http://127.0.0.1:6040/stage23.html?before=stage22-presets#fire
+
+Whole-frame timing: two reversed orders,60 warmup frames,120 single-frame
+samples. Geometric mean of paired median ratios across ten affected presets:
+0.952 at DPR1,0.922 at DPR2. Some individual cases regress; no universal FPS
+claim. Additional80-sample batch8 confirmation and complete tables are in
+[the timing report](2026-11-27-saber-noise-sharing.md). Both confirmation runs
+have complete GPU sample counts and GL errors0. Initial batch3 pilot overlapped
+a repository build/test run and is excluded from performance conclusions.
