@@ -1227,3 +1227,30 @@ test("devices without linear float filtering keep the legacy field", () => {
     assert.equal(core.uniforms.compactField, 0);
     effect.dispose();
 });
+
+test("noise grids retain precision with RG32F and fall back without float extensions", () => {
+    for (const missing of [
+        null,
+        "OES_texture_float_linear",
+        "EXT_float_blend",
+    ]) {
+        const f = fixture();
+        f.ctx.gl.getExtension = (name) => (name === missing ? null : {});
+        const effect = steadyEffect({
+            coreDistortion: { amount: 8 },
+            glowDistortion: { amount: 20 },
+        });
+        effect.init(f.ctx);
+        f.render(effect);
+        const grids = f.draws.filter((d) => d.uniforms.noiseFieldPass === 1);
+        assert.equal(grids.length, 3);
+        for (const { target } of grids) {
+            assert.equal(target.format, missing ? undefined : "rg32f");
+        }
+        const count = f.targets.length;
+        f.render(effect);
+        assert.equal(f.targets.length, count);
+        effect.dispose();
+        assert.ok(grids.every((d) => d.target.disposed));
+    }
+});

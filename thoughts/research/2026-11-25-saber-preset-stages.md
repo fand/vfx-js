@@ -859,3 +859,21 @@ Electric/Energy results;50 warmup frames +100 samples,batch3 in alternating
 order gave Electric paired means2.98→2.98ms and Energy2.95→3.02ms. With dynamic
 sources at DPR2, repeated Arc Reactor medians21.80/21.98→13.63/13.36ms; Fire
 27.70/26.58→19.35/21.44ms. All GL errors0. No universal frame-rate claim.
+
+## 21. RG32F noise grids
+
+Stage20 baseline. Core, Glow and Halo noise grids store only the two32F
+displacement channels they sample. Float-linear/blend support gates RG32F;
+other devices retain the existing automatic float format. Grid spacing,
+noise arithmetic, presets and render-target resolutions are unchanged.
+
+960×540 source,DPR2,pad320, full contours, tracked texture storage:
+Arc Reactor231.94→221.06MiB; Fire200.22→189.28MiB. Typical three-grid savings
+are10.9MiB; Torch uses one grid and saves3.62MiB.
+
+All12 presets × DPR1/2 × t=1,1.5,2 have zero screen-pixel difference.
+All864 review PNGs are byte-identical to Stage20.44 effects tests pass.
+Full-contour and Reveal context restoration, resize, dynamic/static transitions
+and lifecycle checks pass; disposal releases every tracked object. GL errors0.
+Artifacts: ignored results/stage21-evidence/ (qa.json, frame-diff.json, timing.json).
+Review: http://127.0.0.1:6040/stage21.html?before=stage20-presets#fire

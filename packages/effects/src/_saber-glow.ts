@@ -724,7 +724,12 @@ export class SaberGlowPasses {
                 field = undefined;
             }
             field ??= ctx.createRenderTarget({
-                float: true,
+                // Only RG carries the displacement. Keep 32-bit precision and
+                // the existing float fallback on devices without linear 32F.
+                ...(ctx.gl.getExtension("OES_texture_float_linear") &&
+                ctx.gl.getExtension("EXT_float_blend")
+                    ? { format: "rg32f" as const }
+                    : { float: true }),
                 size: [width, height],
             });
             this.#noise[kind] = field;
