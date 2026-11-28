@@ -1010,3 +1010,65 @@ arc-reactor: 2.409→2.404ms (-0.2%).
 fire: 6.531→6.234ms (-4.6%).
 torch: 0.890→0.835ms (-6.1%).
 windy: 2.061→1.947ms (-5.6%).
+
+
+## 25. Fused Glow/Halo warp composition
+
+Stage24 baseline (`58b686df`). Glow/Halo cached-noise warp shaders are embedded
+as independent namespaced functions in final light composition. Their full-size
+R16F outputs are eliminated. Core retains its separate path. Presets and noise
+formulas are unchanged. Shader variants are cached without concatenating entire
+bodies each frame. A1×1 R16F probe identifies attachment rounding without CPU
+readback; the function reproduces that rounding before composing light. This
+backend truncates positive attachment writes, unlike packHalf2x16's nearest
+rounding. Recalibration runs after context restoration. On fractional DPR/output
+or source grids, retain the former intermediate interpolation. Static noise and
+base light stay cached; fused final warps execute with each composite.
+
+960×540,DPR2,pad320,tracked texture storage (MiB):
+
+| Preset | Stage23 steady | Stage24 steady | Stage25 steady | Stage25 rebuild/dynamic peak |
+|---|---:|---:|---:|---:|
+| Fire |142.41|114.82|86.02|116.05|
+| Arc Reactor |174.23|146.64|117.83|147.86|
+| Torch |137.97|110.39|95.98|126.02|
+
+Stage25 saves28.81MiB for a two-warp preset,14.40MiB for Torch (one warp),
+less the2-byte rounding probe. Stage24+25 save56.39MiB steady and83.98MiB at
+rebuild/dynamic peak for Fire/Arc Reactor. These are effect texture allocations,
+not total VRAM. Active Reveal still uses its existing full-size payload/field.
+
+All12 presets ×DPR1/2 ×t=1,1.5,2 have zero screen difference from Stage24.
+All864 review frames are byte-identical to Stage24. Custom storage cases at
+DPR1.5 (native and forced legacy) are byte-identical. At DPR1/2 some custom HDR,
+flow/Multiply and live mode-switch cases differ by1/255 in at most8 channel
+values per frame; strict byte-equality flags are retained as failures in raw
+storage output, not relabeled as passes. Fractional fallback avoids the earlier
+5/255 interpolation differences. Full/Reveal context restore, resize, lifecycle,
+GPU object disposal and GL-error checks pass.51 unit tests, ESM/CJS and changed
+file Biome checks pass. No public API changes.
+
+Evidence: ignored results/stage25-evidence/ and stage25-fused-v4/.
+Review: http://127.0.0.1:6040/stage25.html?before=stage24-presets#arc-reactor
+
+Timing: four presets ×DPR1/2 ×two reversed orders,40 warmup frames,
+80 samples,batch3. Full-frame GPU median means (ms), Apple M4 Max/Chrome158:
+
+| Preset | DPR1 before | DPR1 after | DPR2 before | DPR2 after |
+|---|---:|---:|---:|---:|
+| arc-reactor | 2.863 | 1.498 | 2.463 | 1.530 |
+| fire | 2.581 | 1.580 | 3.005 | 1.351 |
+| torch | 1.399 | 1.493 | 1.338 | 1.108 |
+| windy | 2.817 | 1.415 | 2.816 | 1.589 |
+
+DPR2 confirmation:60 warmup,120 samples,batch1,two reversed orders.
+Ordinary-frame GPU median means (ms):
+
+arc-reactor: 3.581→2.661ms (-25.7%).
+fire: 4.593→3.549ms (-22.7%).
+torch: 2.169→1.872ms (-13.7%).
+windy: 3.050→2.428ms (-20.4%).
+
+All16 runs contain120 GPU samples; GL errors0. Timing varies across runs,
+especially Fire; these measurements are device/workload-specific. DPR1 Torch
+had a small batch3 regression; no universal speedup claim.

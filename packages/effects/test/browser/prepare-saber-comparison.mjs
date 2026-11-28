@@ -90,6 +90,7 @@ for (const file of [
     "candidate/_saber-blur.js",
     "candidate/_saber-coverage.js",
     "candidate/_saber-field.js",
+    "candidate/_saber-warp.js",
     "candidate/_saber-flicker.js",
     "candidate/saber-presets.js",
     "core/gl/framebuffer.js",

@@ -8,6 +8,7 @@ import {
 } from "./_saber-blur.js";
 import { GLSL_LINE_COVERAGE } from "./_saber-coverage.js";
 import { GLSL_SABER_FIELD } from "./_saber-field.js";
+import type { SaberDeferredWarp } from "./_saber-warp.js";
 
 /** Independent procedural distortion; native noise patterns remain approximate. */
 export type SaberDistortionParams = {
@@ -554,6 +555,7 @@ void main() {
 // Auto-sized targets belong to the effect host. Explicit mip/layer targets are
 // released on resize and disposal.
 export class SaberGlowPasses {
+    deferred: SaberDeferredWarp | null = null;
     #core: EffectRenderTarget | null = null;
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
@@ -598,12 +600,30 @@ export class SaberGlowPasses {
         // Halo may borrow Core's grid. Ownership stays with the Core passes;
         // different coordinates, evolution or noise settings fall back below.
         coreNoise?: SaberGlowPasses,
+        defer = false,
     ): EffectRenderTarget {
+        if (kind !== "core") {
+            this.deferred = null;
+        }
+        if (defer) {
+            if (kind === "glow") {
+                this.#distortedGlow?.dispose();
+                this.#distortedGlow = null;
+            } else {
+                this.#core?.dispose();
+                this.#core = null;
+            }
+        }
         if (!(params.amount > 0) && !(flowDistance > 0)) {
             return src;
         }
-        let target = kind !== "glow" ? this.#core : this.#distortedGlow;
+        let target = defer
+            ? src
+            : kind !== "glow"
+              ? this.#core
+              : this.#distortedGlow;
         if (
+            !defer &&
             target &&
             kind !== "core" &&
             (target.width !== outputSize[0] ||
@@ -828,15 +848,27 @@ export class SaberGlowPasses {
                     target: field,
                 });
             }
-            ctx.draw({
-                frag: shaders.cached,
+            const warped = {
+                fragment: shaders.cached,
                 uniforms: { ...uniforms, noiseField: field },
-                target,
-            });
+            };
+            if (defer) {
+                this.deferred = warped;
+            } else {
+                ctx.draw({
+                    frag: warped.fragment,
+                    uniforms: warped.uniforms,
+                    target,
+                });
+            }
         } else {
             this.#noise[kind]?.target.dispose();
             delete this.#noise[kind];
-            ctx.draw({ frag: fragment, uniforms, target });
+            if (defer) {
+                this.deferred = { fragment, uniforms };
+            } else {
+                ctx.draw({ frag: fragment, uniforms, target });
+            }
         }
         return target;
     }
@@ -1129,6 +1161,7 @@ export class SaberGlowPasses {
     }
 
     dispose(): void {
+        this.deferred = null;
         this.releaseLayers();
         this.#noise.core?.target.dispose();
         this.#noise.halo?.target.dispose();

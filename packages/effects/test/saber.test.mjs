@@ -439,9 +439,9 @@ test("turbulent advection invalidates only the glow result and clamps its streng
         effect.setParams({ glowDistortion: { noiseTurbulence: strength } });
         f.render(effect);
         const distortion = f.draws.filter((d) => d.uniforms.glowPass === 1);
-        assert.equal(distortion.length, 2);
+        assert.equal(distortion.length, 1);
         assert.equal(distortion[0].uniforms.noiseTurbulence, expected);
-        assert.equal(f.draws.length, 3); // Noise grid + distortion + composition; no new light blur.
+        assert.equal(f.draws.length, 2); // Noise grid + fused composition; no new light blur.
         f.render(effect);
         assert.equal(f.draws.length, 1);
     }
@@ -456,7 +456,7 @@ test("flow-only glow caches blurs while reach, direction and wind sign stay live
     const f = fixture();
     effect.init(f.ctx);
     f.render(effect);
-    assert.ok(f.draws.some((d) => d.uniforms.flowOffset?.[1] > 0));
+    assert.ok(f.draws.some((d) => d.uniforms.gw_flowOffset?.[1] > 0));
     f.render(effect);
     assert.equal(f.draws.length, 1);
     for (const options of [
@@ -466,7 +466,7 @@ test("flow-only glow caches blurs while reach, direction and wind sign stay live
     ]) {
         effect.setParams(options);
         f.render(effect);
-        const distortion = f.draws.find((d) => d.uniforms.flowOffset);
+        const distortion = f.draws.find((d) => d.uniforms.gw_flowOffset);
         assert.ok(
             distortion,
             "flow changes redraw distortion even with amount zero",
@@ -478,7 +478,7 @@ test("flow-only glow caches blurs while reach, direction and wind sign stay live
     }
     effect.setParams({ glowFlow: 0 });
     f.render(effect);
-    assert.ok(!f.draws.some((d) => d.uniforms.flowOffset));
+    assert.ok(!f.draws.some((d) => d.uniforms.gw_flowOffset));
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
@@ -722,14 +722,14 @@ test("static light is reused while glow distortion and composition stay live", (
     f.render(effect);
     assert.equal(
         f.draws.length,
-        3,
-        "animated noise grid, glow distortion and final composition",
+        2,
+        "animated noise grid and fused final composition",
     );
     assert.equal(f.draws[0].uniforms.glowPass, 1);
     effect.params.color = "#ff8800";
     effect.params.glowBias = 1;
     const composite = f.render(effect);
-    assert.equal(f.draws.length, 3);
+    assert.equal(f.draws.length, 2);
     assert.equal(composite.uniforms.glowBias, undefined);
     assert.deepEqual(
         composite.uniforms.colorRamp,
@@ -763,7 +763,7 @@ test("static light is reused while glow distortion and composition stay live", (
         "animated Core and Halo reuse their original blur pyramid",
     );
     assert.ok(!f.draws.some((d) => isCore(d)));
-    assert.ok(f.draws.some((d) => d.uniforms.haloPass === 1));
+    assert.ok(f.draws.some((d) => d.uniforms.hw_haloPass === 1));
     effect.setParams({ haloIntensity: 0 });
     f.render(effect);
     f.render(effect);
@@ -1065,10 +1065,9 @@ test("resize, layer changes and disposal release explicit targets without feedba
     });
     effect.init(f.ctx);
     f.render(effect);
-    assert.ok(
-        f.draws.some((d) => d.uniforms.haloPass === 1 && d.uniforms.noiseField),
-    );
-    const first = f.targets.filter((t) => t.explicit);
+    assert.ok(f.draws.some((d) => d.uniforms.hw_noiseField));
+    const rounding = f.draws.at(-1).uniforms.warpRounding;
+    const first = f.targets.filter((t) => t.explicit && t !== rounding);
     f.resize();
     f.render(effect);
     assert.ok(first.every((t) => t.disposed));
@@ -1244,7 +1243,7 @@ test("noise grids retain precision with RG32F and fall back without float extens
         assert.equal(grids.length, 2);
         const warps = f.draws.filter((d) => d.uniforms.noiseField);
         assert.equal(
-            warps.find((d) => d.uniforms.haloPass === 1).uniforms.noiseField,
+            f.draws.at(-1).uniforms.hw_noiseField,
             warps.find(
                 (d) => d.uniforms.haloPass === 0 && d.uniforms.glowPass === 0,
             ).uniforms.noiseField,
@@ -1265,8 +1264,10 @@ test("scalar glow switches between warped, flow-only and unwarped composition", 
     const effect = steadyEffect({ glowDistortion: { amount: 20 } });
     effect.init(f.ctx);
     const warped = f.render(effect);
-    assert.equal(warped.uniforms.glowTex.format, "r16f");
-    assert.equal(warped.uniforms.glowTex.width, 256);
+    assert.equal(warped.uniforms.glowTex.format, "rgba16f");
+    assert.equal(warped.uniforms.glowTex.width, 128);
+    assert.equal(warped.uniforms.gw_src, warped.uniforms.glowBase);
+    assert.ok(warped.frag.includes("gw_sample()"));
     assert.equal(warped.uniforms.glowBase.format, "rgba16f");
     assert.equal(warped.uniforms.glowBase.width, 128);
     assert.ok(warped.frag.includes("#define SCALAR_GLOW"));
@@ -1368,10 +1369,7 @@ test("frozen Core shares its cached grid when only Halo light changes", () => {
     effect.setParams({ haloSize: 80 });
     f.render(effect);
     assert.ok(!f.draws.some((d) => d.uniforms.noiseFieldPass === 1));
-    assert.equal(
-        f.draws.find((d) => d.uniforms.haloPass === 1).uniforms.noiseField,
-        shared,
-    );
+    assert.equal(f.draws.at(-1).uniforms.hw_noiseField, shared);
     effect.dispose();
 });
 
@@ -1397,12 +1395,10 @@ test("every active preset Core/Halo pair shares one noise grid; Torch skips both
                         d.uniforms.glowPass === 0 &&
                         d.uniforms.haloPass === 0,
                 );
-                const halo = f.draws.find(
-                    (d) => d.uniforms.noiseField && d.uniforms.haloPass === 1,
-                );
+                const halo = f.draws.at(-1);
                 assert.equal(
                     core.uniforms.noiseField,
-                    halo.uniforms.noiseField,
+                    halo.uniforms.hw_noiseField,
                     preset,
                 );
             }
@@ -1444,6 +1440,61 @@ test("distance windows crop allocations, retain full-pixel sampling and restore 
     assert.deepEqual(revealed.fieldOrigin, [0, 0]);
     assert.equal(revealed.field.width, 3200);
     assert.ok(field.disposed);
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("fused Glow/Halo keep no full-size warp targets and calibrate rounding once per context", () => {
+    const f = fixture({ width: 320, height: 240, pixelRatio: 2 });
+    const effect = new SaberEffect({ preset: "fire" });
+    effect.init(f.ctx);
+    const first = f.render(effect);
+    const probe = first.uniforms.warpRounding;
+    assert.deepEqual([probe.width, probe.height, probe.format], [1, 1, "r16f"]);
+    assert.ok(
+        first.frag.includes("gw_sample()") &&
+            first.frag.includes("hw_sample()"),
+    );
+    const warped = f.draws.filter((d) => d.uniforms.noiseField);
+    assert.equal(warped.length, 1, "only Core has a separate warp pass");
+    assert.ok(
+        !f.targets.some(
+            (t) =>
+                t.explicit &&
+                t.width === 320 &&
+                t.height === 240 &&
+                t.format === "r16f",
+        ),
+    );
+    f.render(effect);
+    assert.ok(!f.draws.some((d) => d.target === probe));
+    f.restore();
+    f.render(effect);
+    assert.equal(f.draws.filter((d) => d.target === probe).length, 1);
+    effect.dispose();
+    assert.ok(probe.disposed);
+});
+
+test("fractional raster grids retain intermediate interpolation", () => {
+    const f = fixture({ width: 480, height: 360, pixelRatio: 1.5 });
+    const effect = new SaberEffect({ preset: "fire" });
+    effect.init(f.ctx);
+    const final = f.render(effect);
+    assert.equal(final.uniforms.warpRounding, undefined);
+    assert.equal(final.uniforms.glowTex.format, "r16f");
+    assert.equal(final.uniforms.haloTex.format, "r16f");
+    assert.equal(f.draws.filter((d) => d.uniforms.noiseField).length, 3);
+    f.ctx.dims.pixelRatio = 2;
+    const fused = f.render(effect);
+    assert.ok(fused.uniforms.warpRounding);
+    assert.ok(
+        final.uniforms.glowTex.disposed && final.uniforms.haloTex.disposed,
+    );
+    f.ctx.dims.pixelRatio = 1.5;
+    const restored = f.render(effect);
+    assert.equal(restored.uniforms.warpRounding, undefined);
+    assert.equal(restored.uniforms.glowTex.format, "r16f");
+    assert.notEqual(restored.uniforms.glowTex, final.uniforms.glowTex);
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });

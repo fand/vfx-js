@@ -24,6 +24,7 @@ import {
     type SaberGlowLayers,
     SaberGlowPasses,
 } from "./_saber-glow.js";
+import { SaberWarpComposer } from "./_saber-warp.js";
 import { SABER_PRESETS, type SaberPresetName } from "./saber-presets.js";
 
 export type { SaberDistortionParams, SaberGlowLayer } from "./_saber-glow.js";
@@ -705,6 +706,7 @@ export class SaberEffect implements Effect {
     #region: EffectGeometry | undefined;
     #regionKey: readonly number[] = [];
     #glowPasses = new SaberGlowPasses();
+    #warpComposer = new SaberWarpComposer();
     #rampColor = "";
     #colorRamp: Float32Array = new Float32Array(99);
     #dirty = true;
@@ -807,6 +809,7 @@ export class SaberEffect implements Effect {
         this.#dirty = true;
         // Restored targets come back empty, so the cached field must be built again.
         ctx.onContextRestored(() => {
+            this.#warpComposer.invalidate();
             this.#compactSupported = !!(
                 ctx.gl.getExtension("OES_texture_float_linear") &&
                 ctx.gl.getExtension("EXT_float_blend")
@@ -1020,6 +1023,12 @@ export class SaberEffect implements Effect {
             effectiveLayers.some(
                 (layer) => layer.size > 0 && layer.intensity > 0,
             );
+        // Fractional raster grids need the old intermediate's interpolation.
+        // Keep that path rather than evaluate a warp four times per final pixel.
+        const fuseWarps =
+            Number.isInteger(ctx.dims.pixelRatio) &&
+            this.outputRect(ctx.dims).every(Number.isInteger) &&
+            ctx.dims.srcRect.every(Number.isInteger);
         let glowTex = core;
         let glowLayers: SaberGlowLayers | undefined;
         let haloTex: EffectRenderTarget | undefined;
@@ -1122,6 +1131,7 @@ export class SaberEffect implements Effect {
             glowLayers = this.#glowLayers;
             const glowResultKey = [
                 this.#glowBaseVersion,
+                fuseWarps,
                 this.params.glowFlow,
                 this.params.glowDistortion.windDirection,
                 this.params.glowDistortion.windSpeed < 0,
@@ -1142,12 +1152,15 @@ export class SaberEffect implements Effect {
                     [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
                     [core.width, core.height],
                     true,
+                    undefined,
+                    fuseWarps,
                 );
                 this.#glowResultKey = glowResultKey;
             }
             if (warpHalo) {
                 const haloKey = [
                     this.#glowBaseVersion,
+                    fuseWarps,
                     ...distortionKey(this.params.coreDistortion, ctx.time),
                 ];
                 if (
@@ -1166,6 +1179,7 @@ export class SaberEffect implements Effect {
                         [core.width, core.height],
                         false,
                         this.#glowPasses,
+                        fuseWarps,
                     );
                     this.#haloResultKey = haloKey;
                 }
@@ -1192,12 +1206,18 @@ export class SaberEffect implements Effect {
             this.params.flickerSpeed,
             this.params.flickerSeed,
         );
+        const deferredGlow =
+            glowEnabled && !glowLayers ? this.#glowPasses.deferred : null;
+        const deferredHalo = haloTex ? this.#haloPasses.deferred : null;
         const scalarGlowBase =
-            glowEnabled && !glowLayers && glowTex !== this.#glowBase
+            glowEnabled &&
+            !glowLayers &&
+            (deferredGlow || glowTex !== this.#glowBase)
                 ? this.#glowBase
                 : null;
-        ctx.draw({
-            frag: COMPOSITE_SHADERS[
+        const fused = this.#warpComposer.compose(
+            ctx,
+            COMPOSITE_SHADERS[
                 (glowLayers ? 1 : 0) |
                     (customTint ? 2 : 0) |
                     (this.params.coreBlendOnTop &&
@@ -1208,7 +1228,13 @@ export class SaberEffect implements Effect {
                     (haloTex ? 8 : 0) |
                     (scalarGlowBase ? 16 : 0)
             ],
+            deferredGlow,
+            deferredHalo,
+        );
+        ctx.draw({
+            frag: fused.fragment,
             uniforms: {
+                ...fused.uniforms,
                 ...glowLayers,
                 src: ctx.src,
                 core: displayedCore,
@@ -1245,6 +1271,7 @@ export class SaberEffect implements Effect {
     }
 
     dispose(): void {
+        this.#warpComposer.dispose();
         this.#glowPasses.dispose();
         this.#haloPasses.dispose();
         this.#haloResult = null;
