@@ -265,7 +265,7 @@ float maskGain(vec2 n) {
 float nearbyDistance(vec2 delta, float offset) {
     vec2 n = cachedNoiseAt(uvContent * contentSize + delta * bufferSize - windVelocity * offset);
     n = mix(n, flowDirection * dot(n, flowDirection), directionality);
-    return texture(contourField, uv + delta + n * amount / bufferSize).r;
+    return sampleSaberDistance(contourField, uv + delta + n * amount / bufferSize);
 }
 #endif
 
@@ -304,7 +304,7 @@ void main() {
 #ifdef CORE_BOUNDS
     // The support bound includes displacement and shutter transport. Decide once per
     // derivative quad; retained quads still evaluate every derivative lane.
-    vec4 bounds = texelFetch(contourField, ivec2(gl_FragCoord.xy) & ~1, 0);
+    vec4 bounds = fetchSaberField(contourField, ivec2(gl_FragCoord.xy) & ~1);
     if (saberFieldValidity(bounds) < 0.5 || abs(bounds.r) > supportReach) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
@@ -584,6 +584,8 @@ export class SaberGlowPasses {
         bounds?: {
             field: EffectRenderTarget;
             compact?: boolean;
+            origin?: readonly number[];
+            bufferSize?: readonly number[];
             reach: number;
             lineWidth?: number;
         },
@@ -648,6 +650,13 @@ export class SaberGlowPasses {
                 ? {
                       contourField: bounds.field,
                       compactField: bounds.compact ? 1 : 0,
+                      fieldOrigin: [...(bounds.origin ?? [0, 0])],
+                      fieldBufferSize: [
+                          ...(bounds.bufferSize ?? [
+                              bounds.field.width,
+                              bounds.field.height,
+                          ]),
+                      ],
                       signedCoreWidth:
                           (bounds.lineWidth ?? 0) * ctx.dims.pixelRatio,
                       supportReach:

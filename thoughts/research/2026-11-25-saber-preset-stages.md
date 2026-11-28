@@ -967,3 +967,46 @@ claim. Additional80-sample batch8 confirmation and complete tables are in
 [the timing report](2026-11-27-saber-noise-sharing.md). Both confirmation runs
 have complete GPU sample counts and GL errors0. Initial batch3 pilot overlapped
 a repository build/test run and is excluded from performance conclusions.
+
+
+## 24. Cropped distance-field allocation
+
+Stage23 baseline (`336e9870`). Compact steady-contour fields and their jump-flood
+scratch now allocate the existing restricted raster window. Full output/core
+resolution, source sampling, noise coordinates and flood reach stay unchanged.
+Reveal and legacy float paths retain full-size fields. Reads outside the window
+return the former zero border. Explicit field ownership now includes disposal.
+
+960×540,DPR2,pad320: field3200×2360→2448×1608, RG32F57.62→30.03MiB.
+Fire steady142.41→114.82MiB, rebuild/dynamic peak200.03→144.86MiB;
+Arc Reactor174.23→146.64MiB, peak231.84→176.67MiB. Tracked texture storage,
+not total driver/process VRAM. A rebuilt Fire field matched the baseline float
+field exactly inside the window. Warped sampling has extra UV conversion:
+864 review frames contain213 differing PNGs, maximum channel difference1/255,
+maximum9 changed channel values per960×540 frame. Not byte-identical. Inspected
+Fire before/after; no visible shape/color change. All90 custom storage cases
+are byte-identical, including fallback, fractional DPR, Reveal and live switches.
+Full/Reveal context restoration, resize and lifecycle checks pass, GL errors0.
+49 effects tests pass. ESM/CJS builds checked.
+
+Evidence: ignored results/stage24-evidence/ and stage24-field-window-v3/.
+Review: http://127.0.0.1:6040/stage24.html?before=stage23-presets#arc-reactor
+
+Timing: four presets ×DPR1/2 ×two reversed orders,40 warmup frames,
+80 samples,batch3. Full-frame GPU median means (ms), Apple M4 Max/Chrome158:
+
+| Preset | DPR1 before | DPR1 after | DPR2 before | DPR2 after |
+|---|---:|---:|---:|---:|
+| arc-reactor | 2.662 | 3.246 | 2.128 | 2.680 |
+| fire | 2.849 | 2.878 | 2.872 | 2.996 |
+| torch | 1.550 | 1.556 | 1.351 | 1.476 |
+| windy | 2.761 | 2.415 | 2.494 | 2.797 |
+
+Timings vary by workload and run; allocation reduction is deterministic.
+All GPU samples present, GL errors0.
+
+DPR2 confirmation:60 warmup,80 samples,batch8,two reversed orders.
+arc-reactor: 2.409→2.404ms (-0.2%).
+fire: 6.531→6.234ms (-4.6%).
+torch: 0.890→0.835ms (-6.1%).
+windy: 2.061→1.947ms (-5.6%).

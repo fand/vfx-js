@@ -149,6 +149,23 @@ void main() {
 }
 `;
 
+// Keep the full-buffer UV mapping while rasterizing only the retained field window.
+const VERT_FIELD_WINDOW = `#version 300 es
+precision highp float;
+in vec3 position;
+out vec2 uvSrc;
+uniform vec4 contentRectUv;
+uniform vec4 srcRectUv;
+uniform vec4 fieldWindow;
+uniform vec2 fieldBufferSize;
+void main() {
+    vec2 bufferUV = position.xy * 0.5 + 0.5;
+    vec2 uvContent = (bufferUV - contentRectUv.xy) / contentRectUv.zw;
+    uvSrc = srcRectUv.xy + uvContent * srcRectUv.zw;
+    gl_Position = vec4((bufferUV * fieldBufferSize - fieldWindow.xy) / fieldWindow.zw * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+
 // One jump flood step: keep the nearest contour point among 9 neighbours.
 const FRAG_JFA = `#version 300 es
 precision highp float;
@@ -296,12 +313,12 @@ const float MIN_SEGMENT = 160.0;
 
 void main() {
     // Decide once per derivative quad, retaining all lanes needed for coverage.
-    vec4 quad = texelFetch(field, ivec2(gl_FragCoord.xy) & ~1, 0);
+    vec4 quad = fetchSaberField(field, ivec2(gl_FragCoord.xy) & ~1);
     if (saberFieldValidity(quad) < 0.5 || abs(quad.r) > thickness + 4.0) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    vec4 f = decodeSaberField(texelFetch(field, ivec2(gl_FragCoord.xy), 0));
+    vec4 f = decodeSaberField(fetchSaberField(field, ivec2(gl_FragCoord.xy)));
     float d = f.r;
     vec2 n = f.gb;
     vec2 q = gl_FragCoord.xy - d * n;
@@ -680,6 +697,7 @@ export class SaberEffect implements Effect {
     params: SaberParams;
 
     #field: EffectRenderTarget | null = null;
+    #fieldWindow: readonly number[] = [0, 0, 0, 0];
     #compactSupported = false;
     #compactField = false;
     #floodScratch: EffectRenderTarget | null = null;
@@ -785,6 +803,7 @@ export class SaberEffect implements Effect {
             this.#compactField ? { format: "rg32f" } : { float: true },
         );
         this.#core = ctx.createRenderTarget({ format: "r16f" });
+        this.#fieldWindow = [0, 0, this.#core.width, this.#core.height];
         this.#dirty = true;
         // Restored targets come back empty, so the cached field must be built again.
         ctx.onContextRestored(() => {
@@ -821,7 +840,29 @@ export class SaberEffect implements Effect {
             this.#floodScratch.dispose();
             this.#floodScratch = null;
         }
-        const regionChanged = this.#updateRegion(ctx, field);
+        const regionChanged = this.#updateRegion(ctx, core);
+        const region =
+            compact && this.#regionKey.length ? this.#regionKey : null;
+        const window = region
+            ? [
+                  region[0],
+                  region[1],
+                  region[2] - region[0],
+                  region[3] - region[1],
+              ]
+            : [0, 0, core.width, core.height];
+        const windowChanged = !sameKey(window, this.#fieldWindow);
+        if (windowChanged || formatChanged) {
+            field.dispose();
+            this.#floodScratch?.dispose();
+            this.#floodScratch = null;
+            this.#fieldWindow = window;
+            field = ctx.createRenderTarget({
+                ...(compact ? { format: "rg32f" as const } : { float: true }),
+                ...(region ? { size: [window[2], window[3]] as const } : {}),
+            });
+            this.#field = field;
+        }
         // Equal-sized buffers can still have different mappings (notably a
         // moving element with fullscreen padding, or a DPR/layout change).
         const geometry = [
@@ -840,6 +881,7 @@ export class SaberEffect implements Effect {
             geometry.some((value, i) => value !== this.#builtGeometry[i]);
         const sourceChanged =
             formatChanged ||
+            windowChanged ||
             geometryChanged ||
             regionChanged ||
             field.width !== this.#builtW ||
@@ -890,6 +932,8 @@ export class SaberEffect implements Effect {
                 uniforms: {
                     field,
                     compactField: this.#compactField ? 1 : 0,
+                    fieldOrigin: this.#fieldWindow.slice(0, 2),
+                    fieldBufferSize: [core.width, core.height],
                     thickness: thickness * pixelRatio,
                     pixelRatio,
                     arcTex: usePayload && this.#arc ? this.#arc : field,
@@ -951,6 +995,8 @@ export class SaberEffect implements Effect {
                     ? {
                           field,
                           compact: this.#compactField,
+                          origin: this.#fieldWindow.slice(0, 2),
+                          bufferSize: [core.width, core.height],
                           lineWidth: !reveal && !soften ? thickness : 0,
                           reach: thickness + (soften ? softness + 2 : 0),
                       }
@@ -1220,7 +1266,9 @@ export class SaberEffect implements Effect {
         this.#fieldHasPayload = false;
         this.#floodScratch?.dispose();
         this.#floodScratch = null;
+        this.#field?.dispose();
         this.#field = null;
+        this.#fieldWindow = [0, 0, 0, 0];
         this.#core = null;
         this.#region = undefined;
         this.#regionKey = [];
@@ -1425,20 +1473,29 @@ export class SaberEffect implements Effect {
 
     #buildField(ctx: EffectContext, usePayload: boolean): void {
         const field = this.#field;
-        if (!field) {
+        const core = this.#core;
+        if (!field || !core) {
             return;
         }
         const { edge, edgeThreshold } = this.params;
         const dst = this.outputRect(ctx.dims);
+        const cropped =
+            this.#fieldWindow[0] !== 0 ||
+            this.#fieldWindow[1] !== 0 ||
+            field.width !== core.width ||
+            field.height !== core.height;
+        const fullSize = [core.width, core.height];
         const maskUniforms = {
+            fieldWindow: [...this.#fieldWindow],
+            fieldBufferSize: fullSize,
             compactField: this.#compactField ? 1 : 0,
             src: ctx.src,
             edgeMode: edge === "luminance" ? 1 : 0,
             edgeThreshold,
             maskFilterStep: maskFilterStep(
                 ctx,
-                dst[2] / (field.width * Math.max(ctx.dims.srcRect[2], 1)),
-                dst[3] / (field.height * Math.max(ctx.dims.srcRect[3], 1)),
+                dst[2] / (fullSize[0] * Math.max(ctx.dims.srcRect[2], 1)),
+                dst[3] / (fullSize[1] * Math.max(ctx.dims.srcRect[3], 1)),
             ),
         };
         // The old distance field is invalid now; use it as flood scratch.
@@ -1446,9 +1503,14 @@ export class SaberEffect implements Effect {
         const seedA = field;
         const seedB =
             this.#floodScratch ??
-            ctx.createRenderTarget(
-                this.#compactField ? { format: "rg32f" } : { float: true },
-            );
+            ctx.createRenderTarget({
+                ...(this.#compactField
+                    ? { format: "rg32f" as const }
+                    : { float: true }),
+                ...(cropped
+                    ? { size: [field.width, field.height] as const }
+                    : {}),
+            });
         this.#floodScratch = null;
         if (this.#region) {
             ctx.clear(seedA);
@@ -1473,6 +1535,7 @@ export class SaberEffect implements Effect {
         }
         ctx.draw({
             frag: FRAG_SEED,
+            ...(cropped ? { vert: VERT_FIELD_WINDOW } : {}),
             uniforms: {
                 ...maskUniforms,
                 payload: withPayload ? payload : seedB,
@@ -1491,18 +1554,19 @@ export class SaberEffect implements Effect {
                     seed: read,
                     stepSize,
                     compactField: this.#compactField ? 1 : 0,
-                    floodRect: this.#regionKey.length
-                        ? this.#regionKey.slice(0, 4)
-                        : [0, 0, field.width, field.height],
+                    floodRect:
+                        !cropped && this.#regionKey.length
+                            ? this.#regionKey.slice(0, 4)
+                            : [0, 0, field.width, field.height],
                 },
                 target: write,
-                geometry: this.#region,
+                geometry: cropped ? undefined : this.#region,
             });
             [read, write] = [write, read];
         };
         // Keep the established field support for distorted contour sampling.
         // Texels further out stay invalid and draw nothing.
-        const maxSide = Math.max(field.width, field.height);
+        const maxSide = Math.max(...fullSize);
         const reach = Math.min(maxSide, FIELD_REACH * ctx.dims.pixelRatio * 2);
         for (
             let stepSize = 2 ** Math.ceil(Math.log2(reach)) / 2;
@@ -1516,6 +1580,7 @@ export class SaberEffect implements Effect {
 
         ctx.draw({
             frag: FRAG_RESOLVE,
+            ...(cropped ? { vert: VERT_FIELD_WINDOW } : {}),
             uniforms: { ...maskUniforms, seed: read },
             target: write,
             geometry: this.#region,

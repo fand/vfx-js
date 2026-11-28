@@ -1414,3 +1414,36 @@ test("every active preset Core/Halo pair shares one noise grid; Torch skips both
         );
     }
 });
+
+test("distance windows crop allocations, retain full-pixel sampling and restore for Reveal", () => {
+    const f = fixture({ width: 3200, height: 2360, pixelRatio: 2 });
+    f.ctx.dims.element = [960, 540];
+    f.ctx.dims.srcRect = [0, 0, 1920, 1080];
+    f.ctx.dims.contentRect = [0, 0, 1920, 1080];
+    const effect = new SaberEffect({ preset: "fire", pad: 320 });
+    effect.init(f.ctx);
+    f.render(effect);
+    const field = f.draws.find((d) => d.uniforms.revealEnd !== undefined)
+        .uniforms.field;
+    assert.deepEqual([field.width, field.height], [2448, 1608]);
+    const core = f.draws.find((d) => d.uniforms.revealEnd !== undefined);
+    assert.deepEqual(core.uniforms.fieldOrigin, [376, 376]);
+    assert.deepEqual(core.uniforms.fieldBufferSize, [3200, 2360]);
+    effect.setParams({ dynamic: true });
+    f.render(effect);
+    assert.ok(
+        f.draws
+            .filter((d) => d.uniforms.stepSize)
+            .every((d) => d.target.width === 2448),
+    );
+    effect.setParams({ end: 0.5 });
+    f.render(effect);
+    const revealed = f.draws.find(
+        (d) => d.uniforms.revealEnd !== undefined,
+    ).uniforms;
+    assert.deepEqual(revealed.fieldOrigin, [0, 0]);
+    assert.equal(revealed.field.width, 3200);
+    assert.ok(field.disposed);
+    effect.dispose();
+    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
