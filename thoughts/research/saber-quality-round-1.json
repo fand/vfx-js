@@ -1,0 +1,128 @@
+[
+  {
+    "label": "calm",
+    "name": "baseline",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.04999999701976776,
+      "p95": 0.08749999850988388,
+      "min": 0.02499999850988388,
+      "max": 0.17499999701976776,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 2.104729125,
+      "p95": 2.54664575,
+      "min": 1.427953,
+      "max": 2.97378125,
+      "samples": 180
+    },
+    "glError": 0
+  },
+  {
+    "label": "calm",
+    "name": "current",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.0625,
+      "p95": 0.08749999850988388,
+      "min": 0.02499999850988388,
+      "max": 0.10000000149011612,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 1.979760375,
+      "p95": 2.3793645,
+      "min": 1.21299475,
+      "max": 4.669161375,
+      "samples": 180
+    },
+    "glError": 0
+  },
+  {
+    "label": "electric",
+    "name": "baseline",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.05000000447034836,
+      "p95": 0.07499999552965164,
+      "min": 0.025000005960464478,
+      "max": 0.11249999701976776,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 2.90624475,
+      "p95": 3.282677,
+      "min": 2.259848875,
+      "max": 3.431901,
+      "samples": 180
+    },
+    "glError": 0
+  },
+  {
+    "label": "electric",
+    "name": "current",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.0625,
+      "p95": 0.07500000298023224,
+      "min": 0.03749999403953552,
+      "max": 0.14999999850988388,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 2.698843625,
+      "p95": 3.077427,
+      "min": 2.146927,
+      "max": 5.12702075,
+      "samples": 180
+    },
+    "glError": 0
+  },
+  {
+    "label": "fluid",
+    "name": "baseline",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.05000000447034836,
+      "p95": 0.07500000298023224,
+      "min": 0.012500002980232239,
+      "max": 0.125,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 2.691192625,
+      "p95": 3.60134375,
+      "min": 2.073953,
+      "max": 5.33473425,
+      "samples": 180
+    },
+    "glError": 0
+  },
+  {
+    "label": "fluid",
+    "name": "current",
+    "dpr": 2,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "cpuMs": {
+      "median": 0.0625,
+      "p95": 0.08749999850988388,
+      "min": 0.02499999850988388,
+      "max": 0.13750000298023224,
+      "samples": 180
+    },
+    "gpuMs": {
+      "median": 2.746380125,
+      "p95": 3.096598875,
+      "min": 1.98036975,
+      "max": 3.700203,
+      "samples": 180
+    },
+    "glError": 0
+  }
+]

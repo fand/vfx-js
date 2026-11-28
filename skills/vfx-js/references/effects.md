@@ -60,6 +60,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `RainbowEffect` | Moving rainbow gradient. |
 | `RgbGlitchEffect` | Block glitch with RGB split. |
 | `RgbShiftEffect` | RGB channel shift. |
+| `SaberEffect` | A distorted core and four glow layers along the outline, with independent `coreDistortion` / `glowDistortion`, optional halo, brightness flicker and twelve preset names. Defaults to Electric. `thickness` and `pad` use CSS px (`pad`: 80 or `"fullscreen"`); `source: false` draws light only. Outline from alpha, or `edge: "luminance"` with `edgeThreshold` for photos. `start` / `end` (0..1 along each outline loop) reveal or erase the contour; `segments` (default 3) creates several reveal heads; `fade` (CSS px, default 100) adds a fading tail behind `start` (0 = crisp cut). Outline caching: call `effect.invalidate()` after `await vfx.update(el)` changes content without resizing, or use `dynamic: true` for video. |
 | `ScanlineEffect` | CRT scanlines. |
 | `SinewaveEffect` | Sine wave distortion. |
 | `SliceShiftEffect` | Split into strips and shift each toward the center. |
@@ -134,6 +135,235 @@ await vfx.add(el, {
 
 Live demos: https://amagi.dev/vfx-js/storybook
 
+### Saber distortion and layered glow
+
+`SABER_PRESETS` contains twelve names for eleven AE-inspired recipes, keyed by
+`SaberPresetName`: `arc-reactor`, `burning`, `electric`, `energy`, `fog`,
+`kryptonite`, `fire`, `torch`, `tractor-beam`, `windy`, `wormhole`, and `embers`.
+The first eleven reference the same-named AE Saber presets; `embers` is an alias
+of `burning`. Original presets `neon`, `plasma`, `ice`, `toxic`, `spectral`,
+`laser`, and `unstable` were removed; passing those names throws. Use
+`new SaberEffect({ preset: "fire", source: false })` or
+`effect.setParams({ preset: "fire", brightness: 0.5 })`. A preset resets
+appearance; explicit options override it, including partial distortion groups.
+Source/edge detection, dynamic input, padding and reveal settings are retained.
+Without a preset, construction starts from Electric, then applies explicit options.
+Use `coreDistortion: { amount: 0 }` and `glowDistortion: { amount: 0 }`
+for a steady outline. There is no separate multi-line generator.
+Unknown top-level or distortion-group constructor or `setParams` options throw before changing state.
+Nested values are copied per instance; the shared recipes are frozen.
+The eleven recipes now import native AE color, output grades, Core Size/Softness,
+Halo controls and four Glow layers through measured unit conversions. They target
+the original AE exports, including Fire; the previously approved dimmer Fire and
+hand-selected Wormhole/Fog settings are historical snapshots, not these defaults.
+Glow sigma is `2 * AE Spread * AE Size Multiplier * AE layer Size`.
+Full core width is `2 * AE Core Size`; input Glow gain is
+`AE Glow Intensity * AE Intensity Multiplier / 200`.
+The renderer limits Glow source mass for contours wider than 6.8px, following
+isolated AE large-Core-Size probes; the wide-source footprint is approximate.
+Native distortion amounts, wind, and core shape settings are imported too.
+Wind converts at 100 CSS px/second per AE unit. Native noise type, scale,
+Bias, aspect, evolution speed and seed are imported. Presets retain four octaves,
+with fixed octave spacing and no synthetic transport extensions. The procedural
+fields match isolated distributions and spatial correlations approximately;
+they do not reproduce native random patterns or all temporal behavior.
+Matching numeric values alone does not yet give matching animations.
+There is no independent particle generator or global preset flicker.
+Set `coreDistortion.noiseComplexity` and `glowDistortion.noiseComplexity`
+independently (integers 1..8), including through `setParams`. The demo exposes
+both as **Noise octaves** under Core Distortion / Glow Distortion.
+
+`coreSoftness` (Electric default 25; two centered box filters of width `softness + 1` CSS px) filters the original core
+before Core Distortion; Glow layers 1–3 use the original sharp core. Halo is also
+blurred/amplified from the original core, then warped with Core Distortion. Zero
+bypasses the blur. Nonzero softness adds cached blur work and render targets;
+Core animation reuses the cached soft source, updating only deformation.
+`coreBlendOnTop` (Electric default true) Screens the original core light into the scalar result before colorization
+and output grading when both Glow and nonzero Core Distortion are active.
+Both outlines respect `coreSoftness`. The original outline's blur is cached
+separately from animated distortion. Overlay does not alter either Glow input.
+Output grading uses `gamma` (0.1..10), `brightness` (0..5), and
+`saturation` (0..2). Each is neutral at 1; named recipes may override them.
+The order is brightness multiplication, scalar Screen combination, measured hue/radiance colorization,
+saturation about the RGB mean, then `pow(rgb, gamma)` and display clipping.
+The colorizer uses 36 measured hue curves with 33 luminance knots, interpolated
+on color changes without another texture or render pass. Gamma below 1 lifts midtones; above 1
+darkens them. Saturation 0 makes grayscale; brightness 0 hides the effect.
+These directions, ranges and ordering were checked against installed AE Saber.
+The three glow layers, core/Halo and original-core overlay combine as scalar
+light, then share colorization and grading. Source composition comes last. Grading leaves cached shapes
+and source pixels unchanged; it adds no render pass.
+When Glow Distortion is active, each scalar Glow layer is multiplied by
+Brightness and clipped to 0..1 **before** scalar Screen and distortion/masking, then colorized and
+graded without a second Brightness multiplication. This preserves dark noise
+inside otherwise saturated light. Brightness changes rerun layer composition
+and distortion, reusing the blur pyramid; Gamma/Saturation only affect output.
+The old `toneMapping` option is removed (passing it throws). Output recipes now
+use the exported AE Gamma/Brightness/Saturation, not fitted replacements for
+the old exponential curve. The empirical colorizer is approximate near curve
+knees; colored overlap and intense highlights still differ from AE.
+`haloIntensity` and `haloSize` are Layer 4 multipliers in percent, 0..1000,
+neutral 100. Layer 4 radius is `size * glowSizeMultiplier * haloSize / 100`;
+its input gain includes `haloIntensity / 100`. Either multiplier at zero
+hides Layer 4. Halo shares the measured colorizer and `color`.
+It follows the core that feeds the glow, but not Glow Distortion.
+There is no separate Halo blur or independent fifth light source.
+AE's white-line sweeps show an extra Brightness factor on Halo: it is bounded
+and screened under the core before their shared output grading. Outside the
+core, with white light, output is `pow(B * min(B * layer4, 1), gamma)`.
+Changing positive Halo intensity reuses the blur pyramid; changing Halo size
+rebuilds Layer 4's blur. Halo also follows flicker.
+The previous independent-Halo units have changed; custom settings require
+reauthoring. Named recipes use their native exported percentages.
+
+`flickerIntensity` (0..1, default 0) modulates core, halo and glow brightness without
+affecting source pixels. Gain stays between `1 - flickerIntensity` and 1.
+`flickerSpeed` (default 12) sets smooth random keyframes per second; 0 freezes
+the brightness noise. `flickerSeed` (integer, default 0) selects its pattern.
+This clock follows VFX time independently of both distortion clocks.
+Brightness flicker only changes final composition and does not invalidate the core/glow cache.
+
+`SaberOptions` accepts partial `coreDistortion` and `glowDistortion` groups;
+`SaberParams` holds their fully populated, live values. Glow uses
+`SaberDistortionParams`; Core omits `composite` and always distorts. Shared controls are `amount` (CSS px, 0 bypasses), `type` (`"fluid"`,
+`"smoke"`, `"energy"`) and `invert`. Only Glow accepts `composite`
+(`"distort"` warps; `"multiply"` modulates brightness, reaching full modulation
+at amount 100). Each group has
+independent `windSpeed` (CSS px/s), `windDirection` (degrees, 0 right / 90 up),
+`noiseSpeed` (AE-calibrated evolution rate), `noiseScale` (CSS px), `noiseBias` (positive contrast
+control), `noiseComplexity` (1..8),
+`noiseAspectRatio` (horizontal frequency multiplier; above1 compresses X,
+matching AE rather than stretching X),
+and deterministic `seed`. Noise is anchored to the element. These clocks use VFX
+time independently for core and glow; set wind and noise speeds to zero in each
+group to freeze it. Core distortion changes the displayed contour and Halo input; glow
+distortion changes only the generated glow. A fully revealed core uses distance-field
+coverage after warping to keep steep thin streaks continuous; animated reveals
+retain the raster path. Smoke accumulates bounded density; Energy accumulates
+ridges with recoverable octave feedback (fine ridges can regain strength after
+a weak coarse sample); Fluid warps that ridge field with another
+fractal. Octave sums are not normalized. Bias applies signed power to each of
+the two displacement components. Multiply averages the two resulting density
+components, then interpolates from no modulation using Amount / 100.
+
+Octave frequency doubles and gain halves at every level. Spatial frequency increases per octave; evolution speed
+does not. The shared time conversion is 1 for Smoke, 0.5 for Fluid and 0.75 for Energy,
+fitted to isolated temporal correlations rather than individual preset motion.
+Noise is evaluated on a two-CSS-pixel content-aligned grid, then bilinearly
+interpolated after signed Bias. Octaves are not dropped as pixel ratio changes.
+Each group accepts `motionBlur` (wind transport interval in seconds, 0..0.25).
+Six equally weighted samples span the interval while evolution stays at the
+current time. Source pixels do not translate. Native Motion Blur maps to
+`motionBlur = native * 0.15`; zero wind bypasses the samples, even with evolving
+noise. A transient noise texture avoids six procedural evaluations. There is no
+framebuffer history, so seeking remains deterministic. Core, Glow and Halo use
+the same two-pixel noise grid; light sampling and coverage remain full resolution.
+The grid includes wind-blur margins and stays aligned when padding changes.
+
+Glow Distortion affects all three Glow layers, independent of their radii.
+Layer 4 (Halo) follows Core Distortion instead.
+
+Glow always uses exactly four `SaberGlowLayer` objects in `glowLayers`,
+each with `size` (approximate Gaussian sigma in CSS px) and `intensity` (input
+energy gain). The blur conserves energy before nonlinear amplification;
+final displayed energy is not conserved as radius changes. Either value at
+zero disables that layer. Layer 4 is the Halo, with additional percent multipliers.
+Earlier radius-weighted gains first converted as
+`newIntensity = oldIntensity * size * glowSizeMultiplier`.
+
+Effective radius is `size * glowSizeMultiplier`; the multiplier defaults to 1,
+and zero disables glow. `pad` only bounds the
+output: allow roughly 3 times the largest effective radius plus distortion
+reach, or use `"fullscreen"`. Large radii use lower-resolution blurs.
+Their Gaussian kernels account for downsampling and use smooth cubic
+reconstruction; changing radius across resolution levels avoids abrupt bright
+rings. Subpixel radii approach an unblurred source; zero explicitly disables
+the layer. Thin core lines use pixel
+coverage filtering with centered gradients after deformation.
+Minified alpha sources receive an area prefilter; degenerate contour normals
+cannot turn a fractional-width line into a fully lit pixel.
+The native-style noise lattice interpolates sampled ridges; very small Noise
+Scale can alias instead of automatically discarding high octaves.
+
+Noise coordinates follow the element, so changing padding does not reseed the
+pattern. Static core/glow passes are cached independently: a steady core with
+animated glow distortion reuses its blurred source. Live parameter edits,
+`invalidate()`, dynamic sources, layout changes and context restoration refresh
+the relevant caches. Reveals trace the source bounds and reuse their contours
+when only output padding or fullscreen position changes.
+Large padding restricts distance-field/core work to a conservative source region while
+keeping full-size glow/distortion outputs.
+
+`glow` is input gain before per-layer Pre Gamma and amplification.
+`glowPreGamma` (0.1..5) raises each weighted, blurred layer to a power.
+Below 1 broadens dim tails; above 1 narrows them. Isolated AE gain sweeps are
+approximated by `f(x) = x * (0.34 + x * (0.18 + 0.48*x))`; Layer 1 uses
+`(x + f(x))/2`, Layers 2–4 use `f(x)`. This is an empirical fit, not AE source.
+The shader Screens Glow layers1–3 together before noise; the same Multiply
+mask or warped/shutter sample acts on their combined light. Halo bypasses Glow
+distortion. Protected Glow layers split transmission into moving and stationary
+groups so zero deformation preserves their scalar Screen result. Scalar Screen combination precedes colorization and output grading.
+
+`glowBias` (0..5, neutral 1) approximates AE's layer balance with relative
+input gains `[b, (1+2b)/3, (3+2b)/5, (4+b)/5]` before Pre Gamma.
+It is not a contrast exponent. Glow gain, positive layer gains, Bias and Pre
+Gamma reuse the blur pyramid and leave core extraction unchanged. They also
+apply to Layer 4. Turning a layer on/off can rebuild the blur pyramid.
+
+Recipes use native AE layer order and gains. Earlier weak-signal migration
+compensation is removed. Multiply blends linearly toward a noise-density mask
+at Amount 100, replacing the former up-to-8x hotspot amplification.
+Nested defaults/options are copied per instance;
+`setParams({ glowDistortion: { amount: 20 } })` preserves other group values.
+AE blur kernels, Bias outside the measured range, colored-light behavior,
+noise and very dim quantized output still differ. These are procedural WebGL
+approximations, not interchangeable AE parameters or proprietary source.
+
+```ts
+const saber = new SaberEffect({
+    source: false,
+    coreDistortion: { amount: 0 },
+    pad: 320,
+    glowDistortion: {
+        amount: 32,
+        type: "fluid",
+        windDirection: 90,
+        windSpeed: 35,
+    },
+});
+```
+
+### Migrating older Saber options
+
+The legacy line generator, pyramid glow and redundant multipliers were removed.
+Removed options are rejected; there are no compatibility aliases.
+
+Saber now exposes 58 leaf parameters (excluding preset selection). Thirteen
+non-AE controls were removed, preserving current named presets and the default
+Electric look: `intensity`, `coreIntensity`, `coreWhiteness`, `glowWhiteness`,
+`glowFlow`, `glowDistortAllLayers`, Core `composite`, and Core/Glow
+`noiseDetail`, `noiseTurbulence`, `directionality`. Their former preset values
+are now fixed: gains 1, white mixes/transport extensions 0, octave spacing 2,
+Core Distort, all three Glow layers affected. Non-neutral custom uses require
+reauthoring; `brightness` is not an exact replacement for removed gain stages.
+
+
+| Removed option | Replacement |
+| --- | --- |
+| `amplitude`, `mainAmplitude` | Tune `coreDistortion.amount`; no exact numeric conversion. |
+| `scale` | Tune `coreDistortion.noiseScale`; the spatial basis differs. |
+| `sharpness`, `burst` | Tune distortion `type`, `noiseBias` and `noiseComplexity`. |
+| `speed` | Set `windSpeed` and `noiseSpeed` independently in each distortion group. |
+| `flicker` | Shape motion uses distortion clocks; brightness flicker uses `flickerIntensity`, `flickerSpeed` and `flickerSeed`. |
+| `lines`, `variation` | No line-count equivalent. Use a distorted contour and optional `coreBlendOnTop`. |
+| `glowMode`, `glowFalloff` | Glow always uses four layers. Reauthor pyramid looks with `glowLayers` sizes/intensities. |
+| `glowSpread` | Set `glowSizeMultiplier` to the old `glowSpread * glowSizeMultiplier`. |
+| `glowIntensityMultiplier` | Set `glow` to the old `glow * glowIntensityMultiplier`. |
+
+Default construction uses Electric. The seven original presets were removed;
+there are no replacement aliases. AE-inspired recipes remain approximate;
+Glow calibration changes their brightness and overlap.
+
 ## Writing an effect
 
 ```ts
@@ -202,7 +432,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. Both are premultiplied alpha. |
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
-| `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. |
+| `createRenderTarget(opts)` | `{ size?, float?, format?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. `format` overrides `float`: `rgba8`, `r16f`, `rg16f`, `rgba16f`, `rg32f`. RG32F keeps 32-bit vector precision; requires `EXT_float_blend` and, with linear filtering, `OES_texture_float_linear` (throws if unavailable). Use R/RG half-float for scalar/vector HDR intermediates; omitted retains automatic RGBA storage. |
 | `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
 | `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. `target` can be an array to write several targets in one draw. |
 | `blit(source, target?)` | Copy a texture into a target. |
@@ -387,3 +617,19 @@ page.dispose();      // free it and restore the element
 - After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`, and before `render` returns. End transform feedback first.
 - Use `ctx.dims` for pixel sizes. Don't read DOM sizes in `render`.
 - Read pixels with `ctx.readPixels`, not raw `gl.readPixels`. It copies the target as it is when you call it, so call it in `render` after the draw you want to read. The promise rejects when the effect is disposed or the context is lost: always handle the rejection.
+
+
+### Preparing shaders without blocking a draw
+
+`ctx.createProgram({ frag, vert? })` returns a VFX-owned `EffectProgram`.
+In `async init(ctx)`, await `program.ready`, then use `ctx.draw({ program, uniforms })`.
+For live changes, check `program.isReady` and defer drawing until ready.
+Sources are cached; a later `ctx.draw({ frag, vert })` reuses the prepared program too.
+`EffectProgramOpts` specifies its sources; `EffectDrawShader` accepts either sources
+or a program. Handles must belong to the same VFX context. No effect-owned disposal.
+Compilation uses `KHR_parallel_shader_compile` when available. Without it,
+creation falls back to synchronous compilation. Drawing before readiness also
+waits synchronously. `ready` rejects on compilation failure or disposal while pending.
+After context restoration, check readiness again (the program compiles again).
+Saber prepares its current shader configuration automatically, including live
+preset/layout changes. While a new configuration compiles, its rendering is deferred.

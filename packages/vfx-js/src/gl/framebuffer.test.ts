@@ -34,6 +34,11 @@ function makeMockGl() {
         LINEAR_MIPMAP_LINEAR: 0x2703,
         CLAMP_TO_EDGE: 0x812f,
         RGBA: 0x1908,
+        RED: 0x1903,
+        RG: 0x8227,
+        R16F: 0x822d,
+        RG16F: 0x822f,
+        RG32F: 0x8230,
         RGBA8: 0x8058,
         RGBA16F: 0x881a,
         RGBA32F: 0x8814,
@@ -81,6 +86,132 @@ function makeCtx(
 }
 
 describe("Framebuffer", () => {
+    it.each(["r16f", "rg16f", "rgba16f", "rgba8", "rg32f"] as const)(
+        "keeps explicit %s storage through resize, mipmaps and restore",
+        (format) => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(
+                makeCtx(gl, { floatLinearFilter: true, floatBlend: true }),
+                8,
+                4,
+                {
+                    format,
+                    float: true,
+                    mipmap: true,
+                },
+            );
+            const internal = {
+                r16f: gl.R16F,
+                rg16f: gl.RG16F,
+                rgba16f: gl.RGBA16F,
+                rgba8: gl.RGBA8,
+                rg32f: gl.RG32F,
+            }[format];
+            const external =
+                format === "r16f"
+                    ? gl.RED
+                    : format === "rg16f" || format === "rg32f"
+                      ? gl.RG
+                      : gl.RGBA;
+            const type =
+                format === "rgba8"
+                    ? gl.UNSIGNED_BYTE
+                    : format === "rg32f"
+                      ? gl.FLOAT
+                      : gl.HALF_FLOAT;
+            expect(fb.float).toBe(format !== "rgba8");
+            fb.setSize(16, 8);
+            fb.restore();
+            for (const call of gl.texImage2D.mock.calls) {
+                expect(call[2]).toBe(internal);
+                expect(call[6]).toBe(external);
+                expect(call[7]).toBe(type);
+            }
+        },
+    );
+
+    it("rejects unsupported RG32F before allocating GPU objects", () => {
+        const gl = makeMockGl();
+        expect(
+            () => new Framebuffer(makeCtx(gl), 8, 8, { format: "rg32f" }),
+        ).toThrow("EXT_float_blend");
+        expect(
+            () =>
+                new Framebuffer(makeCtx(gl, { floatBlend: true }), 8, 8, {
+                    format: "rg32f",
+                }),
+        ).toThrow("OES_texture_float_linear");
+        expect(gl.createTexture).not.toHaveBeenCalled();
+        expect(gl.createFramebuffer).not.toHaveBeenCalled();
+        const fb = new Framebuffer(makeCtx(gl, { floatBlend: true }), 8, 8, {
+            format: "rg32f",
+            filter: "nearest",
+        });
+        expect(fb.float).toBe(true);
+    });
+
+    it("keeps RG32F precision when MSAA falls back to one sample", () => {
+        const gl = makeMockGl();
+        gl.getInternalformatParameter.mockReturnValue(new Int32Array([]));
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const fb = new Framebuffer(
+                makeCtx(gl, { floatBlend: true, floatLinearFilter: true }),
+                8,
+                8,
+                { format: "rg32f", samples: 4 },
+            );
+            expect(fb.samples).toBe(1);
+            expect(gl.texImage2D.mock.calls[0][2]).toBe(gl.RG32F);
+            expect(gl.texImage2D.mock.calls[0][7]).toBe(gl.FLOAT);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it("uses the explicit format for MSAA support and allocation", () => {
+        const gl = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 8, 8, {
+            format: "r16f",
+            samples: 4,
+        });
+        expect(fb.samples).toBe(4);
+        expect(gl.getInternalformatParameter).toHaveBeenCalledWith(
+            gl.RENDERBUFFER,
+            gl.R16F,
+            gl.SAMPLES,
+        );
+        expect(gl.renderbufferStorageMultisample).toHaveBeenCalledWith(
+            gl.RENDERBUFFER,
+            4,
+            gl.R16F,
+            8,
+            8,
+        );
+    });
+
+    it.each([
+        {},
+        { depth: true },
+        { samples: 4 as const, depth: true, mipmap: true },
+    ])("restore never deletes handles from the lost context: %j", (options) => {
+        const gl = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 16, 16, options);
+        const oldFbo = fb.fbo;
+        fb.restore();
+        expect(fb.fbo).not.toBe(oldFbo);
+        expect(gl.deleteFramebuffer).not.toHaveBeenCalled();
+        expect(gl.deleteRenderbuffer).not.toHaveBeenCalled();
+        expect(gl.deleteTexture).not.toHaveBeenCalled();
+        const restoredFbo = fb.fbo;
+        fb.setSize(32, 32);
+        expect(gl.deleteFramebuffer).toHaveBeenCalledWith(restoredFbo);
+        expect(gl.deleteFramebuffer).not.toHaveBeenCalledWith(oldFbo);
+        const currentFbo = fb.fbo;
+        fb.dispose();
+        expect(gl.deleteFramebuffer).toHaveBeenCalledWith(currentFbo);
+    });
+
     it("deletes the old FBO on setSize", () => {
         const gl = makeMockGl();
         const fb = new Framebuffer(makeCtx(gl), 10, 10);

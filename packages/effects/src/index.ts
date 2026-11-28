@@ -119,6 +119,14 @@ export {
 export { RainbowEffect, type RainbowParams } from "./rainbow.js";
 export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch.js";
 export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift.js";
+export {
+    type SaberDistortionParams,
+    SaberEffect,
+    type SaberGlowLayer,
+    type SaberOptions,
+    type SaberParams,
+} from "./saber.js";
+export { SABER_PRESETS, type SaberPresetName } from "./saber-presets.js";
 export { ScanlineEffect, type ScanlineParams } from "./scanline.js";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave.js";
 export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift.js";

@@ -55,6 +55,18 @@ type ActiveUniform = {
     size: number;
 };
 
+/** `KHR_parallel_shader_compile`'s COMPLETION_STATUS_KHR. */
+const COMPLETION_STATUS = 0x91b1;
+
+/** A program whose shaders are compiling: its link has not been checked. */
+type PendingLink = {
+    program: WebGLProgram;
+    vs: WebGLShader;
+    fs: WebGLShader;
+    vertSrc: string;
+    fragSrc: string;
+};
+
 /**
  * Compiled GLSL program. Handles vertex/fragment shader compilation,
  * link, attribute binding (attribute "position" → location 0), and
@@ -63,31 +75,46 @@ type ActiveUniform = {
  * GLSL version: `glslVersion` if given, else auto-detected from the
  * fragment shader via {@link detectGlslVersion}.
  *
+ * With `parallel`, the constructor only starts the compile where the
+ * context supports it. {@link isReady} and {@link ready} tell when it is
+ * done; using the program before that waits for it.
+ *
  * Self-registers with {@link GLContext} so the program is recompiled
  * after a `webglcontextrestored` event.
  * @internal
  */
 export class Program implements Restorable {
     gl: WebGL2RenderingContext;
-    program!: WebGLProgram;
     #ctx: GLContext;
     #vertSrc: string;
     #fragSrc: string;
     #glslVersion: GlslVersion;
     #uniforms = new Map<string, ActiveUniform>();
+    #program: WebGLProgram | null = null;
+    #pending: PendingLink | null = null;
+    #error: Error | null = null;
+    #ready: Promise<void> | null = null;
+    #settle: { resolve: () => void; reject: (e: Error) => void } | null = null;
+    #disposed = false;
+    #parallel: boolean;
 
     constructor(
         ctx: GLContext,
         vertSrc: string,
         fragSrc: string,
         glslVersion?: GlslVersion,
+        parallel = false,
     ) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
         this.#vertSrc = vertSrc;
         this.#fragSrc = fragSrc;
         this.#glslVersion = glslVersion ?? detectGlslVersion(fragSrc);
-        this.#compile();
+        this.#parallel = parallel;
+        this.#start();
+        if (!parallel || !ctx.parallelCompile) {
+            this.#finish();
+        }
         ctx.addResource(this);
     }
 
@@ -95,19 +122,89 @@ export class Program implements Restorable {
         return this.#glslVersion;
     }
 
-    #compile(): void {
-        const gl = this.gl;
-        const vs = compileShader(
-            gl,
-            gl.VERTEX_SHADER,
-            ensureVersion(this.#vertSrc, this.#glslVersion),
-        );
-        const fs = compileShader(
-            gl,
-            gl.FRAGMENT_SHADER,
-            ensureVersion(this.#fragSrc, this.#glslVersion),
-        );
+    /** The linked program. Waits for the compile when it is still running. */
+    get program(): WebGLProgram {
+        this.#finish();
+        if (!this.#program) {
+            throw this.#error ?? new Error("[VFX-JS] Program is not compiled");
+        }
+        return this.#program;
+    }
 
+    /** Whether the program can be used without waiting for its compile. */
+    get isReady(): boolean {
+        const pending = this.#pending;
+        if (!pending) {
+            return true;
+        }
+        if (this.gl.isContextLost()) {
+            return false;
+        }
+        if (!this.gl.getProgramParameter(pending.program, COMPLETION_STATUS)) {
+            return false;
+        }
+        try {
+            this.#finish();
+        } catch {
+            // Kept for `ready` and the next use.
+        }
+        return true;
+    }
+
+    /** Resolves when the compile is done. Rejects when it failed. */
+    get ready(): Promise<void> {
+        if (!this.#ready) {
+            if (this.isReady) {
+                this.#ready = this.#error
+                    ? Promise.reject(this.#error)
+                    : Promise.resolve();
+            } else {
+                this.#ready = new Promise((resolve, reject) => {
+                    this.#settle = { resolve, reject };
+                });
+                this.#poll();
+            }
+            // A caller that never reads the result must not get an
+            // unhandled rejection.
+            this.#ready.catch(() => {});
+        }
+        return this.#ready;
+    }
+
+    #poll = (): void => {
+        if (!this.#settle || this.#disposed) {
+            return;
+        }
+        if (this.isReady) {
+            this.#settled();
+            return;
+        }
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(this.#poll);
+        } else {
+            setTimeout(this.#poll, 16);
+        }
+    };
+
+    #settled(): void {
+        const settle = this.#settle;
+        this.#settle = null;
+        if (this.#error) {
+            settle?.reject(this.#error);
+        } else {
+            settle?.resolve();
+        }
+    }
+
+    /** Start the compile and the link, without waiting for the result. */
+    #start(): void {
+        const gl = this.gl;
+        const vertSrc = ensureVersion(this.#vertSrc, this.#glslVersion);
+        const fragSrc = ensureVersion(this.#fragSrc, this.#glslVersion);
+        this.#program = null;
+        this.#error = null;
+        const vs = createShader(gl, gl.VERTEX_SHADER, vertSrc);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fragSrc);
         const program = gl.createProgram();
         if (!program) {
             throw new Error("[VFX-JS] Failed to create program");
@@ -118,19 +215,35 @@ export class Program implements Restorable {
         // works across all programs.
         gl.bindAttribLocation(program, 0, "position");
         gl.linkProgram(program);
+        this.#pending = { program, vs, fs, vertSrc, fragSrc };
+    }
+
+    /** Check the link, waiting for it, and read the uniforms. */
+    #finish(): void {
+        const pending = this.#pending;
+        if (!pending) {
+            if (this.#error) {
+                throw this.#error;
+            }
+            return;
+        }
+        this.#pending = null;
+        const gl = this.gl;
+        const { program, vs, fs } = pending;
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            const log = gl.getProgramInfoLog(program) ?? "";
+            this.#error = linkError(gl, pending);
             gl.deleteShader(vs);
             gl.deleteShader(fs);
             gl.deleteProgram(program);
-            throw new Error(`[VFX-JS] Program link failed: ${log}`);
+            this.#settled();
+            throw this.#error;
         }
         gl.detachShader(program, vs);
         gl.detachShader(program, fs);
         gl.deleteShader(vs);
         gl.deleteShader(fs);
-        this.program = program;
+        this.#program = program;
 
         this.#uniforms.clear();
         const count = gl.getProgramParameter(
@@ -153,11 +266,19 @@ export class Program implements Restorable {
                 size: info.size,
             });
         }
+        this.#settled();
     }
 
     restore(): void {
         // The old handle is dead after context loss; recompile from source.
-        this.#compile();
+        if (!this.#settle) {
+            this.#ready = null;
+        }
+        this.#uniforms.clear();
+        this.#start();
+        if (!this.#parallel || !this.#ctx.parallelCompile) {
+            this.#finish();
+        }
     }
 
     use(): void {
@@ -165,6 +286,7 @@ export class Program implements Restorable {
     }
 
     hasUniform(name: string): boolean {
+        this.#finish();
         return this.#uniforms.has(name);
     }
 
@@ -201,8 +323,23 @@ export class Program implements Restorable {
     }
 
     dispose(): void {
+        if (this.#disposed) {
+            return;
+        }
+        this.#disposed = true;
+        this.#error = new Error("[VFX-JS] Program disposed");
+        this.#settled();
+        this.#ready = null;
         this.#ctx.removeResource(this);
-        this.gl.deleteProgram(this.program);
+        const pending = this.#pending;
+        this.#pending = null;
+        if (pending) {
+            this.gl.deleteShader(pending.vs);
+            this.gl.deleteShader(pending.fs);
+            this.gl.deleteProgram(pending.program);
+        }
+        this.gl.deleteProgram(this.#program);
+        this.#program = null;
     }
 }
 
@@ -226,7 +363,8 @@ export function skipTextureHandle(value: UniformValue): boolean {
     return true;
 }
 
-function compileShader(
+/** Start compiling a shader. Its status is read when the link fails. */
+function createShader(
     gl: WebGL2RenderingContext,
     type: number,
     src: string,
@@ -237,12 +375,25 @@ function compileShader(
     }
     gl.shaderSource(sh, src);
     gl.compileShader(sh);
-    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-        const log = gl.getShaderInfoLog(sh) ?? "";
-        gl.deleteShader(sh);
-        throw new Error(`[VFX-JS] Shader compile failed: ${log}\n\n${src}`);
-    }
     return sh;
+}
+
+/** Why a link failed: the first shader's compile error, else the link's. */
+function linkError(gl: WebGL2RenderingContext, link: PendingLink): Error {
+    const shaders = [
+        [link.vs, link.vertSrc],
+        [link.fs, link.fragSrc],
+    ] as const;
+    for (const [sh, src] of shaders) {
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+            const log = gl.getShaderInfoLog(sh) ?? "";
+            return new Error(
+                `[VFX-JS] Shader compile failed: ${log}\n\n${src}`,
+            );
+        }
+    }
+    const log = gl.getProgramInfoLog(link.program) ?? "";
+    return new Error(`[VFX-JS] Program link failed: ${log}`);
 }
 
 function ensureVersion(src: string, version: GlslVersion): string {

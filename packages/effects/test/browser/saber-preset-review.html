@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Saber — 段階別比較 / AE</title>
+<style>
+:root{color-scheme:dark;font:15px/1.6 system-ui;background:#101318;color:#edf1fa}
+body{max-width:1600px;margin:0 auto;padding:28px}h1{font-size:27px;margin:0}h2{font-size:21px;margin-top:36px}
+p{color:#afbdd1}a{color:#87c8ff}header,.transport{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button,select{font:inherit;color:inherit;background:#242c38;border:1px solid #4b5970;border-radius:6px;padding:7px 12px}
+button{cursor:pointer}button:disabled,input:disabled{opacity:.45;cursor:wait}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #87c8ff;outline-offset:3px}
+.pair.three{grid-template-columns:repeat(3,minmax(0,1fr))}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}figure{margin:0;min-width:0}figcaption{font-weight:600;margin:0 0 8px}
+canvas,.empty{width:100%;aspect-ratio:16/9;background:#000;border-radius:6px}canvas{display:block;height:auto}.empty{display:flex;align-items:center;justify-content:center;color:#8898ad;box-sizing:border-box;padding:24px;text-align:center}[hidden]{display:none!important}
+.transport{padding:14px;background:#19202b;border-radius:8px}.transport input{flex:1;min-width:150px;accent-color:#83c8ff}.transport output{font-variant-numeric:tabular-nums;min-width:155px}
+#status{min-height:24px;font-size:13px}#status[data-error]{color:#ff9e8e}.overview{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{padding:14px;text-align:left;background:#181e28;border:1px solid #344052;border-radius:8px}.card:hover{border-color:#87c8ff}.card strong{display:block;margin-bottom:8px}.thumbs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.thumbs img{width:100%;aspect-ratio:16/9;display:block;background:#000;object-fit:contain}.thumbs span{font-size:12px;color:#a8b7ca}.thumbs .empty{border-radius:0;font-size:12px;padding:4px}.badge{color:#99b9da;font-size:12px;font-weight:400;margin-left:8px}
+@media(max-width:800px){body{padding:16px}.overview{grid-template-columns:1fr}.pair,.pair.three{grid-template-columns:1fr}.transport{gap:8px}}
+</style>
+<h1>Saber — 段階別比較 / AE</h1>
+<p>同じ入力・同じ時刻で比較。AEは元preset設定の出力、右は選択段階の固定スナップショット。</p>
+<header>
+  <label>Preset <select id="preset" aria-label="VFX-JS preset"></select></label>
+  <label>AE参照 <select id="reference"><option value="auto">対応preset（自動）</option></select></label>
+</header>
+<p id="note"></p>
+<section class="pair" aria-label="同期比較">
+  <figure><figcaption id="ae-title">Video Copilot Saber / After Effects</figcaption><canvas id="ae" width="960" height="540" aria-label="AEの出力"></canvas><div id="no-ae" class="empty" hidden>対応するAE presetなし。上の「AE参照」で任意の比較対象を選べます。</div></figure>
+  <figure id="before-panel" hidden><figcaption>VFX-JS / 前段階</figcaption><canvas id="before" width="960" height="540" aria-label="前段階の出力"></canvas></figure>
+  <figure><figcaption id="current-title">VFX-JS / Current</figcaption><canvas id="current" width="960" height="540" aria-label="現行VFX-JSの出力"></canvas></figure>
+</section>
+<div class="transport">
+  <button id="play" disabled>再生</button><button id="prev" disabled aria-label="1コマ戻る">← 1コマ</button><button id="next" disabled aria-label="1コマ進む">1コマ →</button>
+  <input id="seek" type="range" min="0" max="71" step="1" value="24" aria-label="フレーム" disabled>
+  <output id="time">2.000 s · 25 / 72</output>
+  <label>速度 <select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option></select></label>
+</div>
+<p id="status" role="status">読み込み中…</p>
+<p>960 × 540 · 24 fps · t = 1.000–3.958秒。左右は同じフレーム番号で表示。Fireも明るさを変更していないAE元設定です。EmbersはBurningの別名。AE由来11種類＋Embers（Burningの別名）。独自presetは削除済みです。</p>
+<h2>全<span id="preset-count">12</span> presets — t = 2秒</h2>
+<p>カードを選ぶと上の同期比較に切り替わります。</p>
+<section id="overview" class="overview" aria-label="全preset一覧"></section>
+<p><a href="results/preset-review/manifest.json">スナップショットの設定・描画コードのハッシュ</a></p>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const preset = $("preset"), reference = $("reference"), seek = $("seek"), status = $("status");
+const beforeKey = new URLSearchParams(location.search).get("before");
+const beforePrefix = beforeKey && /^[a-z0-9-]+$/.test(beforeKey) ? `results/${beforeKey}` : null;
+const contexts = [$("ae").getContext("2d"), $("before").getContext("2d"), $("current").getContext("2d")];
+if (beforePrefix) { $("before-panel").hidden = false; document.querySelector(".pair").classList.add("three"); }
+const title = (key) => key.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+let manifest, generation = 0, frames = [], ready = false, playing = false, frame = 24, anchor = 0, anchorFrame = 0;
+const frameName = (n) => String(n).padStart(3, "0") + ".png";
+const currentPath = (key, n) => `results/preset-review/${key}/${frameName(n)}`;
+const aePath = (key, n) => `ae/${key}-raw/${frameName(n)}`;
+function pause() { playing = false; $("play").textContent = "再生"; }
+function controls(enabled) { for (const id of ["play", "prev", "next", "seek"]) $(id).disabled = !enabled; }
+function draw(n) {
+    if (!frames[n]) return;
+    frame = n; seek.value = n;
+    frames[n].forEach((image, i) => { if (image) contexts[i].drawImage(image, 0, 0); });
+    $("time").value = `${(manifest.startTime + n / manifest.fps).toFixed(3)} s · ${n + 1} / ${manifest.frameCount}`;
+    window.presetReviewState = { preset: preset.value, reference: reference.value, frame: n, ready };
+}
+function loadImage(src) { const image = new Image(); image.src = src; return image.decode().then(() => image); }
+async function load() {
+    const id = ++generation; pause(); ready = false; controls(false); frames = [];
+    status.removeAttribute("data-error"); status.textContent = "フレームを読み込み中…";
+    const record = manifest.presets.find(p => p.key === preset.value);
+    const ae = reference.value === "auto" ? record.ae : reference.value;
+    $("ae").hidden = !ae; $("no-ae").hidden = !!ae;
+    contexts.forEach(c => c.clearRect(0, 0, 960, 540));
+    $("ae-title").textContent = ae ? `After Effects / ${title(ae)} — 元preset` : "After Effects / 対応なし";
+    $("current-title").textContent = `VFX-JS / ${title(record.key)} — 現行`;
+    $("note").textContent = reference.value !== "auto" ? "AE参照を手動選択中。元々の対応関係を示すものではありません。" : record.key === "embers" ? "EmbersはBurningと同じ設定です。AE Burningと比較します。" : !ae ? "VFX-JS独自preset。比較したいAE presetを任意に選べます。" : record.key === "fire" ? "AE Fireの元設定と比較。以前のCore Size=2 / Glow Intensity=20の構造比較用出力とは異なります。" : "AE元presetと比較。両実装のパラメーター単位・ノイズはまだ完全一致ではありません。";
+    history.replaceState(null, "", `#${record.key}`);
+    window.presetReviewState = { preset: record.key, ready: false };
+    const loaded = new Array(manifest.frameCount);
+    const first = frame;
+    const queue = [first, ...Array.from({length: manifest.frameCount}, (_, n) => n).filter(n => n !== first)];
+    let completed = 0;
+    async function worker() {
+        while (queue.length && id === generation) {
+            const n = queue.shift();
+            loaded[n] = await Promise.all([ae ? loadImage(aePath(ae, n)) : null, beforePrefix ? loadImage(`${beforePrefix}/${record.key}/${frameName(n)}`) : null, loadImage(currentPath(record.key, n))]);
+            if (id !== generation) return;
+            completed++; frames = loaded;
+            if (n === first) draw(n);
+            status.textContent = `${completed} / ${manifest.frameCount} フレーム読み込み済み`;
+        }
+    }
+    try {
+        await Promise.all(Array.from({length: 4}, worker));
+        if (id !== generation) return;
+        ready = true; controls(true); draw(first);
+        status.textContent = "同期再生できます。Space: 再生／停止 · ← / →: コマ送り";
+    } catch (error) {
+        if (id !== generation) return;
+        generation++; status.dataset.error = "true";
+        status.textContent = `読み込み失敗: ${error.message}。ページを再読み込みしてください。`;
+    }
+}
+function toggle() { if (!ready) return; if (playing) pause(); else { playing = true; anchor = performance.now(); anchorFrame = frame; $("play").textContent = "停止"; } }
+function step(delta) { if (!ready) return; pause(); draw((frame + delta + manifest.frameCount) % manifest.frameCount); }
+$("play").onclick = toggle; $("prev").onclick = () => step(-1); $("next").onclick = () => step(1);
+seek.oninput = () => { pause(); draw(Number(seek.value)); };
+preset.onchange = load; reference.onchange = load;
+$("speed").onchange = () => { anchor = performance.now(); anchorFrame = frame; };
+window.onhashchange = () => { const key = location.hash.slice(1); if (manifest.presets.some(p => p.key === key)) { preset.value = key; load(); } };
+window.addEventListener("keydown", e => {
+    if (/INPUT|SELECT|BUTTON|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.code === "Space") { e.preventDefault(); toggle(); }
+    if (e.code === "ArrowLeft") { e.preventDefault(); step(-1); }
+    if (e.code === "ArrowRight") { e.preventDefault(); step(1); }
+});
+function tick(now) {
+    if (playing && ready) {
+        const n = (anchorFrame + Math.floor((now - anchor) / 1000 * manifest.fps * Number($("speed").value))) % manifest.frameCount;
+        if (n !== frame) draw(n);
+    }
+    requestAnimationFrame(tick);
+}
+try {
+    const response = await fetch("results/preset-review/manifest.json");
+    if (!response.ok) throw new Error("現行presetの書き出しが未完了です");
+    manifest = await response.json();
+    $("preset-count").textContent = manifest.presets.length;
+    const keys = [...new Set(manifest.presets.map(p => p.ae).filter(Boolean))];
+    for (const key of keys) reference.add(new Option(title(key), key));
+    for (const record of manifest.presets) {
+        preset.add(new Option(title(record.key), record.key));
+        const card = document.createElement("button"); card.className = "card";
+        const ae = record.ae;
+        card.innerHTML = `<strong>${title(record.key)}<span class="badge">${ae ? "AE: " + title(ae) : "独自preset"}</span></strong><div class="thumbs"><div><span>After Effects</span>${ae ? `<img loading="lazy" src="${aePath(ae, 24)}" alt="AE ${title(ae)}">` : '<div class="empty">対応AEなし</div>'}</div><div><span>VFX-JS / Current</span><img loading="lazy" src="${currentPath(record.key, 24)}" alt="VFX-JS ${title(record.key)}"></div></div>`;
+        card.onclick = () => { preset.value = record.key; reference.value = "auto"; frame = 24; load(); window.scrollTo({top: 0, behavior: "smooth"}); };
+        $("overview").append(card);
+    }
+    preset.value = manifest.presets.some(p => p.key === location.hash.slice(1)) ? location.hash.slice(1) : "fire";
+    await load(); requestAnimationFrame(tick);
+} catch (error) { status.dataset.error = "true"; status.textContent = error.message; }
+</script>
+</html>

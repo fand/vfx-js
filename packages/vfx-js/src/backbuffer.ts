@@ -2,6 +2,7 @@ import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import type { Texture, TextureFilter, TextureWrap } from "./gl/texture.js";
 import { type GLRect, getGLRect } from "./gl-rect.js";
+import type { EffectRenderTargetOpts } from "./types.js";
 
 /**
  * Double-buffered render target. Pass 0 is read, pass 1 is written;
@@ -22,6 +23,7 @@ export class Backbuffer {
         pixelRatio: number,
         float: boolean | undefined,
         opts: {
+            format?: EffectRenderTargetOpts["format"];
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
             mipmap?: boolean;
@@ -37,6 +39,7 @@ export class Backbuffer {
         const pheight = height * pixelRatio;
         const fbOpts = {
             float,
+            format: opts.format,
             wrap: opts.wrap,
             filter: opts.filter,
             mipmap: opts.mipmap,

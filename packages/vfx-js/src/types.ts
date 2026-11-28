@@ -760,6 +760,17 @@ export type EffectRenderTargetOpts = {
     float?: boolean;
 
     /**
+     * Explicit color storage, overriding `float`. Omitted preserves automatic
+     * RGBA8/16F/32F selection. Half-float formats retain HDR values with less
+     * memory; R/RG omit unused channels (sampling returns 0 for missing RGB,
+     * 1 for alpha). `readPixels` still returns four RGBA components per pixel.
+     * `rg32f` preserves 32-bit precision; requires EXT_float_blend and, for
+     * linear filtering, OES_texture_float_linear. Unsupported use throws;
+     * explicit formats never silently reduce precision.
+     */
+    format?: "rgba8" | "r16f" | "rg16f" | "rgba16f" | "rg32f";
+
+    /**
      * Whether the target content should persist across frames (Default: `false`).
      * Useful for feedback effects like trails or motion blur.
      */
@@ -806,7 +817,7 @@ export type EffectRenderTargetOpts = {
      * The target still samples and blits like a normal texture.
      * It uses about 5 times the memory, or 10 times with `depth: true`.
      * If the GPU can't take 4 samples for the format, it uses 1 and warns.
-     * With `float: true`, asking for 4 samples always gives 16-bit float,
+     * Without an explicit `format`, `float: true` with 4 samples gives 16-bit float,
      * also when the GPU falls back to 1.
      * Other values are ignored with a warning.
      */
@@ -898,10 +909,51 @@ export type EffectReadPixelsOpts = {
     flipY?: boolean;
 };
 
-export type EffectDrawOpts = {
-    frag: string;
-    vert?: string;
+/**
+ * A shader pair to draw with, compiled ahead of the draw.
+ * Create one with {@link EffectContext.createProgram}.
+ *
+ * Its compile runs in the background where the browser supports it,
+ * avoiding synchronous compile waits on that path.
+ * Drawing with a program that is not ready waits for the compile.
+ *
+ * Programs are shared and owned by the VFX instance: there is nothing to dispose.
+ */
+export type EffectProgram = {
+    readonly __brand: "EffectProgram";
 
+    /**
+     * Resolves when the program can draw without a wait.
+     * Rejects when the shaders fail to compile or a pending program is disposed.
+     */
+    readonly ready: Promise<void>;
+
+    /** Whether the program can draw without a wait now. */
+    readonly isReady: boolean;
+};
+
+/** Options for {@link EffectContext.createProgram}. */
+export type EffectProgramOpts = {
+    frag: string;
+
+    /** Default: the same vertex shader as `ctx.draw()` without `vert`. */
+    vert?: string;
+};
+
+/**
+ * The shaders of a draw: their source, or a program made from it.
+ * @see {@link EffectDrawOpts}
+ */
+export type EffectDrawShader =
+    | { frag: string; vert?: string; program?: undefined }
+    | {
+          /** A program from {@link EffectContext.createProgram}. */
+          program: EffectProgram;
+          frag?: undefined;
+          vert?: undefined;
+      };
+
+export type EffectDrawOpts = EffectDrawShader & {
     /** Default: `ctx.quad`. */
     geometry?: EffectQuad | EffectGeometry;
     uniforms?: EffectUniforms;
@@ -1077,6 +1129,21 @@ export type EffectContext = {
             filter?: EffectTextureFilter;
         },
     ): EffectTexture;
+
+    /**
+     * Start compiling a shader pair, and get a handle to draw with:
+     * `ctx.draw({ program })`.
+     *
+     * Use it for a large shader, or one an effect switches to later:
+     * wait for `program.ready` in `init()`, or keep drawing with another
+     * program until `program.isReady`.
+     *
+     * Valid in `init()`, `update()` and `render()`.
+     * The same sources give the same program. Without parallel-compilation
+     * support, creation compiles synchronously. After context restoration,
+     * check readiness again before drawing.
+     */
+    createProgram(opts: EffectProgramOpts): EffectProgram;
 
     /**
      * Run a draw call.

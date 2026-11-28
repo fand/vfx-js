@@ -20,11 +20,20 @@ export class ProgramCache {
         this.#glCtx = glCtx;
     }
 
-    get(vert: string, frag: string, glslVersion?: GlslVersion): Program {
+    /**
+     * With `parallel`, a new program only starts its compile
+     * (see {@link Program}).
+     */
+    get(
+        vert: string,
+        frag: string,
+        glslVersion?: GlslVersion,
+        parallel = false,
+    ): Program {
         const key = `${frag}\0${vert}\0${glslVersion ?? ""}`;
         let p = this.#programs.get(key);
         if (!p) {
-            p = new Program(this.#glCtx, vert, frag, glslVersion);
+            p = new Program(this.#glCtx, vert, frag, glslVersion, parallel);
             this.#programs.set(key, p);
         }
         return p;

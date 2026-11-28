@@ -1,3 +1,4 @@
+import type { EffectRenderTargetOpts } from "../types.js";
 import type { GLContext, Restorable } from "./context.js";
 import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
 
@@ -24,6 +25,7 @@ export class Framebuffer implements Restorable {
     width: number;
     height: number;
     float: boolean;
+    #format: EffectRenderTargetOpts["format"];
     mipmap: boolean;
     depth: boolean;
     samples: 1 | 4;
@@ -50,6 +52,7 @@ export class Framebuffer implements Restorable {
         height: number,
         opts: {
             float?: boolean;
+            format?: EffectRenderTargetOpts["format"];
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
             mipmap?: boolean;
@@ -57,11 +60,24 @@ export class Framebuffer implements Restorable {
             samples?: 1 | 4;
         } = {},
     ) {
+        if (opts.format === "rg32f") {
+            if (!ctx.floatBlend) {
+                throw new Error("[VFX-JS] RG32F requires EXT_float_blend.");
+            }
+            if (opts.filter !== "nearest" && !ctx.floatLinearFilter) {
+                throw new Error(
+                    "[VFX-JS] Linear RG32F requires OES_texture_float_linear.",
+                );
+            }
+        }
         this.#ctx = ctx;
         this.gl = ctx.gl;
         this.width = Math.max(1, Math.floor(width));
         this.height = Math.max(1, Math.floor(height));
-        this.float = opts.float ?? false;
+        this.#format = opts.format;
+        this.float = opts.format
+            ? opts.format !== "rgba8"
+            : (opts.float ?? false);
         this.mipmap = opts.mipmap ?? false;
         this.depth = opts.depth ?? false;
         this.#multisampleRequested = opts.samples === 4;
@@ -112,7 +128,7 @@ export class Framebuffer implements Restorable {
         // done manually here because ordering matters).
         this.texture.restore();
         this.depthTexture?.restore();
-        this.#allocate();
+        this.#allocate(false);
     }
 
     dispose(): void {
@@ -127,13 +143,31 @@ export class Framebuffer implements Restorable {
         this.depthTexture?.dispose();
     }
 
+    #explicitFormat(): number | undefined {
+        const gl = this.gl;
+        switch (this.#format) {
+            case "rgba8":
+                return gl.RGBA8;
+            case "r16f":
+                return gl.R16F;
+            case "rg16f":
+                return gl.RG16F;
+            case "rgba16f":
+                return gl.RGBA16F;
+            case "rg32f":
+                return gl.RG32F;
+        }
+        return undefined;
+    }
+
     /**
      * Whether the color format takes 4 samples.
      * Warns once per context if not.
      */
     #supportsMultisample(): boolean {
         const gl = this.gl;
-        const format = this.float ? gl.RGBA16F : gl.RGBA8;
+        const format =
+            this.#explicitFormat() ?? (this.float ? gl.RGBA16F : gl.RGBA8);
         const counts = gl.getInternalformatParameter(
             gl.RENDERBUFFER,
             format,
@@ -264,7 +298,7 @@ export class Framebuffer implements Restorable {
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
-    #allocate(): void {
+    #allocate(deleteOldHandles = true): void {
         const gl = this.gl;
         const oldFbo = this.fbo;
         const oldResolveFbo = this.resolveFbo;
@@ -293,21 +327,29 @@ export class Framebuffer implements Restorable {
         // Choose format based on float/non-float. For float textures, use
         // RGBA16F as a fallback if linear filtering on RGBA32F is not
         // supported by the GPU.
-        // Asking for 4 samples always gives RGBA16F, even after the fallback to 1.
-        const floatLinear =
-            this.#ctx.floatLinearFilter && !this.#multisampleRequested;
-        if (this.float && floatLinear && !this.#ctx.floatBlend) {
+        // With automatic storage, 4 samples use RGBA16F even after fallback to 1.
+        // An explicit RG32F target retains its format and precision.
+        const useFloat32 =
+            this.#format === "rg32f" ||
+            (this.#ctx.floatLinearFilter &&
+                !this.#multisampleRequested &&
+                !this.#format);
+        if (this.float && useFloat32 && !this.#ctx.floatBlend) {
             // Blending into RGBA32F needs EXT_float_blend; fail fast
             // instead of letting blended draws drop silently.
             throw new Error("[VFX-JS] EXT_float_blend is not supported.");
         }
-        const internalFormat = this.float
-            ? floatLinear
-                ? gl.RGBA32F
-                : gl.RGBA16F
-            : gl.RGBA8;
+        const internalFormat =
+            this.#explicitFormat() ??
+            (this.float ? (useFloat32 ? gl.RGBA32F : gl.RGBA16F) : gl.RGBA8);
+        const externalFormat =
+            this.#format === "r16f"
+                ? gl.RED
+                : this.#format === "rg16f" || this.#format === "rg32f"
+                  ? gl.RG
+                  : gl.RGBA;
         const type = this.float
-            ? floatLinear
+            ? useFloat32
                 ? gl.FLOAT
                 : gl.HALF_FLOAT
             : gl.UNSIGNED_BYTE;
@@ -329,7 +371,7 @@ export class Framebuffer implements Restorable {
                     w,
                     h,
                     0,
-                    gl.RGBA,
+                    externalFormat,
                     type,
                     null,
                 );
@@ -344,7 +386,7 @@ export class Framebuffer implements Restorable {
                 this.width,
                 this.height,
                 0,
-                gl.RGBA,
+                externalFormat,
                 type,
                 null,
             );
@@ -392,15 +434,18 @@ export class Framebuffer implements Restorable {
         this.texture.source = null;
 
         // Delete after assigning the new FBO so this.fbo is never stale.
-        // On restore() the old handle is dead; deleteFramebuffer is a no-op.
-        if (oldFbo) {
-            gl.deleteFramebuffer(oldFbo);
+        // Pre-loss handles belong to the old context. Deleting them after
+        // restoration raises INVALID_OPERATION, so only retire live handles.
+        if (deleteOldHandles) {
+            if (oldFbo) {
+                gl.deleteFramebuffer(oldFbo);
+            }
+            this.#deleteMultisample(
+                oldResolveFbo,
+                oldColorRenderbuffer,
+                oldDepthRenderbuffer,
+            );
         }
-        this.#deleteMultisample(
-            oldResolveFbo,
-            oldColorRenderbuffer,
-            oldDepthRenderbuffer,
-        );
     }
 
     /** Allocate multisampled renderbuffers and attach them to `fbo`. */

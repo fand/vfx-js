@@ -29,6 +29,7 @@ import {
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
+    SaberEffect,
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
@@ -759,6 +760,15 @@ img.addEventListener("click", () => effect.trigger());`,
         about: "Moves the red, green and blue channels apart.",
         media: "pigeon",
         effect: RgbShiftEffect,
+    }),
+    demo({
+        name: "SaberEffect",
+        text: "Distorted outline and layered glow. Draws outside the element.",
+        about: "Animates light along the element's outline. Core and Glow distort independently; four glow layers and output grading control the light.",
+        media: "logo",
+        effect: SaberEffect,
+        // A small pad keeps the tile cheap.
+        params: { pad: 40 },
     }),
     demo({
         name: "ScanlineEffect",

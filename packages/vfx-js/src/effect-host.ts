@@ -26,6 +26,8 @@ import type {
     EffectDims,
     EffectDrawOpts,
     EffectGeometry,
+    EffectProgram,
+    EffectProgramOpts,
     EffectReadPixelsOpts,
     EffectRenderTarget,
     EffectRenderTargetOpts,
@@ -274,6 +276,10 @@ type OwnedRT = {
     resolver: RenderTargetResolver;
 };
 
+// The program behind each handle from ctx.createProgram(), and back.
+const PROGRAMS = new WeakMap<EffectProgram, Program>();
+const PROGRAM_HANDLES = new WeakMap<Program, EffectProgram>();
+
 /**
  * One-to-one owner of an Effect's `EffectContext`.
  *
@@ -374,6 +380,7 @@ export class EffectHost {
             createRenderTarget: (opts) => this.#createRenderTarget(opts),
             releaseGeometry: (geo) => this.#geometries.release(geo),
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
+            createProgram: (opts) => this.#createProgram(opts),
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target, opts) => this.#clear(target, opts),
@@ -502,6 +509,7 @@ export class EffectHost {
     #createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget {
         const persistent = opts?.persistent ?? false;
         const float = opts?.float ?? false;
+        const format = opts?.format;
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
         const mipmapOpt = opts?.mipmap ?? false;
@@ -522,6 +530,7 @@ export class EffectHost {
             const cssW = explicitSize ? sizeW : sizeW / pr;
             const cssH = explicitSize ? sizeH : sizeH / pr;
             const bb = new Backbuffer(this.#glCtx, cssW, cssH, pr, float, {
+                format,
                 wrap,
                 filter,
                 mipmap,
@@ -563,6 +572,7 @@ export class EffectHost {
         } else {
             const fb = new Framebuffer(this.#glCtx, sizeW, sizeH, {
                 float,
+                format,
                 wrap,
                 filter,
                 mipmap,
@@ -1044,16 +1054,50 @@ export class EffectHost {
     }
 
     #getProgram(opts: EffectDrawOpts): Program {
-        const vert =
-            opts.vert ??
-            (this.#mutCtx.vfxProps.glslVersion === "100"
-                ? DEFAULT_VERT_100
-                : DEFAULT_VERT_300);
+        if (opts.program) {
+            const program = PROGRAMS.get(opts.program);
+            if (!program || program.gl !== this.#glCtx.gl) {
+                throw new Error(
+                    "[VFX-JS] ctx.draw() requires a program from the same VFX context.",
+                );
+            }
+            return program;
+        }
+        return this.#resolveProgram(opts.frag, opts.vert, false);
+    }
+
+    #resolveProgram(
+        frag: string,
+        vert: string | undefined,
+        parallel: boolean,
+    ): Program {
+        const glslVersion = this.#mutCtx.vfxProps.glslVersion;
         return this.#programCache.get(
-            vert,
-            opts.frag,
-            this.#mutCtx.vfxProps.glslVersion,
+            vert ??
+                (glslVersion === "100" ? DEFAULT_VERT_100 : DEFAULT_VERT_300),
+            frag,
+            glslVersion,
+            parallel,
         );
+    }
+
+    #createProgram(opts: EffectProgramOpts): EffectProgram {
+        const program = this.#resolveProgram(opts.frag, opts.vert, true);
+        let handle = PROGRAM_HANDLES.get(program);
+        if (!handle) {
+            handle = {
+                __brand: "EffectProgram",
+                get ready() {
+                    return program.ready;
+                },
+                get isReady() {
+                    return program.isReady;
+                },
+            };
+            PROGRAM_HANDLES.set(program, handle);
+            PROGRAMS.set(handle, program);
+        }
+        return handle;
     }
 
     #doDraw(opts: EffectDrawOpts): void {

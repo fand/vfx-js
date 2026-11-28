@@ -24,6 +24,9 @@ export class GLContext {
     /** True if `EXT_float_blend` is available (blending into RGBA32F). */
     floatBlend = false;
 
+    /** True if `KHR_parallel_shader_compile` is available. */
+    parallelCompile = false;
+
     /** True between `webglcontextlost` and `webglcontextrestored`. */
     isContextLost = false;
 
@@ -96,6 +99,7 @@ export class GLContext {
         // Required to blend into RGBA32F targets.
         this.floatBlend = !!gl.getExtension("EXT_float_blend");
         this.floatLinearFilter = !!gl.getExtension("OES_texture_float_linear");
+        this.parallelCompile = !!gl.getExtension("KHR_parallel_shader_compile");
     }
 
     #handleLost = (event: Event): void => {

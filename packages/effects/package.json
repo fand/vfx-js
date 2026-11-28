@@ -55,7 +55,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "lint-staged": "lint-staged",
-    "test": "vitest --dir src --run",
+    "test": "tsc -p tsconfig.esm.json && vitest --dir src --run && node --test test/*.test.mjs",
     "test:watch": "vitest --dir src"
   },
   "peerDependencies": {

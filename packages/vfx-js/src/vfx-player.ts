@@ -232,6 +232,12 @@ export class VFXPlayer {
             window.removeEventListener("pointermove", this.#pointermove);
         }
 
+        // Element chains own their render targets and effects. Removing only
+        // the canvas leaves these GPU resources live and the sources hidden.
+        for (const { element } of [...this.#elements]) {
+            this.removeElement(element);
+        }
+
         this.#postEffectTarget?.dispose();
         for (const rt of this.#postEffectBufferTargets.values()) {
             rt?.dispose();
