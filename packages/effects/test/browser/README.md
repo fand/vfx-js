@@ -71,6 +71,19 @@ preserve the previous VFX-JS looks; they are not copied AE preset values.
 
 ## GPU comparison
 
+For startup/preset-switch measurements, run
+`await (await import('./saber-startup-checks.mjs')).startupChecks()` on a
+frozen harness served beside `ae-source.png`, with POST enabled under `/results/`.
+It records effect first-render CPU submission and GPU-completed wall time,
+compile/link/status/uniform-setup API time, first switches and repeat switches.
+GPU completion uses a synchronous one-pixel readback (including its overhead),
+not only `finish()`, which may return before Chromium's GPU process completes.
+Cached-source and unique-source trials run separately, in alternating renderer
+order. Unique-source trials rename the shader entry function without changing
+arithmetic; they request new compilation but cannot guarantee a driver binary
+cache miss. They are not clean-browser cold-start measurements. Page loading,
+module loading, and network time are excluded. Run separately from GPU timing.
+
 Keep other animation tabs closed, the viewport fixed, and the machine on the
 same power setting. Run in the browser console:
 

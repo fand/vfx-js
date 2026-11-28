@@ -1072,3 +1072,106 @@ windy: 3.050→2.428ms (-20.4%).
 All16 runs contain120 GPU samples; GL errors0. Timing varies across runs,
 especially Fire; these measurements are device/workload-specific. DPR1 Torch
 had a small batch3 regression; no universal speedup claim.
+
+
+## 26. Fused Core warp and compilation measurements
+
+Stage25 baseline (`6dca5656`). Core warp now runs in final composition on the
+same integer raster grids as Glow/Halo. The original/soft Core remains cached
+for light generation and overlay. Core/Halo share their noise grid as before.
+Separate deferred Core state survives subsequent Glow preparation. Bounds now
+address the original padded pixel grid via UV, not the final viewport's
+`gl_FragCoord`; a naive initial implementation failed this mapping and was
+rejected. Existing half-float rounding is reproduced. Fractional grids retain
+the separate Core warp and release/recreate that target on live mode switches.
+Static Core noise remains cached; the fused Core warp itself runs each composite.
+No preset or public API changes.
+
+960×540,DPR2,pad320,tracked texture allocations (MiB; not total VRAM):
+
+| Preset | Before steady | After steady | Before rebuild/dynamic peak | After peak |
+|---|---:|---:|---:|---:|
+| Fire |86.02|71.61|116.05|101.64|
+| Arc Reactor |117.83|103.43|147.86|133.46|
+| Torch |95.98|95.98|126.02|126.02|
+
+One R16F3200×2360 target (14.40MiB) removed where Core distortion is active.
+Torch has no Core distortion; its shaders and allocation behavior are unchanged.
+
+Visual validation:864 review frames vs Stage25,307 differ, maximum1/255 in
+at most4 channel values per960×540 frame. Fire, Windy and Torch review sequences
+are byte-identical. All12 presets ×DPR1/2 ×t1/1.5/2 have maximum1/255 difference.
+90 additional cases (HDR, flow, Multiply, live switches, Reveal, legacy float,
+DPR1/1.5/2) have maximum1/255 in at most25 channel values; DPR1.5 is exact.
+Strict storage equality failures remain in raw evidence. Context restore,
+Reveal restore, resize, lifecycle and object disposal pass; GL errors0.
+51 unit tests, ESM/CJS and changed-file Biome checks pass.
+
+### Startup and preset switching
+
+Apple M4 Max/Chrome158, source960×540,DPR2,pad320. Three repetitions, four
+initial presets (Arc Reactor, Fire, Windy, Torch), reversed renderer order.
+Each fixture renders the initial preset, all11 others, then repeats those11.
+48 fixtures/1104 rows; all GL errors0. No compilation on repeated switches.
+Module/page/network loading excluded. GPU-completed wall time uses a synchronous
+one-pixel canvas readback, including its overhead. `finish()` alone was insufficient
+on Chromium; the earlier finish-only pilot is archived, excluded below.
+
+Cached-source runs reuse shader source previously compiled by QA. Unique-source
+runs rename the main entry function without changing arithmetic/uniforms; this
+forces new source lookup but does not guarantee a driver binary-cache miss.
+These are not clean-browser cold-start measurements. The API-time subtotal sums
+compile/link/status queries and uniform inspection; it does not isolate parallel
+driver compiler work. Wall time includes allocations, rendering and readback.
+
+Median initial effect-render completion, milliseconds (3 runs per cell):
+
+| Preset | Cached before | Cached after | Unique before | Unique after |
+|---|---:|---:|---:|---:|
+| arc-reactor |37.0|36.0|732.4|689.1|
+| fire |35.8|32.9|762.3|717.4|
+| windy |33.9|36.7|746.5|699.9|
+| torch |30.5|31.3|633.6|627.3|
+
+Medians across12 starting fixtures:
+cached-source: initial33.95→32.55ms; complete preset tour106.70→120.85ms; compile/link/inspection API subtotal49.60→65.95ms.
+unique-source: initial743.85→695.60ms; complete preset tour1141.70→1383.35ms; compile/link/inspection API subtotal921.55→973.50ms.
+
+Fewer initial programs do not mean cheaper exploration of every preset.
+A complete tour creates16 programs for either renderer: fusion shifts some
+compilation into later switches. The unique-source tour is about21% slower.
+
+Concrete regression: when starting Arc Reactor and visiting presets in stored
+order, first Fire needs one additional composite variant. Cached completion
+5.7→14.1ms; unique2.9→184.9ms (medians of3). Old Core/composite variants were
+already reusable separately; their combined variant was not. Repeated switches
+create zero programs. This is an explicit memory/startup tradeoff, not a universal
+compile-speed improvement. Actual browser presentation timing is not measured.
+
+The v2 pilot also rewrote unreachable Glow/Halo bounds source. Final code limits
+that rewrite to Core, preserving existing Glow/Halo source and cache identities.
+Torch before/after draw shader sequences are byte-identical (38 draws across
+initialization and another render). Final QA/startup/timing were rerun after this
+change; earlier v2 results are archived in results/stage26-pilot-evidence/.
+
+Evidence: ignored stage26-core-final/ and results/stage26-evidence/.
+Review: http://127.0.0.1:6040/stage26.html?before=stage25-presets#fire
+
+### Steady-frame GPU timing
+
+Final renderer, DPR2,60 warmup,120 samples,batch1,three reversed-order runs.
+Median of per-run GPU medians (ms), not summed pass timings:
+
+| Preset | Stage25 | Stage26 | Change |
+|---|---:|---:|---:|
+| arc-reactor |2.911|2.600|-10.7%|
+| fire |3.692|3.293|-10.8%|
+| torch |2.035|1.968|-3.3%|
+| windy |2.623|2.421|-7.7%|
+
+All24 runs have120 GPU samples, GL errors0. Torch's unchanged shader sequence
+is a control: its small timing difference illustrates run variability, not an
+optimization benefit. Active Core presets improved about8–11% on this device.
+Earlier v2 timing is archived; final claims use timing-repeat.json only.
+Keep this as a reversible memory/per-frame optimization with the first-switch
+compilation regression explicitly documented. No universal hardware guarantee.
