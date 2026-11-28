@@ -1175,3 +1175,18 @@ optimization benefit. Active Core presets improved about8–11% on this device.
 Earlier v2 timing is archived; final claims use timing-repeat.json only.
 Keep this as a reversible memory/per-frame optimization with the first-switch
 compilation regression explicitly documented. No universal hardware guarantee.
+
+
+## 27. Revert Core fusion; retain measurement tools
+
+User rejected the additional first-preset-switch compilation stall from Stage26.
+Restore `_saber-glow.ts`, `_saber-warp.ts`, `saber.ts` and their unit tests exactly
+to Stage25 (`6dca5656`). Keep startup measurement tooling and all Stage26 evidence.
+Remove the unreleased Core-fusion changeset. Distance-field cropping and the
+previous Glow/Halo fusion remain enabled. Core uses its separate intermediate
+again: Fire86.02MiB, Arc Reactor117.83MiB at960×540,DPR2,pad320 (Stage25 data).
+This chooses the former shader reuse across presets over14.40MiB of savings.
+
+Stage27 review uses the archived Stage25 captures: production ESM hashes match
+Stage25 exactly. No new GPU/compile timing claim; previous Stage25 evidence applies.
+Review: http://127.0.0.1:6040/stage27.html?before=stage26-presets#fire

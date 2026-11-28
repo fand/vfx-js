@@ -44,14 +44,6 @@ function warpFunction(fragment: string, prefix: string): string {
         .replace(/in vec2 (uv|uvContent);/g, "")
         .replace("uniform vec4 contentRectUv;", "")
         .replace("out vec4 outColor;", "vec4 outColor;")
-        // Final composition can target a viewport offset from the padded core.
-        // Bounds must still address the original offscreen pixel grid.
-        .replaceAll(
-            "gl_FragCoord.xy",
-            prefix === "cw_"
-                ? "(uv * vec2(textureSize(src, 0)))"
-                : "gl_FragCoord.xy",
-        )
         .replace(/\b[A-Za-z_]\w*\b/g, (name) =>
             names.has(name) ? prefix + name : name,
         );
@@ -76,10 +68,7 @@ float saberRoundWarp(float value) {
     return rounded;
 }
 `;
-const composites = new Map<
-    string,
-    Map<string, Map<string, Map<string, string>>>
->();
+const composites = new Map<string, Map<string, Map<string, string>>>();
 export class SaberWarpComposer {
     #rounding: EffectRenderTarget | null = null;
     #ready = false;
@@ -91,10 +80,9 @@ export class SaberWarpComposer {
         composite: string,
         glow: SaberDeferredWarp | null,
         halo: SaberDeferredWarp | null,
-        core: SaberDeferredWarp | null,
     ) {
-        const result = fuseSaberWarps(composite, glow, halo, core);
-        if (!glow && !halo && !core) {
+        const result = fuseSaberWarps(composite, glow, halo);
+        if (!glow && !halo) {
             return result;
         }
         this.#rounding ??= ctx.createRenderTarget({
@@ -126,9 +114,8 @@ function fuseSaberWarps(
     composite: string,
     glow: SaberDeferredWarp | null,
     halo: SaberDeferredWarp | null,
-    core: SaberDeferredWarp | null,
 ): { fragment: string; uniforms: EffectUniforms } {
-    if (!glow && !halo && !core) {
+    if (!glow && !halo) {
         return { fragment: composite, uniforms: {} };
     }
     // Look up original strings directly; do not concatenate/hash whole shader
@@ -145,18 +132,11 @@ function fuseSaberWarps(
         glowVariants.set(glowKey, haloVariants);
     }
     const haloKey = halo?.fragment ?? "";
-    let coreVariants = haloVariants.get(haloKey);
-    if (!coreVariants) {
-        coreVariants = new Map();
-        haloVariants.set(haloKey, coreVariants);
-    }
-    const coreKey = core?.fragment ?? "";
-    let fragment = coreVariants.get(coreKey);
+    let fragment = haloVariants.get(haloKey);
     if (!fragment) {
         const code =
             (glow ? warpFunction(glow.fragment, "gw_") : "") +
-            (halo ? warpFunction(halo.fragment, "hw_") : "") +
-            (core ? warpFunction(core.fragment, "cw_") : "");
+            (halo ? warpFunction(halo.fragment, "hw_") : "");
         fragment = composite.replace(
             "in vec2 uvSrc;",
             "in vec2 uvSrc;\nin vec2 uvContent;\nuniform vec4 contentRectUv;",
@@ -176,16 +156,12 @@ function fuseSaberWarps(
                 "hw_sample()",
             );
         }
-        if (core) {
-            fragment = fragment.replace("texture(core, uv).r", "cw_sample()");
-        }
-        coreVariants.set(coreKey, fragment);
+        haloVariants.set(haloKey, fragment);
     }
     const uniforms: EffectUniforms = {};
     for (const [prefix, warp] of [
         ["gw_", glow],
         ["hw_", halo],
-        ["cw_", core],
     ] as const) {
         if (warp) {
             for (const [name, value] of Object.entries(warp.uniforms)) {

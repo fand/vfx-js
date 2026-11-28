@@ -556,7 +556,6 @@ void main() {
 // released on resize and disposal.
 export class SaberGlowPasses {
     deferred: SaberDeferredWarp | null = null;
-    deferredCore: SaberDeferredWarp | null = null;
     #core: EffectRenderTarget | null = null;
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
@@ -603,9 +602,7 @@ export class SaberGlowPasses {
         coreNoise?: SaberGlowPasses,
         defer = false,
     ): EffectRenderTarget {
-        if (kind === "core") {
-            this.deferredCore = null;
-        } else {
+        if (kind !== "core") {
             this.deferred = null;
         }
         if (defer) {
@@ -856,11 +853,7 @@ export class SaberGlowPasses {
                 uniforms: { ...uniforms, noiseField: field },
             };
             if (defer) {
-                if (kind === "core") {
-                    this.deferredCore = warped;
-                } else {
-                    this.deferred = warped;
-                }
+                this.deferred = warped;
             } else {
                 ctx.draw({
                     frag: warped.fragment,
@@ -872,11 +865,7 @@ export class SaberGlowPasses {
             this.#noise[kind]?.target.dispose();
             delete this.#noise[kind];
             if (defer) {
-                if (kind === "core") {
-                    this.deferredCore = { fragment, uniforms };
-                } else {
-                    this.deferred = { fragment, uniforms };
-                }
+                this.deferred = { fragment, uniforms };
             } else {
                 ctx.draw({ frag: fragment, uniforms, target });
             }
@@ -1173,7 +1162,6 @@ export class SaberGlowPasses {
 
     dispose(): void {
         this.deferred = null;
-        this.deferredCore = null;
         this.releaseLayers();
         this.#noise.core?.target.dispose();
         this.#noise.halo?.target.dispose();
