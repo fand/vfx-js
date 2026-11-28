@@ -13,7 +13,6 @@ import { SaberEffect } from "../../src/saber.ts";
 // Neutral diagnostic appearance: explicit so default-preset changes cannot
 // accidentally animate coverage, cache, or halo probes. Also accepted by baseline.
 export const STEADY_OPTIONS = Object.freeze({
-    intensity: 1,
     gamma: 1,
     brightness: 1,
     saturation: 1,
@@ -21,14 +20,11 @@ export const STEADY_OPTIONS = Object.freeze({
     coreBlendOnTop: false,
     haloIntensity: 100,
     haloSize: 100,
-    glowWhiteness: 0.15,
     glowBias: 1,
     glowPreGamma: 1,
-    glowFlow: 0,
-    glowDistortAllLayers: false,
     flickerIntensity: 0,
     coreDistortion: { ...DEFAULT_DISTORTION },
-    glowDistortion: { ...DEFAULT_DISTORTION, seed: 71 },
+    glowDistortion: { ...DEFAULT_DISTORTION, composite: "distort", seed: 71 },
     glowLayers: [
         { size: 3, intensity: 3 },
         { size: 12, intensity: 6 },
@@ -37,8 +33,6 @@ export const STEADY_OPTIONS = Object.freeze({
     ],
     color: "#3399ff",
     thickness: 2,
-    coreIntensity: 1,
-    coreWhiteness: 0.15,
     glow: 1,
     glowSizeMultiplier: 1,
 });
@@ -193,8 +187,6 @@ void main() {
                 this.input,
                 layers,
                 spread,
-                48,
-                false,
                 true,
             );
             const output = this.passes.combineLayers(ctx, {
@@ -212,7 +204,7 @@ void main() {
             this.input,
             layers,
             // Frozen baselines retain the removed spread argument.
-            ...(this.legacyLayers ? [spread, 1, 48] : [spread, 48]),
+            ...(this.legacyLayers ? [spread, 1, 48] : [spread]),
         );
         ctx.blit(output);
     }
@@ -250,7 +242,7 @@ void main() { outColor = vec4(1.0); }`,
             ctx,
             this.input,
             this.params,
-            "core",
+            "glow",
         );
         ctx.blit(result);
     }
@@ -269,6 +261,7 @@ export async function createSaberFixture({
     sourceHeight = 140,
     paint,
     transformDraw,
+    isolateGlow = false,
     trackResources = false,
 } = {}) {
     // Context loss is dispatched asynchronously. Let a preceding fixture's
@@ -332,6 +325,12 @@ export async function createSaberFixture({
                 }
                 if (transformDraw) {
                     opts = transformDraw(opts, ctx);
+                }
+                if (isolateGlow && opts.uniforms?.coreGain !== undefined) {
+                    opts = {
+                        ...opts,
+                        uniforms: { ...opts.uniforms, coreGain: 0 },
+                    };
                 }
                 ctx.draw(opts);
                 if (opts.target) {

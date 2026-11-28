@@ -153,7 +153,7 @@ const appearance = await appearanceChecks.runAppearanceChecks({
   Baseline: saberComparison.Baseline,
 });
 const motionChecks = await import('./saber-motion-checks.mjs');
-const turbulence = await motionChecks.turbulenceChecks();
+const shutter = await motionChecks.shutterChecks();
 ```
 
 The checks cover impulse energy/variance across mip boundaries, even/odd source
@@ -175,10 +175,7 @@ pixels from an internal pass; `screen()` returns composited RGBA8 pixels.
 Always destroy fixtures. Resource tracking is opt-in and must remain disabled
 for performance measurements.
 
-The turbulence probe isolates coarse/fine production noise bands. With frozen
-evolution it checks distinct signed wind velocities, at DPR 1/2, rather than
-merely asserting that the image changes over time. AE animation analysis should
-also exclude the core and inspect multiple spatial scales. A change in total
+AE animation analysis should exclude the core and inspect multiple spatial scales. A change in total
 image variance alone does not establish matching transport or cloud dynamics.
 
 Visual review remains necessary: numeric improvements do not prove an
@@ -201,15 +198,14 @@ source/softness independence.
 
 Run `await (await import('./saber-motion-checks.mjs')).runMotionChecks()`.
 It isolates the production noise field and verifies upward/reverse transport
-against an exact 12 CSS px translation, checks directional glow-envelope reach,
-and tests all eleven AE-inspired presets for animation, deterministic seeking
+against an exact 12 CSS px translation, and tests all eleven AE-inspired presets for animation, deterministic seeking
 and frozen clocks at DPR 1/2. `failures` must be empty. This verifies motion
 semantics, not pixel agreement with AE's proprietary renderer.
 
-`directionalCoreChecks()` compares thin directional warps at DPR 1/2 with a
+`warpedCoreChecks()` compares thin warps at DPR 1/2 with a
 4× reference, versus the raster-warp fallback. The analytic path should reduce
 relative error by at least 25%. It only applies to steady single outlines with
-nonzero detail, including free-direction warps; reveals retain raster sampling.
+nonzero distortion; reveals retain raster sampling.
 
 `shutterChecks()` exercises core/glow shutter sampling at DPR 1/2: frozen clocks
 match the zero-shutter image exactly, seeking is deterministic, and an animated
@@ -441,9 +437,9 @@ quantization near the empirical color curve's knees and output dithering.
 `ae-saber-layer-noise.jsx` isolates three-layer Screen versus Multiply/Distort,
 including inverted noise and wind blur. Native Multiply masks the combined
 Glow, not each layer independently. `runGlowMaskOrderingChecks()` covers one
-and three saturated layers at DPR1/2 and the identity of partial protection.
-Layer capture RGB now packs combined affected light in R, protected light in G,
-zero in B; A remains Halo. This layout applies when distortion/flow is active.
+and three saturated layers at DPR1/2 and identity masking.
+Layer capture RGB packs combined affected light in R, zero in G/B; A remains
+Halo. All three Glow layers are affected when distortion is active.
 
 
 ### Core/Halo filter ordering
@@ -514,3 +510,20 @@ The fixture now waits for Saber's composite before returning. After changing
 params/layout, `await fixture.settle(time)` before synchronous `screen()` or
 allocation snapshots. `capture()` settles automatically. This avoids comparing
 an intentional pending frame with a completed synchronous frame.
+
+## Reduced Saber API (Stage 30)
+
+The 13 non-AE controls have been removed. Current probes use the 58 remaining
+leaf parameters. `isolateGlow: true` is a test-fixture option that suppresses
+Core in the final draw; it is not a public Saber option. Probes for removed
+whiteness, envelope flow and octave turbulence extensions were retired.
+
+After freezing the pre-removal ESM and building the candidate, prepare a harness
+with `prepare-saber-comparison.mjs`, copy `saber-params-checks.mjs` into it, and run
+`await (await import('./saber-params-checks.mjs')).paramsChecks()`.
+This checks default/all named presets at DPR 1/1.5/2 and live transitions through
+HDR grading, flicker, shutter, Reveal, source composition, dynamic input and
+float-filter fallbacks. It accepts at most one 8-bit step per channel; the raw
+report records all differences and verifies disposed GPU resources. It saves
+`results/stage30-evidence/qa.json`. Capture the 72-frame preset review separately
+and compare PNGs to Stage 29. Historical frozen renderers retain their old API.

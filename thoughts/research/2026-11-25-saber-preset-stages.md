@@ -1374,3 +1374,56 @@ Evidence (ignored review server root): `stage29-async-renderer/manifest.json`,
 `results/stage29-presets/`. The earlier pilot is separately saved as
 `pilot-async.json`; final reported timings use the24-row `async.json`.
 Review: http://127.0.0.1:6040/stage29.html?before=stage28-presets#fire
+
+## 30. Remove non-AE controls
+
+Compared the saved installed-AE property export (`Fire-settings.tsv`, 77 leaf
+controls including Preset) with our public API. Remove thirteen extra leaves,
+reducing SaberParams from71 to58 (excluding the constructor's preset selector):
+
+- `intensity`, `coreIntensity`: fix their gains at1.
+- `coreWhiteness`, `glowWhiteness`: use the measured colorizer without white mixing.
+- `glowFlow`: remove envelope displacement.
+- `glowDistortAllLayers`: always distort all first three layers; Halo follows Core.
+- Core `composite`: always Distort; Glow retains Distort/Multiply.
+- Core/Glow `noiseDetail`, `noiseTurbulence`, `directionality`: fixed octave
+  spacing2, existing transport, unconstrained displacement.
+
+Remove corresponding uniforms, shader variants, public types/options, preset
+entries and Storybook bindings. Nested unknown options now throw before any
+preset or parameter mutation, just like top-level options. Existing custom
+non-neutral uses require reauthoring; no compatibility aliases. Named presets
+and the default Electric look are the preservation target. The pending Saber
+release note and agent reference describe the reduced API.
+
+Before renderer: freshly built `7b964333` ESM, frozen before edits. After:
+`stage30-params-renderer/`, with manifest hashes. Same WebGL host in both.
+
+### Appearance verification
+
+- 12names ×72frames,960×540,DPR1,t1–3.958s:856/864 frames byte-identical to
+  Stage29;8 frames differ by only1–2 color components each, maximum1/255
+  (9 changed components across all864 images). PNG alpha is opaque for the
+  emission-on-black review. This is not a byte-exact claim.
+- Default plus12names ×DPR1/1.5/2 ×t1/2:78 RGBA comparisons. Two comparisons
+  each differ in one component by1/255; the other76 are exact.
+- 15 live-control steps ×DPR1/1.5/2 ×normal/fallback:90 RGBA comparisons, all
+  exact. Covers HDR grading, wind shutter, flicker, Glow Multiply/Distort,
+  distortion bypass, Reveal, preset switching, dynamic input, soft/analytic
+  Core and original-source composition.
+- No GL errors; tracked GPU objects released in all12 lifecycle fixtures.
+- Output grading and isolated Glow transfer probes pass. Glow isolation now
+  suppresses Core in the diagnostic fixture rather than using a removed public
+  brightness control. The transfer probe waits for asynchronous preparation
+  after edits; previously it could compare a stale frame.
+
+53 effects unit tests pass, including atomic rejection of all13 removed leaves.
+Effects ESM/CJS build, effects/Storybook lint and docs API checks pass (118 exports).
+Saber story and pane pass a focused TypeScript check with a test-only CSS module
+shim. Whole-Storybook tsc remains blocked by existing missing React/CSS types;
+no new Saber option/type errors appear. No GPU-speed claim made for this cleanup.
+
+Evidence: ignored review root `results/stage30-evidence/{frame-diff,qa,isolated}.json`
+and `results/stage30-presets/`. Reproducible API comparison runner:
+`packages/effects/test/browser/saber-params-checks.mjs`.
+Review: http://127.0.0.1:6040/stage30.html?before=stage29-presets#fire

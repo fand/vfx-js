@@ -1037,9 +1037,6 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
 
     const line = pane.addFolder({ title: "Core" });
     line.addBinding(p, "color", { view: "color" });
-    line.addBinding(p, "intensity", range(0, 5, 0.01));
-    line.addBinding(p, "coreIntensity", range(0, 10, 0.01));
-    line.addBinding(p, "coreWhiteness", range(0, 1, 0.01));
     line.addBinding(p, "coreSoftness", range(0, 25, 0.05));
     line.addBinding(p, "coreBlendOnTop");
     const halo = pane.addFolder({ title: "Halo" });
@@ -1060,7 +1057,6 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
 
     const glow = pane.addFolder({ title: "Glow" });
     glow.addBinding(p, "glow", range(0, 1000, 0.1));
-    glow.addBinding(p, "glowWhiteness", range(0, 1, 0.01));
     glow.addBinding(p, "glowBias", range(0, 5, 0.01));
     glow.addBinding(p, "glowSizeMultiplier", range(0, 4, 0.01));
     glow.addBinding(p, "glowPreGamma", range(0.1, 5, 0.01));
@@ -1082,22 +1078,15 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
             expanded: false,
         });
         const d = p[key];
-        if (key === "glowDistortion") {
-            distortion.addBinding(p, "glowDistortAllLayers", {
-                label: "All glow layers (1–3)",
-            });
-            distortion.addBinding(p, "glowFlow", {
-                ...range(0, 120, 1),
-                label: "Flow reach",
-            });
-        }
         distortion.addBinding(d, "amount", range(0, 100, 0.5));
         distortion.addBinding(d, "type", {
             options: { Fluid: "fluid", Smoke: "smoke", Energy: "energy" },
         });
-        distortion.addBinding(d, "composite", {
-            options: { Distort: "distort", Multiply: "multiply" },
-        });
+        if (key === "glowDistortion") {
+            distortion.addBinding(p.glowDistortion, "composite", {
+                options: { Distort: "distort", Multiply: "multiply" },
+            });
+        }
         distortion.addBinding(d, "invert");
         distortion.addBinding(d, "windSpeed", range(-240, 240, 1));
         distortion.addBinding(d, "windDirection", range(0, 360, 1));
@@ -1108,10 +1097,7 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
             ...range(1, 8, 1),
             label: "Noise octaves",
         });
-        distortion.addBinding(d, "noiseDetail", range(0, 1, 0.01));
-        distortion.addBinding(d, "noiseTurbulence", range(0, 1, 0.01));
         distortion.addBinding(d, "noiseAspectRatio", range(0.1, 5, 0.01));
-        distortion.addBinding(d, "directionality", range(0, 1, 0.01));
         distortion.addBinding(d, "motionBlur", {
             ...range(0, 0.25, 0.005),
             label: "Wind blur (s)",

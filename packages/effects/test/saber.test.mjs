@@ -11,7 +11,6 @@ function steadyEffect(options = {}) {
         return new SaberEffect(options);
     }
     return new SaberEffect({
-        intensity: 1,
         gamma: 1,
         brightness: 1,
         saturation: 1,
@@ -19,14 +18,15 @@ function steadyEffect(options = {}) {
         coreBlendOnTop: false,
         haloIntensity: 100,
         haloSize: 100,
-        glowWhiteness: 0.15,
         glowBias: 1,
         glowPreGamma: 1,
-        glowFlow: 0,
-        glowDistortAllLayers: false,
         flickerIntensity: 0,
         coreDistortion: { ...DEFAULT_DISTORTION },
-        glowDistortion: { ...DEFAULT_DISTORTION, seed: 71 },
+        glowDistortion: {
+            ...DEFAULT_DISTORTION,
+            composite: "distort",
+            seed: 71,
+        },
         glowLayers: [
             { size: 3, intensity: 3 },
             { size: 12, intensity: 6 },
@@ -35,8 +35,6 @@ function steadyEffect(options = {}) {
         ],
         color: "#3399ff",
         thickness: 2,
-        coreIntensity: 1,
-        coreWhiteness: 0.15,
         glow: 1,
         glowSizeMultiplier: 1,
         ...options,
@@ -99,10 +97,10 @@ test("presets reset appearance without changing input/reveal or sharing mutable 
     }
     effect.setParams({
         preset: "fire",
-        coreIntensity: 2,
+        brightness: 2,
         glowDistortion: { amount: 7 },
     });
-    assert.equal(effect.params.coreIntensity, 2);
+    assert.equal(effect.params.brightness, 2);
     assert.equal(effect.params.glowDistortion.amount, 7);
     assert.equal(
         effect.params.glowDistortion.windSpeed,
@@ -111,14 +109,12 @@ test("presets reset appearance without changing input/reveal or sharing mutable 
     assert.throws(() => effect.setParams({ preset: "missing" }), RangeError);
 });
 
-test("core appearance and brightness flicker preserve the glow cache", () => {
+test("core softness and brightness flicker preserve the glow cache", () => {
     const effect = steadyEffect({});
     const f = fixture();
     effect.init(f.ctx);
     const original = f.render(effect);
     effect.setParams({
-        coreIntensity: 0.5,
-        coreWhiteness: 1,
         flickerIntensity: 0.8,
         flickerSpeed: 7,
         flickerSeed: 11,
@@ -127,8 +123,7 @@ test("core appearance and brightness flicker preserve the glow cache", () => {
     assert.equal(f.draws.length, 1);
     assert.equal(changed.uniforms.core, original.uniforms.core);
     assert.equal(changed.uniforms.layer0, original.uniforms.layer0);
-    assert.equal(changed.uniforms.coreWhiteness, 1);
-    assert.ok(changed.uniforms.coreGain <= original.uniforms.coreGain * 0.5);
+    assert.ok(changed.uniforms.coreGain <= original.uniforms.coreGain);
     assert.ok(changed.uniforms.glowGain < original.uniforms.glowGain);
     effect.params.coreSoftness = 2;
     const soft = f.render(effect);
@@ -191,7 +186,7 @@ test("Halo scales only layer 4 and positive gains reuse the blur pyramid", () =>
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
-test("output grading and glow tint preserve cached shapes and reset with presets", () => {
+test("output grading preserve cached shapes and reset with presets", () => {
     const effect = steadyEffect();
     const f = fixture();
     effect.init(f.ctx);
@@ -200,25 +195,18 @@ test("output grading and glow tint preserve cached shapes and reset with presets
         gamma: 0.7,
         brightness: 0.4,
         saturation: 0,
-        glowWhiteness: 0.8,
     });
     const after = f.render(effect);
     assert.equal(f.draws.length, 1);
     assert.equal(after.uniforms.core, before.uniforms.core);
     assert.equal(after.uniforms.layer0, before.uniforms.layer0);
-    assert.equal(after.uniforms.coreWhiteness, before.uniforms.coreWhiteness);
     assert.equal(after.uniforms.outputGamma, 0.7);
     assert.equal(after.uniforms.outputBrightness, 0.4);
     assert.equal(after.uniforms.outputSaturation, 0);
-    assert.equal(after.uniforms.whiteMix, 0.8);
     effect.setParams({ preset: "electric" });
     for (const key of ["gamma", "brightness", "saturation"]) {
         assert.equal(effect.params[key], SABER_PRESETS.electric[key]);
     }
-    assert.equal(
-        effect.params.glowWhiteness,
-        SABER_PRESETS.electric.glowWhiteness,
-    );
     effect.dispose();
 });
 
@@ -318,7 +306,6 @@ test("noise uses a fixed content grid while light retains full resolution", () =
     const effect = steadyEffect({
         glowLayers: Array.from({ length: 4 }, () => ({
             size: 20,
-            intensity: 1,
         })),
         glowDistortion: {
             amount: 50,
@@ -350,7 +337,7 @@ test("soft original overlay stays soft and cached while distorted core animates"
     const effect = steadyEffect({
         coreBlendOnTop: true,
         coreSoftness: 3,
-        coreDistortion: { amount: 12, noiseDetail: 1 },
+        coreDistortion: { amount: 12 },
     });
     const f = fixture();
     effect.init(f.ctx);
@@ -411,96 +398,19 @@ test("fine noise changes invalidate static distortion without rebuilding the fie
     f.render(effect);
     assert.equal(f.draws.length, 1);
     effect.setParams({
-        coreDistortion: { noiseDetail: 1, noiseComplexity: 8 },
+        coreDistortion: { noiseComplexity: 8 },
     });
     f.render(effect);
-    assert.ok(
-        f.draws.some(
-            (d) => d.uniforms.noiseDetail === 1 && d.uniforms.complexity === 8,
-        ),
-    );
+    assert.ok(f.draws.some((d) => d.uniforms.complexity === 8));
     assert.ok(
         !f.draws.some((d) => isCore(d) || d.uniforms.payloadOn !== undefined),
     );
     effect.dispose();
 });
 
-test("turbulent advection invalidates only the glow result and clamps its strength", () => {
+test("analytic core falls back during reveals and returns afterward", () => {
     const effect = steadyEffect({
-        glowDistortion: { amount: 32, windSpeed: 0, noiseSpeed: 0 },
-    });
-    const f = fixture();
-    effect.init(f.ctx);
-    f.render(effect);
-    for (const [strength, expected] of [
-        [0.7, 0.7],
-        [2, 1],
-        [-1, 0],
-    ]) {
-        effect.setParams({ glowDistortion: { noiseTurbulence: strength } });
-        f.render(effect);
-        const distortion = f.draws.filter((d) => d.uniforms.glowPass === 1);
-        assert.equal(distortion.length, 1);
-        assert.equal(distortion[0].uniforms.noiseTurbulence, expected);
-        assert.equal(f.draws.length, 2); // Noise grid + fused composition; no new light blur.
-        f.render(effect);
-        assert.equal(f.draws.length, 1);
-    }
-    effect.dispose();
-});
-
-test("flow-only glow caches blurs while reach, direction and wind sign stay live", () => {
-    const effect = steadyEffect({
-        glowFlow: 24,
-        glowDistortion: { amount: 0, windSpeed: 0, noiseSpeed: 0 },
-    });
-    const f = fixture();
-    effect.init(f.ctx);
-    f.render(effect);
-    assert.ok(f.draws.some((d) => d.uniforms.gw_flowOffset?.[1] > 0));
-    f.render(effect);
-    assert.equal(f.draws.length, 1);
-    for (const options of [
-        { glowFlow: 48 },
-        { glowDistortion: { windDirection: 270 } },
-        { glowDistortion: { windSpeed: -20 } },
-    ]) {
-        effect.setParams(options);
-        f.render(effect);
-        const distortion = f.draws.find((d) => d.uniforms.gw_flowOffset);
-        assert.ok(
-            distortion,
-            "flow changes redraw distortion even with amount zero",
-        );
-        assert.ok(
-            !f.draws.some((d) => d.uniforms.axis),
-            "base blurs are reused",
-        );
-    }
-    effect.setParams({ glowFlow: 0 });
-    f.render(effect);
-    assert.ok(!f.draws.some((d) => d.uniforms.gw_flowOffset));
-    effect.dispose();
-    assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
-});
-
-test("directionality invalidates a static core without rebuilding the field", () => {
-    const effect = steadyEffect({
-        coreDistortion: { amount: 20, windSpeed: 0, noiseSpeed: 0 },
-    });
-    const f = fixture();
-    effect.init(f.ctx);
-    f.render(effect);
-    effect.setParams({ coreDistortion: { directionality: 1 } });
-    f.render(effect);
-    assert.ok(f.draws.some((d) => d.uniforms.directionality === 1));
-    assert.ok(!f.draws.some((d) => d.uniforms.payloadOn !== undefined));
-    effect.dispose();
-});
-
-test("analytic directional core falls back during reveals and returns afterward", () => {
-    const effect = steadyEffect({
-        coreDistortion: { amount: 20, directionality: 1, noiseDetail: 1 },
+        coreDistortion: { amount: 20 },
     });
     const f = fixture();
     effect.init(f.ctx);
@@ -1036,7 +946,7 @@ test("layer radii are independent of pad; zero size multiplier bypasses glow pas
     );
 });
 
-test("glow protects wide halos by effective radius, independent of layer order", () => {
+test("all three glow layers distort regardless of effective radius", () => {
     const f = fixture();
     const effect = steadyEffect({
         glowDistortion: { amount: 20, noiseScale: 48 },
@@ -1046,20 +956,14 @@ test("glow protects wide halos by effective radius, independent of layer order",
     f.render(effect);
     const shares = () =>
         f.draws.find((d) => d.uniforms.nearShares).uniforms.nearShares;
-    assert.deepEqual(shares(), [0, 1, 0, 1]);
+    assert.deepEqual(shares(), [1, 1, 1, 1]);
     assert.equal(
         f.draws.find((d) => d.uniforms.glowPass === 1).uniforms.layered,
         1,
     );
     effect.params.glowSizeMultiplier = 4;
     f.render(effect);
-    assert.deepEqual(shares(), [0, 1, 0, 0]);
-    effect.params.glowDistortAllLayers = true;
-    f.render(effect);
     assert.deepEqual(shares(), [1, 1, 1, 1]);
-    effect.params.glowDistortAllLayers = false;
-    f.render(effect);
-    assert.deepEqual(shares(), [0, 1, 0, 0]);
 });
 
 test("resize, layer changes and disposal release explicit targets without feedback", () => {
@@ -1110,6 +1014,12 @@ test("default is Electric, with explicit constructor overrides applied last", ()
 
 test("removed and unknown options fail before any preset or parameter mutation", () => {
     const removed = [
+        "intensity",
+        "coreIntensity",
+        "coreWhiteness",
+        "glowWhiteness",
+        "glowFlow",
+        "glowDistortAllLayers",
         "toneMapping",
         "amplitude",
         "mainAmplitude",
@@ -1140,6 +1050,46 @@ test("removed and unknown options fail before any preset or parameter mutation",
             assert.ok(!(key in recipe));
         }
     }
+});
+
+test("removed nested controls reject atomically and presets expose 58 leaves", () => {
+    const effect = new SaberEffect({ preset: "fire" });
+    const before = structuredClone(effect.params);
+    for (const group of ["coreDistortion", "glowDistortion"]) {
+        for (const key of [
+            "noiseDetail",
+            "noiseTurbulence",
+            "directionality",
+            ...(group === "coreDistortion" ? ["composite"] : []),
+        ]) {
+            const invalid = {
+                preset: "fog",
+                brightness: 0,
+                [group]: { [key]: 1 },
+            };
+            assert.throws(
+                () => new SaberEffect(invalid),
+                new RegExp(`${group}.${key}`),
+            );
+            assert.throws(
+                () => effect.setParams(invalid),
+                new RegExp(`${group}.${key}`),
+            );
+            assert.deepEqual(effect.params, before);
+            for (const recipe of Object.values(SABER_PRESETS)) {
+                assert.ok(!(key in recipe[group]));
+            }
+        }
+    }
+    const count = (v) =>
+        typeof v === "object"
+            ? Object.values(v).reduce((n, x) => n + count(x), 0)
+            : 1;
+    for (const preset of Object.keys(SABER_PRESETS)) {
+        assert.equal(count(new SaberEffect({ preset }).params), 58);
+    }
+    effect.setParams({ glowDistortion: { composite: "multiply" } });
+    assert.equal(effect.params.glowDistortion.composite, "multiply");
 });
 
 test("only AE-inspired preset names and the Burning alias remain", () => {
@@ -1263,7 +1213,7 @@ test("noise grids retain precision with RG32F and fall back without float extens
     }
 });
 
-test("scalar glow switches between warped, flow-only and unwarped composition", () => {
+test("scalar glow switches between warped, Halo and unwarped composition", () => {
     const f = fixture({ width: 256, height: 192, pixelRatio: 2 });
     const effect = steadyEffect({ glowDistortion: { amount: 20 } });
     effect.init(f.ctx);
@@ -1275,11 +1225,10 @@ test("scalar glow switches between warped, flow-only and unwarped composition", 
     assert.equal(warped.uniforms.glowBase.format, "rgba16f");
     assert.equal(warped.uniforms.glowBase.width, 128);
     assert.ok(warped.frag.includes("#define SCALAR_GLOW"));
-    effect.setParams({ glowDistortion: { amount: 0 }, glowFlow: 40 });
-    const flow = f.render(effect);
-    assert.equal(flow.uniforms.glowTex, warped.uniforms.glowTex);
-    assert.ok(flow.frag.includes("#define SCALAR_GLOW"));
-    effect.setParams({ glowFlow: 0, coreDistortion: { amount: 5 } });
+    effect.setParams({
+        glowDistortion: { amount: 0 },
+        coreDistortion: { amount: 5 },
+    });
     const halo = f.render(effect);
     assert.equal(halo.uniforms.glowTex.format, "rgba16f");
     assert.ok(!halo.frag.includes("#define SCALAR_GLOW"));
@@ -1308,7 +1257,6 @@ test("Halo borrows matching Core noise without owning it; stale grids fall back"
             "halo",
             false,
             undefined,
-            0,
             [1, 1, 1],
             [128, 96],
             false,
@@ -1320,13 +1268,11 @@ test("Halo borrows matching Core noise without owning it; stale grids fall back"
     renderHalo();
     assert.equal(field(), shared);
     // Light controls do not affect the noise grid.
-    renderHalo({ amount: 40, composite: "multiply", directionality: 1 });
+    renderHalo({ amount: 40 });
     assert.equal(field(), shared);
     for (const overrides of [
         { noiseScale: params.noiseScale + 1 },
         { noiseBias: 2 },
-        { noiseDetail: 1 },
-        { noiseTurbulence: 1 },
         { noiseAspectRatio: 2 },
         { noiseComplexity: 7 },
         { type: "energy" },
@@ -1501,7 +1447,7 @@ test("fractional raster grids retain intermediate interpolation", () => {
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
-test("fused Core modes reuse one composite across softness, Multiply and turbulence", () => {
+test("fused Core modes reuse one composite across softness and shutter", () => {
     const f = fixture();
     const effect = steadyEffect({
         coreDistortion: { amount: 12 },
@@ -1513,12 +1459,9 @@ test("fused Core modes reuse one composite across softness, Multiply and turbule
     assert.equal(initial.uniforms.cw_coreMethod, 1);
     for (const [params, method] of [
         [{ coreSoftness: 0 }, 2],
-        [{ coreDistortion: { composite: "multiply" } }, 0],
         [
             {
                 coreDistortion: {
-                    composite: "distort",
-                    noiseTurbulence: 0.5,
                     motionBlur: 0.12,
                 },
             },

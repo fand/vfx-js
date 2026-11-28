@@ -22,19 +22,13 @@ export type SaberPresetName =
 // Distortion remains an approximation, calibrated separately.
 // Reset appearance on every selection, retaining source, edge, pad and reveal.
 const BASE = {
-    intensity: 1,
     thickness: 2,
-    coreIntensity: 1,
-    coreWhiteness: 0.15,
     coreSoftness: 0,
     coreBlendOnTop: false,
 
     flickerIntensity: 0,
     flickerSpeed: 12,
     flickerSeed: 0,
-
-    glowFlow: 0,
-    glowDistortAllLayers: false,
 } satisfies SaberOptions;
 
 function look(name: Exclude<SaberPresetName, "embers">): SaberOptions {
@@ -43,7 +37,6 @@ function look(name: Exclude<SaberPresetName, "embers">): SaberOptions {
     const result: SaberOptions = {
         ...BASE,
         ...light,
-        glowDistortAllLayers: true,
         coreDistortion: Object.freeze({
             ...DEFAULT_DISTORTION,
             ...transport.core,

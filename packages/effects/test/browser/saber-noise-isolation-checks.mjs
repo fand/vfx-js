@@ -12,6 +12,7 @@ export async function runGlowMaskOrderingChecks() {
     for (const pixelRatio of [1, 2]) {
         let halfMask = true;
         const f = await createSaberFixture({
+            isolateGlow: true,
             width: 256,
             height: 256,
             sourceWidth: 256,
@@ -20,11 +21,9 @@ export async function runGlowMaskOrderingChecks() {
             options: {
                 ...STEADY_OPTIONS,
                 color: "#ffffff",
-                coreIntensity: 0,
                 haloIntensity: 0,
                 glow: 200,
                 pad: 80,
-                glowDistortAllLayers: true,
                 glowLayers: [
                     { size: 0, intensity: 0 },
                     { size: 20, intensity: 1 },
@@ -91,12 +90,11 @@ export async function runGlowMaskOrderingChecks() {
                     }
                 }
             }
-            // Partial layer protection must not change the unmasked image.
+            // An identity mask must not change the unmasked image.
             halfMask = false;
             f.effect.setParams({
                 brightness: 1,
                 glow: 1,
-                glowDistortAllLayers: false,
                 glowLayers: [
                     { size: 8, intensity: 1 },
                     { size: 40, intensity: 1 },
@@ -149,7 +147,6 @@ export async function runNoiseIsolationChecks() {
             options: {
                 type,
                 noiseComplexity: 4,
-                noiseDetail: 0.4,
                 noiseScale: 80,
             },
         });
@@ -509,7 +506,6 @@ export async function runRidgeDensityChecks() {
                     noiseScale: 25,
                     noiseAspectRatio: 1.29,
                     noiseComplexity: reference.complexity,
-                    noiseDetail: 0,
                     noiseBias: 1,
                     seed,
                 },
@@ -584,7 +580,6 @@ export async function runRidgeOctaveChecks() {
                 amount: 100,
                 noiseScale: 25,
                 noiseAspectRatio: 1.29,
-                noiseDetail: 0,
                 noiseBias: 1,
                 seed,
             },
@@ -674,7 +669,6 @@ export async function runNoiseTailChecks() {
                         amount: 100,
                         noiseScale: 25,
                         noiseComplexity: complexity,
-                        noiseDetail: 0,
                         noiseAspectRatio: 1.29,
                         noiseBias: 3,
                         seed,
@@ -750,7 +744,6 @@ export async function runNoiseAspectChecks() {
                     amount: 100,
                     noiseScale: 25,
                     noiseComplexity: 1,
-                    noiseDetail: 0,
                     noiseBias: 1,
                     seed,
                 },
@@ -830,7 +823,6 @@ export async function runNoiseGridChecks() {
                         amount: 100,
                         noiseScale: 25,
                         noiseComplexity: 4,
-                        noiseDetail: 0,
                     },
                 });
                 try {

@@ -30,7 +30,6 @@ export async function runCombustionChecks(Baseline) {
                 coreDistortion: {
                     type,
                     amount: 45,
-                    noiseDetail: 1,
                     noiseBias: 0.1,
                     noiseScale: 90,
                     noiseComplexity: 8,
@@ -125,10 +124,10 @@ export async function runCombustionChecks(Baseline) {
                 }
             }
             const f = await createSaberFixture({
+                isolateGlow: true,
                 options: {
                     ...calm,
                     glow: 1,
-                    coreIntensity: 0,
                     haloIntensity: 100,
                     haloSize: 100,
                     glowLayers: [

@@ -32,14 +32,8 @@ export type SaberDistortionParams = {
     noiseBias: number;
     /** Number of noise octaves, 1..8. */
     noiseComplexity: number;
-    /** Octave frequency spacing, 0..1: 2 to about 4.49. Octave gain halves at each step. */
-    noiseDetail: number;
-    /** Turbulent transport, 0..1. Separates octave wind speeds; Smoke/Energy also gain domain warping. */
-    noiseTurbulence: number;
     /** Horizontal frequency multiplier, positive. Above1 compresses X, as in AE. */
     noiseAspectRatio: number;
-    /** Constrain displacement to the wind axis: 0 = free, 1 = along wind only. */
-    directionality: number;
     /** Wind transport interval in seconds, 0..0.25. Six spatial samples at the current evolution time; zero wind bypasses. */
     motionBlur: number;
     /** Deterministic noise seed. */
@@ -54,10 +48,9 @@ export type SaberGlowLayer = {
     intensity: number;
 };
 
-export const DEFAULT_DISTORTION: SaberDistortionParams = {
+export const DEFAULT_DISTORTION: Omit<SaberDistortionParams, "composite"> = {
     amount: 0,
     type: "fluid",
-    composite: "distort",
     invert: false,
     windSpeed: 20,
     windDirection: 90,
@@ -65,10 +58,7 @@ export const DEFAULT_DISTORTION: SaberDistortionParams = {
     noiseScale: 48,
     noiseBias: 1,
     noiseComplexity: 4,
-    noiseDetail: 0,
-    noiseTurbulence: 0,
     noiseAspectRatio: 1,
-    directionality: 0,
     motionBlur: 0,
     seed: 0,
 };
@@ -89,8 +79,6 @@ uniform vec2 noiseMargin;
 uniform vec2 wind;
 uniform vec2 windVelocity;
 uniform float motionBlur;
-uniform vec2 flowDirection;
-uniform vec2 flowOffset;
 uniform int glowPass;
 uniform int haloPass;
 uniform int layered;
@@ -99,12 +87,7 @@ uniform float clock;
 uniform float amount;
 uniform float noiseScale;
 uniform float noiseBias;
-uniform float noiseDetail;
-#ifdef TURBULENT_NOISE
-uniform float noiseTurbulence;
-#endif
 uniform float aspect;
-uniform float directionality;
 uniform float seed;
 uniform int complexity;
 uniform int noiseType;
@@ -139,7 +122,7 @@ vec2 noisePair(vec3 p) {
 vec2 fractalWarp(vec3 p) {
     vec2 total = vec2(0.0);
     float weight = 0.5;
-    float lacunarity = exp2(1.0 + (7.0 / 6.0) * noiseDetail);
+    float lacunarity = 2.0;
     for (int i = 0; i < 8; i++) {
         if (i >= complexity) break;
         total += weight * vec2(snoise(p + 3.1), snoise(p + 19.7));
@@ -152,21 +135,13 @@ vec2 fractalWarp(vec3 p) {
     return total;
 }
 
-vec2 fractalDensity(vec3 p
-#ifdef TURBULENT_NOISE
-    , vec2 transport
-#endif
-) {
+vec2 fractalDensity(vec3 p) {
     vec2 total = vec2(0.0), feedback = vec2(1.0);
     float weight = 0.5;
-    float frequency = 1.0;
-    float lacunarity = exp2(1.0 + (7.0 / 6.0) * noiseDetail);
+    float lacunarity = 2.0;
     for (int i = 0; i < 8; i++) {
         if (i >= complexity) break;
         vec3 position = p;
-#ifdef TURBULENT_NOISE
-        position.xy += transport * frequency * (1.0 - min(0.6 + 0.3 * float(i), 1.8)) * noiseTurbulence;
-#endif
         vec2 value = noisePair(position);
         vec2 signal = noiseType == 1
             ? clamp(0.6 + 0.85 * value, 0.0, 1.0)
@@ -183,7 +158,6 @@ vec2 fractalDensity(vec3 p
         // Octaves refine space, not the rate of evolution. Retain the seeded
         // phase offsets while keeping the same clock speed at every octave.
         p.z -= clock * (lacunarity - 1.0);
-        frequency *= lacunarity;
         weight *= 0.5;
     }
     // AE complexity sweeps retain the octave sum; normalizing it erases the
@@ -202,16 +176,6 @@ vec3 lightAt(vec2 p) {
     return (layered == 1 ? light * layerShares : vec3(light.r)) * inside.x * inside.y;
 }
 
-vec3 sampleLight(vec2 p) {
-    vec3 light = lightAt(p);
-    if (dot(flowOffset, flowOffset) > 0.0) {
-        // Transport the emitting envelope as well as the noise. A moving mask
-        // over a symmetric blur alone looks like boiling, not rising flames.
-        light = light * 0.5 + lightAt(p - flowOffset * 0.45) * 0.3
-            + lightAt(p - flowOffset) * 0.2;
-    }
-    return light;
-}
 
 #ifdef CACHED_NOISE
 vec2 cachedNoiseAt(vec2 position) {
@@ -239,19 +203,7 @@ vec2 distortionAt(float offset) {
     if (noiseType == 0) {
         p.xy += 1.8 * fractalWarp(p);
     }
-#ifdef TURBULENT_NOISE
-    vec2 transport = (wind + windVelocity * offset) / noiseScale * frequency;
-    transport.x *= aspect;
-    if (noiseType != 0 && noiseTurbulence > 0.0) {
-        p.xy += 0.2 * noiseTurbulence
-            * vec2(snoise(p + 3.1), snoise(p + 19.7));
-    }
-#endif
-    return fractalDensity(p
-#ifdef TURBULENT_NOISE
-        , transport
-#endif
-    ) * polarity;
+    return fractalDensity(p) * polarity;
 #endif
 }
 
@@ -265,14 +217,12 @@ float maskGain(vec2 n) {
 #if defined(ANALYTIC_CORE) && defined(CACHED_NOISE)
 float nearbyDistance(vec2 delta, float offset) {
     vec2 n = cachedNoiseAt(uvContent * contentSize + delta * bufferSize - windVelocity * offset);
-    n = mix(n, flowDirection * dot(n, flowDirection), directionality);
     return sampleSaberDistance(contourField, uv + delta + n * amount / bufferSize);
 }
 #endif
 
 vec3 shadeNoise(vec2 n, float offset) {
     vec3 light;
-    n = mix(n, flowDirection * dot(n, flowDirection), directionality);
     vec2 warped = uv + n * amount / bufferSize;
 #ifdef ANALYTIC_CORE
     // Pulling a thin raster line through a steep warp misses whole pixels.
@@ -295,7 +245,7 @@ vec3 shadeNoise(vec2 n, float offset) {
     light *= step(0.5, field.a) * step(0.0, min(warped.x, warped.y))
         * step(max(warped.x, warped.y), 1.0);
 #else
-    light = sampleLight(warped);
+    light = lightAt(warped);
 #endif
 
     return light;
@@ -312,7 +262,7 @@ void main() {
     }
 #endif
     if (amount <= 0.0) {
-        vec3 light = sampleLight(uv);
+        vec3 light = lightAt(uv);
 #ifdef SCALAR_GLOW
         outColor = vec4(light.r, 0.0, 0.0, 1.0);
 #else
@@ -334,7 +284,7 @@ void main() {
             }
             gain /= 6.0;
         }
-        light = sampleLight(uv) * gain;
+        light = lightAt(uv) * gain;
     } else {
         light = shadeNoise(n, 0.0);
         if (motionBlur > 0.0) {
@@ -368,22 +318,10 @@ const FRAG_DISTORT_CONTOUR = FRAG_DISTORT_BOUNDED.replace(
     "#version 300 es\n#define ANALYTIC_CORE",
 );
 
-// Compile the opt-in path separately: zero turbulence retains the original
-// arithmetic, register usage and displayed pixels of existing recipes.
-function turbulentFragment(fragment: string): string {
-    return fragment.replace(
-        "#version 300 es",
-        "#version 300 es\n#define TURBULENT_NOISE",
-    );
-}
-const FRAG_DISTORT_TURBULENT = turbulentFragment(FRAG_DISTORT);
 const FRAG_DISTORT_SCALAR = FRAG_DISTORT.replace(
     "#version 300 es",
     "#version 300 es\n#define SCALAR_GLOW",
 );
-const FRAG_DISTORT_SCALAR_TURBULENT = turbulentFragment(FRAG_DISTORT_SCALAR);
-const FRAG_DISTORT_BOUNDED_TURBULENT = turbulentFragment(FRAG_DISTORT_BOUNDED);
-const FRAG_DISTORT_CONTOUR_TURBULENT = turbulentFragment(FRAG_DISTORT_CONTOUR);
 
 const noiseShaderVariants = new Map<
     string,
@@ -412,7 +350,7 @@ function noiseShaders(fragment: string) {
 
 // Fused Core always uses one cached-noise shader. Bounds and analytic coverage
 // are draw-wide choices, not new source variants when switching presets.
-// Noise generation remains specialized; turbulence has already acted on its RG grid.
+// Noise generation remains separate from cached Core sampling.
 const FRAG_CACHED_CORE = noiseShaders(
     FRAG_DISTORT_CONTOUR.replace(
         "uniform float signedCoreWidth;",
@@ -423,8 +361,8 @@ const FRAG_CACHED_CORE = noiseShaders(
             "if (coreMethod == 2) {\n    // Pulling",
         )
         .replace(
-            "#else\n    light = sampleLight(warped);\n#endif",
-            "} else {\n    light = sampleLight(warped);\n}",
+            "#else\n    light = lightAt(warped);\n#endif",
+            "} else {\n    light = lightAt(warped);\n}",
         )
         .replace(
             "#ifdef CORE_BOUNDS\n    // The support",
@@ -607,7 +545,8 @@ export class SaberGlowPasses {
     distort(
         ctx: EffectContext,
         src: EffectRenderTarget,
-        params: SaberDistortionParams,
+        params: Omit<SaberDistortionParams, "composite"> &
+            Partial<Pick<SaberDistortionParams, "composite">>,
         kind: "core" | "glow" | "halo",
         layered = false,
         bounds?: {
@@ -618,7 +557,6 @@ export class SaberGlowPasses {
             reach: number;
             lineWidth?: number;
         },
-        flowDistance = 0,
         layerShares: readonly number[] = [1, 1, 1],
         outputSize: readonly number[] = [src.width, src.height],
         // Packed Saber glow: only R moves; the final composite reads the
@@ -643,7 +581,7 @@ export class SaberGlowPasses {
                 this.#core = null;
             }
         }
-        if (!(params.amount > 0) && !(flowDistance > 0)) {
+        if (!(params.amount > 0)) {
             return src;
         }
         let target = defer
@@ -678,22 +616,16 @@ export class SaberGlowPasses {
         }
         const angle = (params.windDirection * Math.PI) / 180;
         const distance = ctx.time * params.windSpeed;
+        const composite =
+            kind === "glow" ? (params.composite ?? "distort") : "distort";
         const fragment =
             scalarGlow && kind === "glow"
-                ? params.noiseTurbulence > 0
-                    ? FRAG_DISTORT_SCALAR_TURBULENT
-                    : FRAG_DISTORT_SCALAR
-                : bounds?.lineWidth && params.composite === "distort"
-                  ? params.noiseTurbulence > 0
-                      ? FRAG_DISTORT_CONTOUR_TURBULENT
-                      : FRAG_DISTORT_CONTOUR
+                ? FRAG_DISTORT_SCALAR
+                : bounds?.lineWidth && composite === "distort"
+                  ? FRAG_DISTORT_CONTOUR
                   : bounds
-                    ? params.noiseTurbulence > 0
-                        ? FRAG_DISTORT_BOUNDED_TURBULENT
-                        : FRAG_DISTORT_BOUNDED
-                    : params.noiseTurbulence > 0
-                      ? FRAG_DISTORT_TURBULENT
-                      : FRAG_DISTORT;
+                    ? FRAG_DISTORT_BOUNDED
+                    : FRAG_DISTORT;
         const uniforms = {
             ...(bounds
                 ? {
@@ -754,19 +686,6 @@ export class SaberGlowPasses {
                 params.windSpeed !== 0
                     ? Math.max(0, Math.min(0.25, params.motionBlur))
                     : 0,
-            flowDirection: [Math.cos(angle), Math.sin(angle)],
-            flowOffset: [
-                (Math.cos(angle) *
-                    Math.max(0, flowDistance) *
-                    (params.windSpeed < 0 ? -1 : 1) *
-                    ctx.dims.pixelRatio) /
-                    outputSize[0],
-                (Math.sin(angle) *
-                    Math.max(0, flowDistance) *
-                    (params.windSpeed < 0 ? -1 : 1) *
-                    ctx.dims.pixelRatio) /
-                    outputSize[1],
-            ],
             glowPass: kind === "glow" ? 1 : 0,
             haloPass: kind === "halo" ? 1 : 0,
             layered: layered ? 1 : 0,
@@ -784,10 +703,7 @@ export class SaberGlowPasses {
             amount: params.amount,
             noiseScale: Math.max(params.noiseScale, 0.1),
             noiseBias: Math.max(params.noiseBias, 0.05),
-            noiseDetail: Math.min(1, Math.max(0, params.noiseDetail)),
-            noiseTurbulence: Math.min(1, Math.max(0, params.noiseTurbulence)),
             aspect: Math.max(params.noiseAspectRatio, 0.05),
-            directionality: Math.max(0, Math.min(1, params.directionality)),
             seed: params.seed,
             complexity: Math.max(
                 1,
@@ -795,7 +711,7 @@ export class SaberGlowPasses {
             ),
             noiseType:
                 params.type === "smoke" ? 1 : params.type === "energy" ? 2 : 0,
-            composite: params.composite === "multiply" ? 1 : 0,
+            composite: composite === "multiply" ? 1 : 0,
             polarity: params.invert ? -1 : 1,
         };
         if (params.amount > 0) {
@@ -815,7 +731,7 @@ export class SaberGlowPasses {
                 ) + 2;
             // Capture all inputs to distortionAt(0) and noiseGridOrigin(),
             // including the host's content mapping. Light/coverage controls
-            // (amount, composite, directionality) do not change the grid.
+            // (amount, composite) do not change the grid.
             const key = [
                 width,
                 height,
@@ -829,8 +745,6 @@ export class SaberGlowPasses {
                 uniforms.clock,
                 uniforms.noiseScale,
                 uniforms.noiseBias,
-                uniforms.noiseDetail,
-                uniforms.noiseTurbulence,
                 uniforms.aspect,
                 uniforms.seed,
                 uniforms.complexity,
@@ -886,8 +800,7 @@ export class SaberGlowPasses {
                     ...(fusedCore
                         ? {
                               coreMethod: bounds
-                                  ? bounds.lineWidth &&
-                                    params.composite === "distort"
+                                  ? bounds.lineWidth && composite === "distort"
                                       ? 2
                                       : 1
                                   : 0,
@@ -942,7 +855,6 @@ export class SaberGlowPasses {
         src: EffectRenderTarget,
         layers: readonly SaberGlowLayer[],
         sizeMultiplier: number,
-        noiseScale: number,
         coreSoftness = 0,
     ): EffectRenderTarget {
         const prepared = this.prepareLayers(
@@ -950,8 +862,6 @@ export class SaberGlowPasses {
             src,
             layers,
             sizeMultiplier,
-            noiseScale,
-            false,
             false,
             coreSoftness,
         );
@@ -1009,8 +919,6 @@ export class SaberGlowPasses {
         src: EffectRenderTarget,
         layers: readonly SaberGlowLayer[],
         sizeMultiplier: number,
-        noiseScale: number,
-        distortAllLayers = false,
         // Normalize blur energy before the transfer. Soft-core callers retain
         // their existing radius-weighted units.
         normalizeEnergy = false,
@@ -1195,18 +1103,7 @@ export class SaberGlowPasses {
             layerBias: [1, 1, 1, 1],
             inputGain: 1,
             response: 0,
-            // Classify by actual blur radius, independent of layer order.
-            nearShares: sizes.map((radius) => {
-                if (distortAllLayers) {
-                    return 1;
-                }
-                const scale = Math.max(noiseScale, 0.1);
-                const t = Math.max(
-                    0,
-                    Math.min(1, (radius / scale - 0.25) / 0.75),
-                );
-                return 1 - t * t * (3 - 2 * t);
-            }),
+            nearShares: [1, 1, 1, 1],
         };
     }
 

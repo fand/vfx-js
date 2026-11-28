@@ -11,7 +11,7 @@ import {
 function fallback(Effect) {
     return class extends Effect {
         init(ctx) {
-            super.init({ ...ctx, gl: { getExtension: () => null } });
+            return super.init({ ...ctx, gl: { getExtension: () => null } });
         }
         render(ctx) {
             super.render({ ...ctx, gl: { getExtension: () => null } });
@@ -41,15 +41,12 @@ export async function storageChecks() {
                 saturation: 1.8,
                 glowPreGamma: 0.6,
                 glow: 4,
-                coreWhiteness: 0.1,
-                glowWhiteness: 0.5,
             },
         },
         {
-            name: "shutter-flow",
+            name: "glow-shutter",
             params: {
-                glowFlow: 32,
-                glowDistortion: { motionBlur: 0.05, noiseTurbulence: 0.5 },
+                glowDistortion: { motionBlur: 0.05 },
             },
         },
         {
@@ -57,8 +54,8 @@ export async function storageChecks() {
             params: { glowDistortion: { composite: "multiply", invert: true } },
         },
         {
-            name: "flow-only",
-            params: { glowDistortion: { amount: 0 }, glowFlow: 60 },
+            name: "unwarped",
+            params: { glowDistortion: { amount: 0 } },
         },
         {
             name: "unwarped-halo",
@@ -74,7 +71,6 @@ export async function storageChecks() {
                 haloIntensity: 100,
                 coreDistortion: { amount: 12 },
                 glowDistortion: { amount: 0 },
-                glowFlow: 0,
             },
         },
         { name: "no-distortion", params: { coreDistortion: { amount: 0 } } },
@@ -86,23 +82,21 @@ export async function storageChecks() {
         { name: "off", params: { glow: 0 } },
         {
             name: "all-layers",
-            params: { glow: 1, glowDistortAllLayers: true, source: false },
+            params: { glow: 1, source: false },
         },
         { name: "preset-switch", params: { preset: "fire" } },
         { name: "dynamic", params: { dynamic: true } },
         { name: "core-soft", params: { dynamic: false, coreSoftness: 2 } },
         { name: "core-analytic", params: { coreSoftness: 0 } },
         {
-            name: "core-multiply",
-            params: { coreDistortion: { composite: "multiply", amount: 12 } },
+            name: "core-distort",
+            params: { coreDistortion: { amount: 12 } },
         },
         {
             name: "core-shutter",
             params: {
                 coreDistortion: {
-                    composite: "distort",
                     motionBlur: 0.12,
-                    noiseTurbulence: 0.5,
                 },
             },
         },

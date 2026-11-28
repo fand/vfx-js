@@ -20,8 +20,6 @@ type Args = {
 } & Pick<
     SaberParams,
     | "thickness"
-    | "coreIntensity"
-    | "coreWhiteness"
     | "coreSoftness"
     | "coreBlendOnTop"
     | "haloIntensity"
@@ -44,8 +42,6 @@ type Args = {
     | "glowBias"
     | "glowSizeMultiplier"
     | "glowPreGamma"
-    | "glowFlow"
-    | "glowDistortAllLayers"
     | "coreDistortion"
     | "glowDistortion"
 >;
@@ -60,8 +56,6 @@ export default {
         background: "dark",
         fontSize: 0,
         thickness: DEFAULTS.thickness,
-        coreIntensity: DEFAULTS.coreIntensity,
-        coreWhiteness: DEFAULTS.coreWhiteness,
         coreSoftness: DEFAULTS.coreSoftness,
         coreBlendOnTop: DEFAULTS.coreBlendOnTop,
         haloIntensity: DEFAULTS.haloIntensity,
@@ -84,20 +78,12 @@ export default {
         glowBias: DEFAULTS.glowBias,
         glowSizeMultiplier: DEFAULTS.glowSizeMultiplier,
         glowPreGamma: DEFAULTS.glowPreGamma,
-        glowFlow: DEFAULTS.glowFlow,
-        glowDistortAllLayers: DEFAULTS.glowDistortAllLayers,
         coreDistortion: DEFAULTS.coreDistortion,
         glowDistortion: DEFAULTS.glowDistortion,
     },
     argTypes: {
         pixelRatio: { control: { type: "select" }, options: [0, 1, 2] },
         thickness: { control: { type: "range", min: 0.1, max: 8, step: 0.05 } },
-        coreIntensity: {
-            control: { type: "range", min: 0, max: 10, step: 0.01 },
-        },
-        coreWhiteness: {
-            control: { type: "range", min: 0, max: 1, step: 0.01 },
-        },
         coreSoftness: {
             control: { type: "range", min: 0, max: 12, step: 0.05 },
         },
@@ -255,8 +241,6 @@ const LAYERED_ARGS: Partial<Args> = {
     coreSoftness: 0,
     coreBlendOnTop: false,
     haloIntensity: 0,
-    glowFlow: 0,
-    glowDistortAllLayers: false,
     coreDistortion: { ...DEFAULTS.coreDistortion, amount: 0 },
     glowDistortion: { ...DEFAULTS.glowDistortion, amount: 0 },
     pad: 320,
@@ -272,9 +256,7 @@ export const layeredGlow: StoryObj<Args> = {
 export const coreAppearance: StoryObj<Args> = {
     args: {
         ...LAYERED_ARGS,
-        coreWhiteness: 0.7,
         coreSoftness: 1.2,
-        coreIntensity: 1.5,
     },
     render: (args) => renderText("Saber", args),
     play: ({ canvasElement, args }) => playText(canvasElement, args),

@@ -729,15 +729,12 @@ export function aeLightOptions(name: keyof typeof AE_PRESETS) {
     const p = AE_PRESETS[name];
     return {
         thickness: 2 * p.coreSize,
-        coreIntensity: 1,
-        coreWhiteness: 0,
         coreSoftness: p.coreSoftness,
         coreBlendOnTop: p.coreBlendOnTop,
         color: p.color,
         gamma: p.gamma,
         brightness: p.brightness,
         saturation: p.saturation,
-        glowWhiteness: 0,
         glow: p.glowIntensity * (p.intensityMultiplier / 100) * 0.5,
         glowBias: p.bias,
         glowPreGamma: p.preGamma,
@@ -758,9 +755,6 @@ export function aeTransportOptions(name: keyof typeof AE_PRESETS) {
         core: {
             ...p.coreNoise,
             motionBlur: p.coreNoise.motionBlur * 0.15,
-            noiseDetail: 0,
-            noiseTurbulence: 0,
-            directionality: 0,
             // Preserve the requested four-octave budget. Native fractional
             // complexity is retained in source data, not silently evaluated.
             noiseComplexity: 4,
@@ -771,9 +765,6 @@ export function aeTransportOptions(name: keyof typeof AE_PRESETS) {
             ...p.glowNoise,
             motionBlur: p.glowNoise.motionBlur * 0.15,
             noiseComplexity: 4,
-            noiseDetail: 0,
-            noiseTurbulence: 0,
-            directionality: 0,
             amount: p.glowAmount,
             invert: p.glowInvert,
             composite: p.glowComposite,

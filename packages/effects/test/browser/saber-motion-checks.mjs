@@ -38,20 +38,8 @@ function translatedError(a, b, dx, dy) {
     }
     return sum / n;
 }
-function centroid(s) {
-    let sum = 0,
-        ySum = 0;
-    for (let y = 0; y < s.height; y++) {
-        for (let x = 0; x < s.width; x++) {
-            const v = s.pixels[(y * s.width + x) * 4];
-            sum += v;
-            ySum += y * v;
-        }
-    }
-    return ySum / sum;
-}
 export async function runMotionChecks() {
-    const result = { transport: [], envelope: [], animation: [], failures: [] };
+    const result = { transport: [], animation: [], failures: [] };
     for (const pixelRatio of [1, 2]) {
         for (const type of ["fluid", "smoke", "energy"]) {
             for (const windSpeed of [96, -96]) {
@@ -68,7 +56,6 @@ export async function runMotionChecks() {
                             amount: 32,
                             type,
                             composite: "multiply",
-                            noiseDetail: 1,
                             noiseComplexity: 4,
                             noiseScale: 90,
                             windSpeed,
@@ -108,34 +95,6 @@ export async function runMotionChecks() {
                 f.destroy();
             }
         }
-        const f = await createSaberFixture({
-            pixelRatio,
-            width: 320,
-            height: 240,
-            sourceWidth: 160,
-            sourceHeight: 80,
-            options: {
-                ...STEADY_OPTIONS,
-                pad: 80,
-                coreIntensity: 0,
-                glowFlow: 40,
-                glowDistortion: { amount: 0, windSpeed: 0, noiseSpeed: 0 },
-                glowLayers: [
-                    { size: 3, intensity: 1 },
-                    { size: 0, intensity: 0 },
-                    { size: 0, intensity: 0 },
-                    { size: 0, intensity: 0 },
-                ],
-            },
-        });
-        const up = centroid(await f.capture("glow-distortion")) / pixelRatio;
-        f.effect.setParams({ glowDistortion: { windDirection: 270 } });
-        const down = centroid(await f.capture("glow-distortion")) / pixelRatio;
-        result.envelope.push({ pixelRatio, upMinusDown: up - down });
-        if (up - down < 20) {
-            result.failures.push({ check: "envelope", pixelRatio, up, down });
-        }
-        f.destroy();
         for (const preset of AE_PRESETS) {
             const f = await createSaberFixture({
                 pixelRatio,
@@ -167,94 +126,7 @@ export async function runMotionChecks() {
     return result;
 }
 
-// Isolate coarse/fine bands from the production fBm. A pure uniform scroll
-// would incorrectly align both bands at the same velocity.
-export async function turbulenceChecks() {
-    const rows = [];
-    for (const pixelRatio of [1, 2]) {
-        for (const windSpeed of [50, -50]) {
-            for (const octave of [0, 3]) {
-                const f = await createSaberFixture({
-                    width: 320,
-                    height: 240,
-                    sourceWidth: 200,
-                    sourceHeight: 120,
-                    pixelRatio,
-                    options: {
-                        ...STEADY_OPTIONS,
-                        pad: 0,
-                        glowDistortion: {
-                            amount: 32,
-                            type: "energy",
-                            composite: "multiply",
-                            noiseDetail: 1,
-                            noiseTurbulence: 1,
-                            noiseComplexity: 4,
-                            noiseScale: 120,
-                            windSpeed,
-                            windDirection: 90,
-                            noiseSpeed: 0,
-                        },
-                    },
-                    transformDraw: (d) =>
-                        d.uniforms?.glowPass === 1
-                            ? {
-                                  ...d,
-                                  frag: d.frag
-                                      .replace(
-                                          "sum += snoise(samplePosition) * weight * band;",
-                                          `if (i == ${octave}) sum += snoise(samplePosition) * weight * band;`,
-                                      )
-                                      .replace(
-                                          "    float light = shadeNoise(n);",
-                                          "    outColor=vec4(vec3(0.5+0.5*n.x),1.0); return;\n    float light = shadeNoise(n);",
-                                      ),
-                              }
-                            : d,
-                });
-                try {
-                    const a = await f.capture("glow-distortion", 1);
-                    const b = await f.capture("glow-distortion", 1.2);
-                    const speed = octave === 0 ? 0.6 : 1.5;
-                    const shift = Math.round(
-                        windSpeed * 0.2 * speed * pixelRatio,
-                    );
-                    const aligned = translatedError(a, b, 0, shift);
-                    const rigid = translatedError(
-                        a,
-                        b,
-                        0,
-                        Math.round(windSpeed * 0.2 * pixelRatio),
-                    );
-                    rows.push({
-                        pixelRatio,
-                        windSpeed,
-                        octave,
-                        aligned,
-                        rigid,
-                        glError: f.gl.getError(),
-                    });
-                } finally {
-                    f.destroy();
-                }
-            }
-        }
-    }
-    return {
-        rows,
-        failures: rows.filter(
-            (r) =>
-                !Number.isFinite(r.aligned) ||
-                !Number.isFinite(r.rigid) ||
-                r.aligned > 0.001 ||
-                r.rigid < r.aligned * 10 ||
-                r.rigid < 0.001 ||
-                r.glError,
-        ),
-    };
-}
-
-// Compare thin directional warps against a 4x raster reference. This catches
+// Compare thin warps against a 4x raster reference. This catches
 // missing streaks which a live/fresh equality check cannot detect.
 export async function shutterChecks() {
     const rows = [];
@@ -312,7 +184,7 @@ export async function shutterChecks() {
     };
 }
 
-export async function directionalCoreChecks() {
+export async function warpedCoreChecks() {
     const rows = [];
     for (const pixelRatio of [1, 2]) {
         const config = {
@@ -334,8 +206,6 @@ export async function directionalCoreChecks() {
                     noiseScale: 120,
                     noiseAspectRatio: 0.2,
                     noiseComplexity: 1,
-                    noiseDetail: 0.1,
-                    directionality: 1,
                     windSpeed: 40,
                     noiseSpeed: 0,
                 },

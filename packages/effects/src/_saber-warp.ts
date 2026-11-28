@@ -27,7 +27,6 @@ function warpFunction(fragment: string, prefix: string): string {
         "CORE_BOUNDS",
         "ANALYTIC_CORE",
         "SCALAR_GLOW",
-        "TURBULENT_NOISE",
     ]);
     for (const match of fragment.matchAll(/uniform\s+\w+\s+(\w+)/g)) {
         if (match[1] !== "contentRectUv") {

@@ -382,16 +382,12 @@ uniform sampler2D haloTex;
 #endif
 uniform vec3 colorRamp[33];
 uniform float coreGain;
-#ifdef CORE_TINT
-uniform float coreWhiteness;
-#endif
 uniform float glowGain;
 #ifdef CORE_OVERLAY
 uniform sampler2D originalCore;
 #endif
 uniform int source;
 uniform float edgeFade;
-uniform float whiteMix;
 uniform float outputGamma;
 uniform float outputBrightness;
 uniform float glowOutputBrightness;
@@ -404,12 +400,12 @@ float ign(vec2 p) {
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
-vec3 tintLight(float energy, float whiteness) {
+vec3 tintLight(float energy) {
     float light = clamp(energy, 0.0, 1.0);
     float coordinate = sqrt(light) * 32.0;
     int i = min(int(coordinate), 31);
     vec3 tinted = mix(colorRamp[i], colorRamp[i + 1], coordinate - float(i));
-    return mix(tinted, vec3(light), whiteness);
+    return tinted;
 }
 
 vec3 gradeLight(vec3 energy) {
@@ -444,10 +440,6 @@ void main() {
 
     float coreLight = texture(core, uv).r * coreGain;
     lights = max(lights, 0.0) * glowGain;
-    float coreWhite = whiteMix;
-#ifdef CORE_TINT
-    coreWhite = coreWhiteness;
-#endif
     // AE combines scalar light before colorization, Saturation and Gamma.
     // Halo retains its measured extra Brightness factor inside core coverage.
     float haloLight = clamp(lights.a * outputBrightness, 0.0, 1.0);
@@ -456,21 +448,12 @@ void main() {
     vec3 glowLight = clamp(lights.rgb * glowOutputBrightness, 0.0, 1.0);
     float light = 1.0 - (1.0 - coreAndHalo)
         * (1.0 - glowLight.r) * (1.0 - glowLight.g) * (1.0 - glowLight.b);
-    // Whiteness is an extension to the native colorizer. Weight the separate
-    // Core/Glow controls by their input light; native presets leave both zero.
-    float coreWeight = max(coreLight * outputBrightness, 0.0);
-    float glowWeight = haloContribution * outputBrightness
-        + glowLight.r + glowLight.g + glowLight.b;
 #ifdef CORE_OVERLAY
     // Blend on Top participates in scalar Screen, before the shared grade.
     float overlay = clamp(texture(originalCore, uv).r * coreGain * outputBrightness, 0.0, 1.0);
     light = 1.0 - (1.0 - light) * (1.0 - overlay);
-    coreWeight += overlay;
 #endif
-    float weight = coreWeight + glowWeight;
-    float whiteness = weight > 0.0
-        ? (coreWhite * coreWeight + whiteMix * glowWeight) / weight : 0.0;
-    vec3 rgb = gradeLight(tintLight(light, whiteness));
+    vec3 rgb = gradeLight(tintLight(light));
     // TPDF dither, faded out where there is no light.
     vec2 p = gl_FragCoord.xy;
     vec3 noise = vec3(ign(p), ign(p + 17.0), ign(p + 41.0))
@@ -489,17 +472,11 @@ void main() {
 `;
 
 // Optional samplers/branches disappear entirely when their feature is off.
-const COMPOSITE_SHADERS = Array.from({ length: 32 }, (_, flags) =>
+const COMPOSITE_SHADERS = Array.from({ length: 16 }, (_, flags) =>
     FRAG_COMPOSITE.replace(
         "#version 300 es",
         "#version 300 es" +
-            [
-                "LAYERED_GLOW",
-                "CORE_TINT",
-                "CORE_OVERLAY",
-                "WARPED_HALO",
-                "SCALAR_GLOW",
-            ]
+            ["LAYERED_GLOW", "CORE_OVERLAY", "WARPED_HALO", "SCALAR_GLOW"]
                 .map((name, bit) =>
                     flags & (1 << bit) ? `\n#define ${name}` : "",
                 )
@@ -508,20 +485,14 @@ const COMPOSITE_SHADERS = Array.from({ length: 32 }, (_, flags) =>
 );
 
 export type SaberParams = {
-    /** Light tint, CSS hex. coreWhiteness controls the core's additional white mix. */
+    /** Light tint, CSS hex. */
     color: string;
-    /** Overall brightness of the lines and glow. */
-    intensity: number;
     /** Output exponent, 0.1..10. 1 is neutral; below 1 lifts midtones, above 1 darkens them. */
     gamma: number;
     /** Output light multiplier before gamma, 0..5. 1 is neutral; 0 hides the light. */
     brightness: number;
     /** Output saturation about the RGB mean, 0..2. 0 is grayscale; 1 is neutral. */
     saturation: number;
-    /** Visible core brightness only. 1 is neutral gain; 0 hides the core. */
-    coreIntensity: number;
-    /** Mix the visible core's tint toward white, 0..1. */
-    coreWhiteness: number;
     /** Core softness in CSS px (two box filters before deformation). 0 bypasses; leaves Glow unchanged. */
     coreSoftness: number;
     /** Screen original Core light before color grading when Glow and Core Distortion are active. */
@@ -540,8 +511,6 @@ export type SaberParams = {
     thickness: number;
     /** Input glow gain, before per-layer Pre Gamma and nonlinear amplification. */
     glow: number;
-    /** Mix Glow/Halo toward white independently of the core, 0..1. */
-    glowWhiteness: number;
     /** Four independent size/intensity pairs. Each size is in CSS px. */
     glowLayers: [
         SaberGlowLayer,
@@ -555,12 +524,8 @@ export type SaberParams = {
     glowSizeMultiplier: number;
     /** Shape each weighted, blurred layer before amplification/distortion: pow(light, gamma), 0.1..5; 1 = neutral. */
     glowPreGamma: number;
-    /** Directional glow trail in CSS px, following glowDistortion wind. 0 disables. */
-    glowFlow: number;
-    /** Distort all three glow layers instead of protecting wide blur layers. Layer 4 (Halo) is always unchanged. */
-    glowDistortAllLayers: boolean;
-    /** Warp/modulate the visible core independently of the Glow source. */
-    coreDistortion: SaberDistortionParams;
+    /** Warp the visible core independently of the Glow source. */
+    coreDistortion: Omit<SaberDistortionParams, "composite">;
     /** Warp/modulate glow separately, leaving visible core lines unchanged. */
     glowDistortion: SaberDistortionParams;
     /**
@@ -608,27 +573,22 @@ export type SaberOptions = Omit<
 > & {
     /** Apply a named appearance first, then explicit overrides. Input/reveal/pad are retained. */
     preset?: SaberPresetName;
-    coreDistortion?: Partial<SaberDistortionParams>;
+    coreDistortion?: Partial<SaberParams["coreDistortion"]>;
     glowDistortion?: Partial<SaberDistortionParams>;
 };
 
 // Distance-field support in CSS px. Preserve flood paths for core distortion.
 const FIELD_REACH = 96;
 
-// Light gain of the core line and the glow, before `intensity`.
+// Light gain of the core line and the glow.
 const CORE_GAIN = 1;
 const GLOW_GAIN = 1;
-// Share of white in the light tint; higher burns the core whiter.
-const WHITE_MIX = 0.15;
 
 const DEFAULT_PARAMS: SaberParams = {
     color: "#3399ff",
-    intensity: 1,
     gamma: 1,
     brightness: 1,
     saturation: 1,
-    coreIntensity: 1,
-    coreWhiteness: WHITE_MIX,
     coreSoftness: 0,
     coreBlendOnTop: false,
     haloIntensity: 100,
@@ -638,7 +598,6 @@ const DEFAULT_PARAMS: SaberParams = {
     flickerSeed: 0,
     thickness: 2,
     glow: 1,
-    glowWhiteness: WHITE_MIX,
     glowLayers: [
         { size: 3, intensity: 3 },
         { size: 12, intensity: 6 },
@@ -648,10 +607,8 @@ const DEFAULT_PARAMS: SaberParams = {
     glowBias: 1,
     glowSizeMultiplier: 1,
     glowPreGamma: 1,
-    glowFlow: 0,
-    glowDistortAllLayers: false,
     coreDistortion: { ...DEFAULT_DISTORTION },
-    glowDistortion: { ...DEFAULT_DISTORTION, seed: 71 },
+    glowDistortion: { ...DEFAULT_DISTORTION, composite: "distort", seed: 71 },
     edge: "alpha",
     edgeThreshold: 0.5,
     source: true,
@@ -691,8 +648,7 @@ const DEFAULT_PARAMS: SaberParams = {
  *
  * `coreDistortion` and `glowDistortion` have independent wind/noise clocks.
  * Set both `windSpeed` and `noiseSpeed`
- * to 0 to freeze a distortion. Amount 0 skips noise; a nonzero `glowFlow`
- * still transports the glow envelope.
+ * to 0 to freeze a distortion. Amount 0 skips noise.
  * Four independently sized glow layers are unaffected by
  * `pad` except for clipping at the buffer boundary. Allow roughly three times
  * the largest effective radius, plus distortion reach, when choosing `pad`.
@@ -1009,7 +965,7 @@ export class SaberEffect implements Effect {
         // Native Softness filters the original core before deformation. Cache
         // that source; the animated warp must not redistribute its blur energy.
         const softness = Math.max(0, this.params.coreSoftness);
-        const soften = softness > 0 && this.params.coreIntensity > 0;
+        const soften = softness > 0;
         let originalCore = core;
         if (soften) {
             const softnessSigma = coreBlurSigma(softness);
@@ -1025,7 +981,6 @@ export class SaberEffect implements Effect {
                         { size: 0, intensity: 0 },
                     ],
                     1,
-                    48,
                     softness,
                 );
                 this.#softCoreKey = key;
@@ -1054,17 +1009,14 @@ export class SaberEffect implements Effect {
                 this.params.coreDistortion,
                 "core",
                 false,
-                this.params.coreDistortion.composite === "distort"
-                    ? {
-                          field,
-                          compact: this.#compactField,
-                          origin: this.#fieldWindow.slice(0, 2),
-                          bufferSize: [core.width, core.height],
-                          lineWidth: !reveal && !soften ? thickness : 0,
-                          reach: thickness + (soften ? softness + 2 : 0),
-                      }
-                    : undefined,
-                0,
+                {
+                    field,
+                    compact: this.#compactField,
+                    origin: this.#fieldWindow.slice(0, 2),
+                    bufferSize: [core.width, core.height],
+                    lineWidth: !reveal && !soften ? thickness : 0,
+                    reach: thickness + (soften ? softness + 2 : 0),
+                },
                 [1, 1, 1],
                 [originalCore.width, originalCore.height],
                 false,
@@ -1074,7 +1026,7 @@ export class SaberEffect implements Effect {
             this.#visibleCoreKey = visibleCoreKey;
         }
         const displayedCore = this.#visibleCore;
-        const { color, intensity, glow, source } = this.params;
+        const { color, glow, source } = this.params;
         const haloIntensity =
             outputParam(this.params.haloIntensity, 0, 1000, 100) / 100;
         const haloSize = outputParam(this.params.haloSize, 0, 1000, 100) / 100;
@@ -1084,7 +1036,6 @@ export class SaberEffect implements Effect {
         }));
         const glowEnabled =
             glow > 0 &&
-            intensity > 0 &&
             this.params.glowSizeMultiplier > 0 &&
             effectiveLayers.some(
                 (layer) => layer.size > 0 && layer.intensity > 0,
@@ -1103,10 +1054,7 @@ export class SaberEffect implements Effect {
                 this.#coreVersion,
                 this.params.glowSizeMultiplier,
                 this.params.pad,
-                this.params.glowDistortion.noiseScale,
-                this.params.glowDistortAllLayers,
-                this.params.glowDistortion.amount > 0 ||
-                    this.params.glowFlow > 0,
+                this.params.glowDistortion.amount > 0,
                 ...effectiveLayers.flatMap((layer) => [
                     layer.size,
                     layer.intensity > 0,
@@ -1115,8 +1063,7 @@ export class SaberEffect implements Effect {
             const glowBaseKey = [
                 ...preparedGlowKey,
                 warpHalo,
-                this.params.glowDistortion.amount > 0 ||
-                this.params.glowFlow > 0
+                this.params.glowDistortion.amount > 0
                     ? outputParam(this.params.brightness, 0, 5)
                     : -1,
                 this.params.glowPreGamma,
@@ -1137,8 +1084,6 @@ export class SaberEffect implements Effect {
                             intensity: layer.intensity > 0 ? 1 : 0,
                         })),
                         this.params.glowSizeMultiplier,
-                        this.params.glowDistortion.noiseScale,
-                        this.params.glowDistortAllLayers,
                         true,
                     );
                     this.#preparedGlowKey = preparedGlowKey;
@@ -1166,9 +1111,7 @@ export class SaberEffect implements Effect {
                         (4 + bias) / 5,
                     ],
                 };
-                const distortGlow =
-                    this.params.glowDistortion.amount > 0 ||
-                    this.params.glowFlow > 0;
+                const distortGlow = this.params.glowDistortion.amount > 0;
                 if (distortGlow || warpHalo) {
                     glowTex = this.#glowPasses.combineLayers(
                         ctx,
@@ -1192,7 +1135,6 @@ export class SaberEffect implements Effect {
             const glowResultKey = [
                 this.#glowBaseVersion,
                 fuseWarps,
-                this.params.glowFlow,
                 this.params.glowDistortion.windDirection,
                 this.params.glowDistortion.windSpeed < 0,
                 ...distortionKey(this.params.glowDistortion, ctx.time),
@@ -1208,7 +1150,6 @@ export class SaberEffect implements Effect {
                     "glow",
                     true,
                     undefined,
-                    this.params.glowFlow,
                     [1, 0, 0], // Packed active/bypass groups, Halo stays in A.
                     [core.width, core.height],
                     true,
@@ -1234,7 +1175,6 @@ export class SaberEffect implements Effect {
                         "halo",
                         false,
                         undefined,
-                        0,
                         [1, 1, 1],
                         [core.width, core.height],
                         false,
@@ -1251,15 +1191,6 @@ export class SaberEffect implements Effect {
             this.#colorRamp = saberColorRamp(parseHexColor(color));
             this.#rampColor = color;
         }
-        const coreWhiteness = Math.min(
-            1,
-            Math.max(0, this.params.coreWhiteness),
-        );
-        const glowWhiteness = Math.min(
-            1,
-            Math.max(0, this.params.glowWhiteness),
-        );
-        const customTint = coreWhiteness !== glowWhiteness;
         const flickerGain = saberFlickerGain(
             ctx.time,
             this.params.flickerIntensity,
@@ -1279,14 +1210,13 @@ export class SaberEffect implements Effect {
             ctx,
             COMPOSITE_SHADERS[
                 (glowLayers ? 1 : 0) |
-                    (customTint ? 2 : 0) |
                     (this.params.coreBlendOnTop &&
                     glowEnabled &&
                     this.params.coreDistortion.amount > 0
-                        ? 4
+                        ? 2
                         : 0) |
-                    (haloTex ? 8 : 0) |
-                    (scalarGlowBase ? 16 : 0)
+                    (haloTex ? 4 : 0) |
+                    (scalarGlowBase ? 8 : 0)
             ],
             deferredGlow,
             deferredHalo,
@@ -1304,20 +1234,13 @@ export class SaberEffect implements Effect {
                 ...(scalarGlowBase ? { glowBase: scalarGlowBase } : {}),
                 ...(haloTex ? { haloTex } : {}),
                 colorRamp: this.#colorRamp,
-                coreGain:
-                    CORE_GAIN *
-                    intensity *
-                    Math.max(0, this.params.coreIntensity) *
-                    flickerGain,
-                coreWhiteness,
-                glowGain: glowEnabled ? GLOW_GAIN * intensity * flickerGain : 0,
+                coreGain: CORE_GAIN * flickerGain,
+                glowGain: glowEnabled ? GLOW_GAIN * flickerGain : 0,
                 source: source ? 1 : 0,
-                whiteMix: glowWhiteness,
                 outputGamma: outputParam(this.params.gamma, 0.1, 10),
                 outputBrightness: outputParam(this.params.brightness, 0, 5),
                 glowOutputBrightness:
-                    this.params.glowDistortion.amount > 0 ||
-                    this.params.glowFlow > 0
+                    this.params.glowDistortion.amount > 0
                         ? 1
                         : outputParam(this.params.brightness, 0, 5),
                 outputSaturation: outputParam(this.params.saturation, 0, 2),
@@ -1729,14 +1652,17 @@ function sameKey(a: CacheKey, b: CacheKey): boolean {
     return a.length === b.length && a.every((value, i) => value === b[i]);
 }
 
-function distortionKey(p: SaberDistortionParams, time: number): CacheKey {
+function distortionKey(
+    p: SaberParams["coreDistortion"] | SaberDistortionParams,
+    time: number,
+): CacheKey {
     if (p.amount <= 0) {
         return [0];
     }
     return [
         p.amount,
         p.type,
-        p.composite,
+        "composite" in p ? p.composite : "distort",
         p.invert,
         p.windSpeed,
         p.windDirection,
@@ -1744,10 +1670,7 @@ function distortionKey(p: SaberDistortionParams, time: number): CacheKey {
         p.noiseScale,
         p.noiseBias,
         p.noiseComplexity,
-        p.noiseDetail,
-        p.noiseTurbulence,
         p.noiseAspectRatio,
-        p.directionality,
         p.motionBlur,
         p.seed,
         p.windSpeed !== 0 || p.noiseSpeed !== 0 ? time : 0,
@@ -1815,9 +1738,23 @@ function validateOptions(options: SaberOptions): void {
     if (unknown.length > 0) {
         const migration = unknown.includes("toneMapping")
             ? "toneMapping has been removed; use gamma, brightness and saturation."
-            : "Legacy line and pyramid glow options have been removed; use coreDistortion, glowDistortion and glowLayers.";
+            : "Use the current SaberParams controls; removed options have no compatibility aliases.";
         throw new TypeError(
             `Unknown Saber option${unknown.length === 1 ? "" : "s"}: ${unknown.map(String).join(", ")}. ${migration}`,
         );
+    }
+    for (const group of ["coreDistortion", "glowDistortion"] as const) {
+        const values = options[group];
+        if (!values) {
+            continue;
+        }
+        const unknown = Reflect.ownKeys(values).filter(
+            (key) => !Object.hasOwn(DEFAULT_PARAMS[group], key),
+        );
+        if (unknown.length > 0) {
+            throw new TypeError(
+                `Unknown Saber options: ${unknown.map((key) => `${group}.${String(key)}`).join(", ")}. Core always distorts; composite is available only for Glow.`,
+            );
+        }
     }
 }

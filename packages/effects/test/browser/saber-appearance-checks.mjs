@@ -255,6 +255,7 @@ export async function runGlowTransferChecks() {
     const result = { rows: [], failures: [] };
     for (const pixelRatio of [1, 2]) {
         const f = await createSaberFixture({
+            isolateGlow: true,
             pixelRatio,
             width: 320,
             height: 240,
@@ -263,24 +264,24 @@ export async function runGlowTransferChecks() {
             options: {
                 ...STEADY_OPTIONS,
                 color: "#ffffff",
-                coreIntensity: 0,
                 coreBlendOnTop: false,
-                glowWhiteness: 0,
                 glowBias: 1,
                 haloIntensity: 100,
                 haloSize: 100,
                 glowPreGamma: 1,
-                intensity: 1,
                 brightness: 0.25,
                 gamma: 1,
                 saturation: 1,
-                glowFlow: 0,
                 source: false,
                 pad: 80,
                 coreDistortion: { amount: 0 },
                 glowDistortion: { amount: 0 },
             },
         });
+        const settledScreen = async (time) => {
+            await f.settle(time);
+            return f.screen(time);
+        };
         try {
             const setLayers = (weights, size = 12) =>
                 f.effect.setParams({
@@ -290,11 +291,11 @@ export async function runGlowTransferChecks() {
                     })),
                 });
             setLayers([0, 15, 0, 0]);
-            const a = f.screen(2);
+            const a = await settledScreen(2);
             setLayers([0, 0, 15, 0]);
-            const b = f.screen(2);
+            const b = await settledScreen(2);
             setLayers([0, 15, 15, 0]);
-            const together = f.screen(2);
+            const together = await settledScreen(2);
             let screenError = 0,
                 additiveError = 0,
                 count = 0;
@@ -316,11 +317,11 @@ export async function runGlowTransferChecks() {
             screenError = Math.sqrt(screenError / count);
             additiveError = Math.sqrt(additiveError / count);
             setLayers([0, 0, 0, 15]);
-            const halo = f.screen(2);
+            const halo = await settledScreen(2);
             f.effect.setParams({ brightness: 1 });
-            const brightHalo = f.screen(2);
+            const brightHalo = await settledScreen(2);
             f.effect.setParams({ brightness: 0.5 });
-            const dimHalo = f.screen(2);
+            const dimHalo = await settledScreen(2);
             let haloBrightnessError = 0;
             let haloBrightnessCount = 0;
             for (let i = 0; i < brightHalo.pixels.length; i += 4) {
@@ -338,22 +339,21 @@ export async function runGlowTransferChecks() {
             f.effect.setParams({ brightness: 0.25 });
             f.effect.setParams({
                 glowDistortion: { amount: 50, windSpeed: 30, noiseSpeed: 1 },
-                glowFlow: 30,
             });
-            const haloMotion = difference(halo, f.screen(3));
+            const haloMotion = difference(halo, await settledScreen(3));
             f.effect.setParams({ haloIntensity: 0 });
-            const disabled = f.screen(3);
+            const disabled = await settledScreen(3);
             const disabledSum = disabled.pixels.reduce(
                 (sum, value) => sum + value,
                 0,
             );
             f.effect.setParams({ haloIntensity: 50, glow: 2 });
-            const matchedGain = f.screen(3);
+            const matchedGain = await settledScreen(3);
             f.effect.setParams({ haloIntensity: 100, glow: 1 });
-            const gainDelta = difference(matchedGain, f.screen(3));
+            const gainDelta = difference(matchedGain, await settledScreen(3));
             f.effect.setParams({ haloSize: 50 });
             setLayers([0, 0, 0, 15], 24);
-            const sizeDelta = difference(halo, f.screen(3));
+            const sizeDelta = difference(halo, await settledScreen(3));
             // Measure amplification below the pre-distortion clipping knee.
             f.effect.setParams({
                 haloSize: 100,
@@ -440,12 +440,10 @@ export async function runOutputChecks() {
         options: {
             ...STEADY_OPTIONS,
             color: "#4080c0",
-            intensity: 0.15,
-            coreWhiteness: 0,
             glow: 0,
             haloIntensity: 0,
             gamma: 1,
-            brightness: 1,
+            brightness: 0.15,
             saturation: 1,
             source: false,
         },
@@ -561,41 +559,12 @@ export async function runAppearanceChecks({ Baseline } = {}) {
         const deterministic = difference(a, repeat);
         fixture.effect.params.flickerSpeed = 0;
         const frozen = difference(fixture.screen(0.2), fixture.screen(8));
-        fixture.effect.setParams({
-            coreIntensity: 0,
-            flickerIntensity: 0,
-            coreWhiteness: 0,
-        });
-        const glowOnly = fixture.screen(2);
-        fixture.effect.setParams({ coreWhiteness: 1, coreSoftness: 8 });
-        const independentGlow = difference(glowOnly, fixture.screen(2));
-        result.flicker = { moving, deterministic, frozen, independentGlow };
-        if (
-            !moving.changed ||
-            deterministic.changed ||
-            frozen.changed ||
-            independentGlow.changed
-        ) {
-            result.failures.push("Flicker or glow independence");
-        }
-        result.tint = [];
-        {
-            fixture.effect.setParams({
-                ...STEADY_OPTIONS,
-                coreWhiteness: 0,
-            });
-            const colored = fixture.screen(2);
-            fixture.effect.params.coreWhiteness = 1;
-            const white = fixture.screen(2);
-            const delta = difference(colored, white);
-            const glError = fixture.gl.getError();
-            result.tint.push({ ...delta, glError });
-            if (!delta.changed || glError) {
-                result.failures.push(`Core tint layers`);
-            }
+        result.flicker = { moving, deterministic, frozen };
+        if (!moving.changed || deterministic.changed || frozen.changed) {
+            result.failures.push("Flicker");
         }
         fixture.effect.setParams({
-            intensity: 0,
+            brightness: 0,
             source: true,
             flickerIntensity: 1,
         });
@@ -731,8 +700,6 @@ export async function runCoreOverlayChecks() {
             ...STEADY_OPTIONS,
             color: "#ffffff",
             brightness: 0.25,
-            coreWhiteness: 0,
-            glowWhiteness: 0,
             haloIntensity: 0,
             glow: 1,
             pad: 80,
@@ -871,9 +838,6 @@ export async function runCoreFilterOrderingChecks() {
                     pad: 80,
                     color: "#ffffff",
                     coreSoftness: kind === "soft-core" ? 24 : 0,
-                    coreIntensity: kind === "soft-core" ? 1 : 0,
-                    coreWhiteness: 0,
-                    glowWhiteness: 0,
                     coreBlendOnTop: false,
                     glow: kind === "halo" ? 1 : 0,
                     glowLayers: [

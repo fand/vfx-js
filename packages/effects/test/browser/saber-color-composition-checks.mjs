@@ -17,8 +17,6 @@ export async function runColorCompositionChecks({ Effect } = {}) {
         pixelRatio: 1,
         options: {
             ...STEADY_OPTIONS,
-            coreWhiteness: 0,
-            glowWhiteness: 0,
             coreBlendOnTop: true,
             coreDistortion: { ...STEADY_OPTIONS.coreDistortion, amount: 0.1 },
             pad: 0,
