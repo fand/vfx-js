@@ -356,7 +356,8 @@ test("soft original overlay stays soft and cached while distorted core animates"
     effect.init(f.ctx);
     const initial = f.render(effect);
     const original = initial.uniforms.originalCore;
-    assert.notEqual(original, initial.uniforms.core);
+    assert.equal(original, initial.uniforms.cw_src);
+    assert.ok(initial.frag.includes("cw_sample()"));
     assert.ok(f.draws.some((d) => d.target === original));
     const animated = f.render(effect);
     assert.equal(animated.uniforms.originalCore, original);
@@ -892,14 +893,17 @@ test("glow distortion leaves the visible core target unchanged", () => {
     assert.notEqual(glow.uniforms.glowTex, original.uniforms.glowTex);
     effect.setParams({ coreDistortion: { amount: 8 } });
     const core = f.render(effect);
-    assert.notEqual(core.uniforms.core, original.uniforms.core);
+    assert.equal(core.uniforms.cw_src, original.uniforms.core);
+    assert.ok(core.frag.includes("cw_sample()"));
     assert.equal(core.uniforms.coreGain, original.uniforms.coreGain);
     effect.setParams({
         coreDistortion: { amount: 0 },
         glowDistortion: { amount: 0 },
         glowPreGamma: 1,
     });
-    assert.equal(f.render(effect).uniforms.core, original.uniforms.core);
+    const restored = f.render(effect);
+    assert.equal(restored.uniforms.core, original.uniforms.core);
+    assert.equal(restored.uniforms.cw_src, undefined);
 });
 
 test("large padding restricts field draws, clearing scratch once and rebuilding for wide lines", () => {
@@ -1241,12 +1245,10 @@ test("noise grids retain precision with RG32F and fall back without float extens
         f.render(effect);
         const grids = f.draws.filter((d) => d.uniforms.noiseFieldPass === 1);
         assert.equal(grids.length, 2);
-        const warps = f.draws.filter((d) => d.uniforms.noiseField);
+        const final = f.draws.at(-1);
         assert.equal(
-            f.draws.at(-1).uniforms.hw_noiseField,
-            warps.find(
-                (d) => d.uniforms.haloPass === 0 && d.uniforms.glowPass === 0,
-            ).uniforms.noiseField,
+            final.uniforms.hw_noiseField,
+            final.uniforms.cw_noiseField,
         );
         for (const { target } of grids) {
             assert.equal(target.format, missing ? undefined : "rg32f");
@@ -1364,8 +1366,7 @@ test("frozen Core shares its cached grid when only Halo light changes", () => {
     });
     effect.init(f.ctx);
     f.render(effect);
-    const shared = f.draws.find((d) => d.uniforms.noiseField)?.uniforms
-        .noiseField;
+    const shared = f.draws.at(-1).uniforms.cw_noiseField;
     effect.setParams({ haloSize: 80 });
     f.render(effect);
     assert.ok(!f.draws.some((d) => d.uniforms.noiseFieldPass === 1));
@@ -1389,16 +1390,10 @@ test("every active preset Core/Halo pair shares one noise grid; Torch skips both
                 preset,
             );
             if (preset !== "torch") {
-                const core = f.draws.find(
-                    (d) =>
-                        d.uniforms.noiseField &&
-                        d.uniforms.glowPass === 0 &&
-                        d.uniforms.haloPass === 0,
-                );
-                const halo = f.draws.at(-1);
+                const final = f.draws.at(-1);
                 assert.equal(
-                    core.uniforms.noiseField,
-                    halo.uniforms.hw_noiseField,
+                    final.uniforms.cw_noiseField,
+                    final.uniforms.hw_noiseField,
                     preset,
                 );
             }
@@ -1444,7 +1439,7 @@ test("distance windows crop allocations, retain full-pixel sampling and restore 
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
 });
 
-test("fused Glow/Halo keep no full-size warp targets and calibrate rounding once per context", () => {
+test("fused Core/Glow/Halo keep no full-size warp targets and calibrate rounding once per context", () => {
     const f = fixture({ width: 320, height: 240, pixelRatio: 2 });
     const effect = new SaberEffect({ preset: "fire" });
     effect.init(f.ctx);
@@ -1456,7 +1451,8 @@ test("fused Glow/Halo keep no full-size warp targets and calibrate rounding once
             first.frag.includes("hw_sample()"),
     );
     const warped = f.draws.filter((d) => d.uniforms.noiseField);
-    assert.equal(warped.length, 1, "only Core has a separate warp pass");
+    assert.equal(warped.length, 0, "all three warps compose directly");
+    assert.ok(first.frag.includes("cw_sample()"));
     assert.ok(
         !f.targets.some(
             (t) =>
@@ -1488,13 +1484,68 @@ test("fractional raster grids retain intermediate interpolation", () => {
     const fused = f.render(effect);
     assert.ok(fused.uniforms.warpRounding);
     assert.ok(
-        final.uniforms.glowTex.disposed && final.uniforms.haloTex.disposed,
+        final.uniforms.glowTex.disposed &&
+            final.uniforms.haloTex.disposed &&
+            final.uniforms.core.disposed,
     );
     f.ctx.dims.pixelRatio = 1.5;
     const restored = f.render(effect);
     assert.equal(restored.uniforms.warpRounding, undefined);
     assert.equal(restored.uniforms.glowTex.format, "r16f");
+    assert.notEqual(restored.uniforms.core, final.uniforms.core);
+    assert.equal(restored.uniforms.cw_src, undefined);
     assert.notEqual(restored.uniforms.glowTex, final.uniforms.glowTex);
     effect.dispose();
     assert.ok(f.targets.filter((t) => t.explicit).every((t) => t.disposed));
+});
+
+test("fused Core modes reuse one composite across softness, Multiply and turbulence", () => {
+    const f = fixture();
+    const effect = steadyEffect({
+        coreDistortion: { amount: 12 },
+        haloIntensity: 0,
+        coreSoftness: 2,
+    });
+    effect.init(f.ctx);
+    const initial = f.render(effect);
+    assert.equal(initial.uniforms.cw_coreMethod, 1);
+    for (const [params, method] of [
+        [{ coreSoftness: 0 }, 2],
+        [{ coreDistortion: { composite: "multiply" } }, 0],
+        [
+            {
+                coreDistortion: {
+                    composite: "distort",
+                    noiseTurbulence: 0.5,
+                    motionBlur: 0.12,
+                },
+            },
+            2,
+        ],
+        [{ coreSoftness: 2 }, 1],
+    ]) {
+        effect.setParams(params);
+        const current = f.render(effect);
+        assert.equal(current.uniforms.cw_coreMethod, method);
+        assert.equal(current.frag, initial.frag);
+        assert.ok(current.uniforms.cw_contourField);
+    }
+    effect.dispose();
+});
+
+test("first Fire in a preset tour reuses an existing fused composite", () => {
+    const f = fixture();
+    const effect = new SaberEffect({ preset: "arc-reactor" });
+    effect.init(f.ctx);
+    const seen = new Set();
+    for (const preset of Object.keys(SABER_PRESETS)) {
+        effect.setParams({ preset });
+        const current = f.render(effect);
+        if (preset === "fire") {
+            assert.equal(current.uniforms.cw_coreMethod, 2);
+            assert.ok(seen.has(current.frag));
+        }
+        seen.add(current.frag);
+    }
+    effect.dispose();
 });

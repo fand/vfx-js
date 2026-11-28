@@ -410,6 +410,32 @@ function noiseShaders(fragment: string) {
     return shaders;
 }
 
+// Fused Core always uses one cached-noise shader. Bounds and analytic coverage
+// are draw-wide choices, not new source variants when switching presets.
+// Noise generation remains specialized; turbulence has already acted on its RG grid.
+const FRAG_CACHED_CORE = noiseShaders(
+    FRAG_DISTORT_CONTOUR.replace(
+        "uniform float signedCoreWidth;",
+        "uniform float signedCoreWidth;\nuniform int coreMethod;",
+    )
+        .replace(
+            "#ifdef ANALYTIC_CORE\n    // Pulling",
+            "if (coreMethod == 2) {\n    // Pulling",
+        )
+        .replace(
+            "#else\n    light = sampleLight(warped);\n#endif",
+            "} else {\n    light = sampleLight(warped);\n}",
+        )
+        .replace(
+            "#ifdef CORE_BOUNDS\n    // The support",
+            "#ifdef CORE_BOUNDS\n    if (coreMethod > 0) {\n    // The support",
+        )
+        .replace(
+            "#endif\n    if (amount <= 0.0)",
+            "    }\n#endif\n    if (amount <= 0.0)",
+        ),
+).cached;
+
 const FRAG_BLUR = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -556,6 +582,7 @@ void main() {
 // released on resize and disposal.
 export class SaberGlowPasses {
     deferred: SaberDeferredWarp | null = null;
+    deferredCore: SaberDeferredWarp | null = null;
     #core: EffectRenderTarget | null = null;
     #output: EffectRenderTarget | null = null;
     #distortedGlow: EffectRenderTarget | null = null;
@@ -602,7 +629,9 @@ export class SaberGlowPasses {
         coreNoise?: SaberGlowPasses,
         defer = false,
     ): EffectRenderTarget {
-        if (kind !== "core") {
+        if (kind === "core") {
+            this.deferredCore = null;
+        } else {
             this.deferred = null;
         }
         if (defer) {
@@ -848,12 +877,43 @@ export class SaberGlowPasses {
                     target: field,
                 });
             }
+            const fusedCore = defer && kind === "core";
             const warped = {
-                fragment: shaders.cached,
-                uniforms: { ...uniforms, noiseField: field },
+                fragment: fusedCore ? FRAG_CACHED_CORE : shaders.cached,
+                uniforms: {
+                    ...uniforms,
+                    noiseField: field,
+                    ...(fusedCore
+                        ? {
+                              coreMethod: bounds
+                                  ? bounds.lineWidth &&
+                                    params.composite === "distort"
+                                      ? 2
+                                      : 1
+                                  : 0,
+                              // Uniform branches still declare these inputs for the
+                              // unbounded raster path. Never retain a stale sampler.
+                              contourField: bounds?.field ?? src,
+                              compactField: bounds?.compact ? 1 : 0,
+                              fieldOrigin: [...(bounds?.origin ?? [0, 0])],
+                              fieldBufferSize: [
+                                  ...(bounds?.bufferSize ?? [
+                                      src.width,
+                                      src.height,
+                                  ]),
+                              ],
+                              supportReach: uniforms.supportReach ?? 0,
+                              signedCoreWidth: uniforms.signedCoreWidth ?? 0,
+                          }
+                        : {}),
+                },
             };
             if (defer) {
-                this.deferred = warped;
+                if (kind === "core") {
+                    this.deferredCore = warped;
+                } else {
+                    this.deferred = warped;
+                }
             } else {
                 ctx.draw({
                     frag: warped.fragment,
@@ -865,7 +925,11 @@ export class SaberGlowPasses {
             this.#noise[kind]?.target.dispose();
             delete this.#noise[kind];
             if (defer) {
-                this.deferred = { fragment, uniforms };
+                if (kind === "core") {
+                    this.deferredCore = { fragment, uniforms };
+                } else {
+                    this.deferred = { fragment, uniforms };
+                }
             } else {
                 ctx.draw({ frag: fragment, uniforms, target });
             }
@@ -1162,6 +1226,7 @@ export class SaberGlowPasses {
 
     dispose(): void {
         this.deferred = null;
+        this.deferredCore = null;
         this.releaseLayers();
         this.#noise.core?.target.dispose();
         this.#noise.halo?.target.dispose();

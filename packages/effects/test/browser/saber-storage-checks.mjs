@@ -90,6 +90,22 @@ export async function storageChecks() {
         },
         { name: "preset-switch", params: { preset: "fire" } },
         { name: "dynamic", params: { dynamic: true } },
+        { name: "core-soft", params: { dynamic: false, coreSoftness: 2 } },
+        { name: "core-analytic", params: { coreSoftness: 0 } },
+        {
+            name: "core-multiply",
+            params: { coreDistortion: { composite: "multiply", amount: 12 } },
+        },
+        {
+            name: "core-shutter",
+            params: {
+                coreDistortion: {
+                    composite: "distort",
+                    motionBlur: 0.12,
+                    noiseTurbulence: 0.5,
+                },
+            },
+        },
     ];
     const result = { done: false, rows: [], failed: false };
     window.saberStorageJob = result;

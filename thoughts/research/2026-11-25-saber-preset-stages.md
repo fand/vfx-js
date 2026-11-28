@@ -1190,3 +1190,103 @@ This chooses the former shader reuse across presets over14.40MiB of savings.
 Stage27 review uses the archived Stage25 captures: production ESM hashes match
 Stage25 exactly. No new GPU/compile timing claim; previous Stage25 evidence applies.
 Review: http://127.0.0.1:6040/stage27.html?before=stage26-presets#fire
+
+
+## 28. Fuse Core with uniform-selected modes
+
+Baseline Stage27 (`a338245a`), whose production renderer is identical to Stage25.
+Restore Core fusion, but use one cached-noise Core shader for raster, bounded
+raster and analytic coverage. `coreMethod` selects these branches per draw.
+Turbulence stays in the existing noise-generation pass; it no longer creates a
+redundant cached Core variant. Glow/Halo specialization is unchanged. Preserve
+Core/Halo noise sharing, R16F rounding and the fractional-grid intermediate path.
+No public parameter or preset changes.
+
+### Visual and allocation validation
+
+864 review frames against Stage25:307 differ, maximum1/255, at most4 changed RGB
+channel values per960×540 frame. Fire, Windy and Torch sequences are byte-identical.
+All12 presets at DPR1/2 and t1/1.5/2: maximum1/255.114 additional cases cover
+HDR, Reveal, flow, live raster/analytic/Multiply/turbulence switches, legacy float
+and DPR1/1.5/2: maximum1/255 in at most25 channel values; DPR1.5 is exact.
+Raw evidence retains strict nonzero-diff flags. Context/Reveal restore,8 resize
+cases, lifecycle and object disposal pass. GL errors0.53 unit tests, ESM/CJS builds,
+changed-file Biome and diff whitespace checks pass.
+
+Tracked texture allocations, MiB (960×540,DPR2,pad320; not total process/GPU memory):
+
+| Preset | Steady before | Steady after | Rebuild/dynamic peak before | Peak after |
+|---|---:|---:|---:|---:|
+| Fire |86.02|71.61|116.05|101.64|
+| Arc Reactor |117.83|103.43|147.86|133.46|
+| Torch |95.98|95.98|126.02|126.02|
+
+Remove one full-resolution R16F target (14.40MiB) for active Core distortion.
+Torch has no Core distortion, so remains an unchanged control.
+
+### Initial compilation and preset switching
+
+Apple M4 Max/Chrome158, source960×540,DPR2,pad320. Three repetitions, four
+initial presets (Arc Reactor, Fire, Windy, Torch), reversed renderer order.
+48 fixtures/1104 rows. Each fixture renders its initial preset, all11 others,
+then repeats those11. All GL errors0. No paired row creates more candidate
+programs than baseline. A complete tour creates16→14 programs; repeat switches
+create0 programs in either renderer.
+
+Initial effect-render completion medians (milliseconds,3 runs per cell):
+
+| Preset | Cached before | Cached after | Unique before | Unique after |
+|---|---:|---:|---:|---:|
+| arc-reactor |34.5|34.7|688.6|675.4|
+| fire |33.2|34.2|711.1|672.7|
+| windy |33.3|34.1|700.0|682.0|
+| torch |26.3|27.2|578.2|592.2|
+
+For initial Fire, compile/link/status/uniform-inspection API subtotal:
+cached30.1→29.4ms; unique664.1→580.6ms. Initial programs12→11.
+
+Previously problematic first Fire after starting Arc Reactor and touring in
+stored preset order: cached completion3.8→3.4ms; unique3.6→3.9ms (medians of3).
+Both versions create0 programs at that switch in every run. Stage26's additional
+~185ms compile stall is absent. This does not mean every first preset switch is
+compilation-free: existing Glow/Halo/noise variants still compile as needed.
+
+Across12 fixtures, median full-tour completion:
+cached86.05→88.30ms; unique1065.20→1014.90ms. Corresponding compiler-related API
+subtotals45.60→44.85ms and865.30→756.05ms.
+
+Method: completion wall time includes allocations, rendering and synchronous
+one-pixel canvas readback; module/page/network load excluded. API subtotal sums
+compile/link/status queries and uniform inspection, not isolated parallel-driver
+compiler work. Cached-source runs reuse QA-warmed sources. Unique-source runs
+rename the main entry function without changing arithmetic/uniforms: this requests
+fresh source compilation but cannot guarantee a driver binary-cache miss. These
+are not clean-browser cold starts or actual presentation latency measurements.
+
+### Steady-frame GPU timing
+
+60 warmup frames,120 samples per run,batch1,three reversed-order runs per
+preset/renderer/DPR. Median of3 per-run GPU medians, milliseconds:
+
+| DPR | Preset | Stage27 | Stage28 | Change |
+|---|---|---:|---:|---:|
+|1|arc-reactor|1.728|1.666|-3.6%|
+|1|fire|3.143|3.067|-2.4%|
+|1|torch|1.494|1.498|+0.2%|
+|1|windy|1.656|1.528|-7.8%|
+|2|arc-reactor|2.466|2.283|-7.4%|
+|2|fire|5.298|5.086|-4.0%|
+|2|torch|1.816|1.821|+0.3%|
+|2|windy|2.235|2.022|-9.5%|
+
+All48 runs have120 GPU samples and GL errors0. Active Core presets improve about
+2–10% here; Torch's0.2–0.3% variation is measurement noise, not an optimization.
+These measurements compare the same-session Stage27/28 renderers; do not compare
+absolute timings with older stages measured under different device conditions.
+
+Frozen final renderer: ignored `stage28-core-uniform-renderer/` (candidate ESM
+hashes match the QA pilot). Evidence: `results/stage28-evidence/{qa,frame-diff,
+startup,startup-summary,timing-repeat,timing-summary}.json`. Review captures:
+`results/stage28-presets/`. Baseline uses archived Stage25 captures because Stage27
+production code is identical. Page includes measurement tables and raw links.
+Review: http://127.0.0.1:6040/stage28.html?before=stage25-presets#fire

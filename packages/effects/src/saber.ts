@@ -979,7 +979,14 @@ export class SaberEffect implements Effect {
             }
             originalCore = this.#softCore;
         }
+        // Fractional raster grids need the old intermediate's interpolation.
+        // Keep that path rather than evaluate a warp four times per final pixel.
+        const fuseWarps =
+            Number.isInteger(ctx.dims.pixelRatio) &&
+            this.outputRect(ctx.dims).every(Number.isInteger) &&
+            ctx.dims.srcRect.every(Number.isInteger);
         const visibleCoreKey = [
+            fuseWarps,
             this.#coreVersion,
             soften ? softness : 0,
             ...distortionKey(this.params.coreDistortion, ctx.time),
@@ -1004,6 +1011,12 @@ export class SaberEffect implements Effect {
                           reach: thickness + (soften ? softness + 2 : 0),
                       }
                     : undefined,
+                0,
+                [1, 1, 1],
+                [originalCore.width, originalCore.height],
+                false,
+                undefined,
+                fuseWarps,
             );
             this.#visibleCoreKey = visibleCoreKey;
         }
@@ -1023,12 +1036,6 @@ export class SaberEffect implements Effect {
             effectiveLayers.some(
                 (layer) => layer.size > 0 && layer.intensity > 0,
             );
-        // Fractional raster grids need the old intermediate's interpolation.
-        // Keep that path rather than evaluate a warp four times per final pixel.
-        const fuseWarps =
-            Number.isInteger(ctx.dims.pixelRatio) &&
-            this.outputRect(ctx.dims).every(Number.isInteger) &&
-            ctx.dims.srcRect.every(Number.isInteger);
         let glowTex = core;
         let glowLayers: SaberGlowLayers | undefined;
         let haloTex: EffectRenderTarget | undefined;
@@ -1230,6 +1237,7 @@ export class SaberEffect implements Effect {
             ],
             deferredGlow,
             deferredHalo,
+            this.#glowPasses.deferredCore,
         );
         ctx.draw({
             frag: fused.fragment,
