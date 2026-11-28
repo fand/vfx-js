@@ -524,6 +524,8 @@ function fixture({ width = 128, height = 96, pixelRatio = 1 } = {}) {
     let restored;
     const ctx = {
         time: 2,
+        vfxProps: { glslVersion: "300 es" },
+        createProgram: () => ({ isReady: true, ready: Promise.resolve() }),
         gl: { getExtension: () => ({}) },
         src: { width, height },
         target: null,
@@ -1548,4 +1550,87 @@ test("first Fire in a preset tour reuses an existing fused composite", () => {
         seen.add(current.frag);
     }
     effect.dispose();
+});
+
+test("Saber prepares shaders without GPU draws and waits before touching render caches", async () => {
+    const f = fixture();
+    const effect = new SaberEffect({ preset: "fire" });
+    let done = false,
+        resolve;
+    const ready = new Promise((r) => {
+        resolve = r;
+    });
+    const sources = new Set();
+    f.ctx.createProgram = ({ frag, vert }) => {
+        sources.add(`${vert ?? ""}\0${frag}`);
+        return {
+            get isReady() {
+                return done;
+            },
+            ready,
+        };
+    };
+    const initialized = effect.init(f.ctx);
+    assert.equal(
+        f.targets.length,
+        2,
+        "planning must not allocate GPU textures",
+    );
+    assert.equal(f.draws.length, 0);
+    assert.equal(f.reads.length, 0);
+    f.render(effect);
+    assert.equal(f.draws.length, 0);
+    done = true;
+    resolve();
+    await initialized;
+    const draw = f.render(effect);
+    assert.ok(draw.uniforms.coreGain !== undefined);
+    for (const draw of f.draws) {
+        assert.ok(
+            sources.has(`${draw.vert ?? ""}\0${draw.frag}`),
+            "every draw was prepared",
+        );
+    }
+});
+
+test("Saber replans live controls and layout, but not its animation clock", async () => {
+    const f = fixture();
+    const effect = new SaberEffect({ preset: "fire" });
+    let done = true,
+        requests = 0;
+    f.ctx.createProgram = () => {
+        requests++;
+        return {
+            get isReady() {
+                return done;
+            },
+            ready: Promise.resolve(),
+        };
+    };
+    await effect.init(f.ctx);
+    f.render(effect);
+    const planned = requests;
+    f.render(effect);
+    assert.equal(requests, planned);
+    done = false;
+    effect.params.coreSoftness = 4;
+    f.render(effect);
+    assert.equal(f.draws.length, 0);
+    assert.ok(requests > planned);
+    done = true;
+    assert.ok(f.render(effect));
+    done = false;
+    f.resize();
+    f.render(effect);
+    assert.equal(f.draws.length, 0);
+    done = true;
+    assert.ok(f.render(effect));
+    done = false;
+    f.restore();
+    f.render(effect);
+    assert.equal(f.draws.length, 0);
+    effect.dispose();
+    done = true;
+    f.render(effect);
+    assert.equal(f.draws.length, 0);
 });

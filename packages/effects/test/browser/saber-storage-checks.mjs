@@ -172,6 +172,7 @@ export async function storageChecks() {
                                 throw new Error("Reveal did not resolve");
                             }
                         }
+                        await f.settle(2);
                         frames.push(f.screen(2).pixels);
                     }
                     resources.push({ glError: f.gl.getError() });

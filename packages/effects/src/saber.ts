@@ -24,6 +24,7 @@ import {
     type SaberGlowLayers,
     SaberGlowPasses,
 } from "./_saber-glow.js";
+import { SaberPrograms } from "./_saber-programs.js";
 import { SaberWarpComposer } from "./_saber-warp.js";
 import { SABER_PRESETS, type SaberPresetName } from "./saber-presets.js";
 
@@ -684,6 +685,9 @@ const DEFAULT_PARAMS: SaberParams = {
  * The lines and glow draw outside the element, within `pad` CSS px.
  * Over a white element the lines inside its edge are hard to see; use `source: false` to draw the light only.
  * All params are read every frame, so you can change `params` live.
+ * Shaders are prepared asynchronously where parallel compilation is supported.
+ * Initial setup waits for preparation; a new shader configuration defers rendering
+ * until ready. Browsers without parallel compilation use the synchronous fallback.
  *
  * `coreDistortion` and `glowDistortion` have independent wind/noise clocks.
  * Set both `windSpeed` and `noiseSpeed`
@@ -697,6 +701,7 @@ const DEFAULT_PARAMS: SaberParams = {
 export class SaberEffect implements Effect {
     params: SaberParams;
 
+    #programs = new SaberPrograms();
     #field: EffectRenderTarget | null = null;
     #fieldWindow: readonly number[] = [0, 0, 0, 0];
     #compactSupported = false;
@@ -791,7 +796,26 @@ export class SaberEffect implements Effect {
         this.#dirty = true;
     }
 
-    init(ctx: EffectContext): void {
+    init(ctx: EffectContext): Promise<void> {
+        this.#programs.clear();
+        this.#initTargets(ctx);
+        this.#preparePrograms(ctx);
+        // init is awaited by VFX.add; the page stays responsive while compiling.
+        const ready = this.#programs.ready();
+        // Restored targets and programs need preparation again.
+        ctx.onContextRestored(() => {
+            this.#programs.clear();
+            this.#warpComposer.invalidate();
+            this.#compactSupported = !!(
+                ctx.gl.getExtension("OES_texture_float_linear") &&
+                ctx.gl.getExtension("EXT_float_blend")
+            );
+            this.#dirty = true;
+        });
+        return ready;
+    }
+
+    #initTargets(ctx: EffectContext): void {
         this.#disposed = false;
         this.#compactSupported = !!(
             ctx.gl.getExtension("OES_texture_float_linear") &&
@@ -807,18 +831,47 @@ export class SaberEffect implements Effect {
         this.#core = ctx.createRenderTarget({ format: "r16f" });
         this.#fieldWindow = [0, 0, this.#core.width, this.#core.height];
         this.#dirty = true;
-        // Restored targets come back empty, so the cached field must be built again.
-        ctx.onContextRestored(() => {
-            this.#warpComposer.invalidate();
-            this.#compactSupported = !!(
-                ctx.gl.getExtension("OES_texture_float_linear") &&
-                ctx.gl.getExtension("EXT_float_blend")
-            );
-            this.#dirty = true;
+    }
+
+    #preparePrograms(ctx: EffectContext): void {
+        // Live controls can select different shaders without setParams(). Include
+        // layout too: cropped fields and fractional grids choose different paths.
+        // No animation clock: a steady configuration plans only once.
+        const key = JSON.stringify([
+            this.params,
+            ctx.dims,
+            ctx.vfxProps.glslVersion,
+        ]);
+        const rect = this.outputRect(ctx.dims);
+        this.#programs.prepare(ctx, key, [rect[2], rect[3]], (planning) => {
+            const probe = new SaberEffect(this.params);
+            try {
+                probe.#initTargets(planning);
+                probe.#render(planning);
+                if (this.params.start > 0 || this.params.end < 1) {
+                    planning.draw({ frag: FRAG_SPLAT, vert: VERT_SPLAT });
+                    planning.draw({ frag: FRAG_ARC });
+                }
+            } finally {
+                probe.dispose();
+            }
         });
     }
 
     render(ctx: EffectContext): void {
+        if (this.#disposed || !this.#core) {
+            return;
+        }
+        this.#preparePrograms(ctx);
+        // Do not touch cached render results until every required program is ready.
+        // New presets/layouts and restored contexts also take this path.
+        if (!this.#programs.isReady) {
+            return;
+        }
+        this.#render(ctx);
+    }
+
+    #render(ctx: EffectContext): void {
         let field = this.#field;
         const core = this.#core;
         if (!field || !core) {
@@ -1279,6 +1332,7 @@ export class SaberEffect implements Effect {
     }
 
     dispose(): void {
+        this.#programs.clear();
         this.#warpComposer.dispose();
         this.#glowPasses.dispose();
         this.#haloPasses.dispose();

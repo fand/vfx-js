@@ -1290,3 +1290,87 @@ startup,startup-summary,timing-repeat,timing-summary}.json`. Review captures:
 `results/stage28-presets/`. Baseline uses archived Stage25 captures because Stage27
 production code is identical. Page includes measurement tables and raw links.
 Review: http://127.0.0.1:6040/stage28.html?before=stage25-presets#fire
+
+
+## 29. Prepare Saber programs asynchronously
+
+Port the `ctx.createProgram()` / `EffectProgram` implementation from
+`claude/parallel-shader-compile` (`180c8913`). Keep source-based draws and the
+VFX-owned program cache compatible. With `KHR_parallel_shader_compile`, submit
+compiles/links without querying blocking compile/link status, poll completion,
+then inspect uniforms. Without the extension, retain synchronous compilation.
+Drawing a pending handle still waits synchronously: effect authors must await
+`ready` or check `isReady`. Reject foreign-context program handles. Pending
+`ready` rejects on disposal; restored prepared programs compile asynchronously
+and expose fresh readiness. These lifecycle cases extend the imported WIP.
+
+Saber now awaits preparation in `init()`. Run its existing shader-selection path
+on a temporary instance with dimension-only targets and intercepted draws; this
+collects exactly the active sources without GPU draws, allocations or readback.
+Explicitly include the later Reveal splat/arc passes. The probe is disposed
+immediately; its empty readback result cannot change the real effect.
+
+A conservative configuration key includes params and layout, excludes time.
+Live edits, preset changes, fractional grids and resizing can replan; repeated
+sources reuse the core cache. Before rendering, check every required program.
+While compilation is pending, defer the effect's draw without mutating its
+render caches. Initial async setup leaves the VFX add operation pending; later
+new configurations temporarily defer Saber output. No extra full-frame target
+or shader arithmetic change. Context restoration clears the preparation key.
+
+### First-display responsiveness
+
+Before: Stage28 effects **and core** frozen renderer. After: Stage29 effects and
+core. Chrome158 / Apple M4 Max,960×540,DPR2,pad320. Four presets, three repetitions,
+reversed renderer order:24 fixtures. Source image/module loading precede timing.
+Each fixture renames shader entry functions to request new-source compilation;
+this does not guarantee a cold driver binary cache or simulate every first visit.
+
+Observe requestAnimationFrame gaps, a5ms interval heartbeat and PerformanceObserver
+Long Tasks (>=50ms). No readback or finish in the measurement interval. First draw
+means the first actual Saber composite **submitted**, not GPU completion or
+presentation. Before setup, two animation frames establish the heartbeat; it
+continues through setup and two frames/25ms after first draw.
+
+First draw is the median of3; RAF gaps are the worst of3, milliseconds:
+
+| Preset | First draw before | First draw after | Max RAF gap before | Max RAF gap after | Long Tasks before / after |
+|---|---:|---:|---:|---:|---:|
+|fire|629.5|136.4|616.7|17.9|3 / 0|
+|arc-reactor|616.4|136.4|599.9|18.6|3 / 0|
+|windy|629.5|136.2|616.6|18.3|3 / 0|
+|torch|595.2|102.9|566.7|18.0|3 / 0|
+
+All12 baseline trials contain a568–626ms Long Task. All12 candidate trials have
+zero Long Tasks. Candidate worst RAF gap18.6ms and5ms-timer gap10.5ms. Thus this
+supported browser remained responsive during the tested new-source preparations;
+this is not a guarantee for other devices or extension-less browsers.
+
+Fire: synchronous init return <=1.1ms; async init completion median110.6ms;
+first draw submission median136.4ms. Maximum render call624.7→1.8ms.
+Compiler/link/status/uniform-inspection API subtotal median606.9→0.2ms: the
+compiler work has moved off the main-thread wait, not vanished. Candidate
+initialization submits all required shaders before waiting, allowing overlap.
+All24 fixtures report parallel-compile support and GL errors0.
+
+### Appearance, allocations and validation
+
+All864 review frames vs Stage28 are byte-identical (RGB on black). All12 presets
+at DPR1/2 and t1/1.5/2 are exact;114 custom cases at DPR1/1.5/2 including HDR,
+Reveal, live modes, fractional grids and legacy float filtering are exact.
+Both full/Reveal context restoration outputs match exactly. Eight resize cases
+round-trip exactly. Lifecycle/disposal checks pass, all tracked GPU objects freed.
+Every preset's steady/rebuild/dynamic/frozen texture byte count is unchanged.
+Fire remains71.61MiB at960×540,DPR2,pad320 (tracked allocations, not total VRAM).
+
+Core696 tests and effects55 tests pass. Core/effects ESM+CJS builds and lint pass.
+Docs API/skill checks pass (118 exports); updated public API docs and changesets.
+Browser fixtures wait for a completed composite before screenshots, so pending
+frames are not mistaken for final output. Compilation failures, missing extension,
+disposal, restore and cross-context ownership are covered by core tests.
+
+Evidence (ignored review server root): `stage29-async-renderer/manifest.json`,
+`results/stage29-evidence/{async,async-summary,qa,frame-diff}.json` and
+`results/stage29-presets/`. The earlier pilot is separately saved as
+`pilot-async.json`; final reported timings use the24-row `async.json`.
+Review: http://127.0.0.1:6040/stage29.html?before=stage28-presets#fire

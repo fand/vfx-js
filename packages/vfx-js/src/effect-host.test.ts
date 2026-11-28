@@ -134,6 +134,8 @@ type MockProgram = {
     vert: string;
     frag: string;
     glslVersion: string | undefined;
+    parallel: boolean;
+    isReady: boolean;
     useCount: number;
     uploads: Array<Record<string, { value: unknown }>>;
     disposed: boolean;
@@ -338,23 +340,30 @@ vi.mock("./backbuffer.js", () => {
 
 vi.mock("./gl/program.js", () => {
     class Program {
+        gl: unknown;
         vert: string;
         frag: string;
         glslVersion: string | undefined;
         useCount = 0;
         uploads: MockProgram["uploads"] = [];
         disposed = false;
+        parallel: boolean;
+        isReady = false;
+        ready = Promise.resolve();
         constructor(
-            _ctx: unknown,
+            _ctx: { gl: unknown },
             vert: string,
             frag: string,
             glslVersion?: string,
+            parallel = false,
         ) {
+            this.gl = _ctx.gl;
             this.vert = vert;
             this.frag = frag;
             this.glslVersion =
                 glslVersion ??
                 (frag.includes("#version 300 es") ? "300 es" : "100");
+            this.parallel = parallel;
             programs.push(this as unknown as MockProgram);
         }
         use() {
@@ -1326,7 +1335,10 @@ describe("EffectHost depth", () => {
     }
 
     function drawWithDepth(
-        opts: Omit<Parameters<EffectHost["ctx"]["draw"]>[0], "frag">,
+        opts: Omit<
+            Parameters<EffectHost["ctx"]["draw"]>[0],
+            "frag" | "program"
+        >,
     ) {
         const { host, gl } = makeHost();
         host.setPhase("render");
@@ -1859,6 +1871,73 @@ describe("EffectHost.dispose", () => {
         // Second dispose must not somehow "un-dispose" or re-enter
         // cleanup logic in a way that mutates counts.
         expect(programs.filter((p) => p.disposed).length).toBe(disposedCount);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// createProgram
+// ---------------------------------------------------------------------------
+
+describe("EffectHost.createProgram", () => {
+    it("starts a parallel compile, outside render() too", () => {
+        const { host } = makeHost();
+        const program = host.ctx.createProgram({ frag: "a" });
+        expect(programs).toHaveLength(1);
+        expect(programs[0].parallel).toBe(true);
+        expect(program.isReady).toBe(false);
+
+        programs[0].isReady = true;
+        expect(program.isReady).toBe(true);
+    });
+
+    it("gives the same handle for the same sources", () => {
+        const { host } = makeHost();
+        const a = host.ctx.createProgram({ frag: "a" });
+        expect(host.ctx.createProgram({ frag: "a" })).toBe(a);
+        expect(host.ctx.createProgram({ frag: "a", vert: "v" })).not.toBe(a);
+        expect(programs).toHaveLength(2);
+    });
+
+    it("draws with the program, compiling nothing more", () => {
+        const { host } = makeHost();
+        const program = host.ctx.createProgram({ frag: "a" });
+        host.setPhase("render");
+        host.ctx.draw({ program, uniforms: { x: 1 } });
+        expect(programs).toHaveLength(1);
+        expect(programs[0].useCount).toBe(1);
+    });
+
+    it("shares the program with ctx.draw({ frag })", () => {
+        const { host } = makeHost();
+        host.ctx.createProgram({ frag: "a" });
+        host.setPhase("render");
+        host.ctx.draw({ frag: "a" });
+        expect(programs).toHaveLength(1);
+    });
+
+    it("compiles in place for ctx.draw({ frag })", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        host.ctx.draw({ frag: "a" });
+        expect(programs[0].parallel).toBe(false);
+    });
+
+    it("rejects a program owned by another WebGL context", () => {
+        const { host: first } = makeHost();
+        const { host: second } = makeHost();
+        const program = first.ctx.createProgram({ frag: "a" });
+        second.setPhase("render");
+        expect(() => second.ctx.draw({ program })).toThrow(/same VFX context/);
+        expect(programs[0].useCount).toBe(0);
+    });
+
+    it("rejects a handle it did not make", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const fake = { __brand: "EffectProgram" } as never;
+        expect(() => host.ctx.draw({ program: fake })).toThrow(
+            /same VFX context/,
+        );
     });
 });
 

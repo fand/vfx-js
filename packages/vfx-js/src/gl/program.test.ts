@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { detectGlslVersion, uploadScalarUniform } from "./program.js";
+import type { GLContext } from "./context.js";
+import { detectGlslVersion, Program, uploadScalarUniform } from "./program.js";
 import { Vec2, Vec4 } from "./vec.js";
 
 describe("detectGlslVersion", () => {
@@ -271,5 +272,177 @@ describe("uploadScalarUniform: unknown type", () => {
         expect(run(0xdead, 1, 0)).toEqual([]);
         expect(warn).toHaveBeenCalledTimes(1);
         expect(warn.mock.calls[0][0]).toMatch(/Unsupported uniform type/);
+    });
+});
+
+describe("Program: parallel compile", () => {
+    const COMPLETION_STATUS = 0x91b1;
+    const LINK_STATUS = 0x8b82;
+    const COMPILE_STATUS = 0x8b81;
+
+    /** A GL stub whose link result is read from `state`. */
+    function makeCtx(parallelCompile: boolean) {
+        const state = { done: false, linked: true, compiled: true };
+        const gl = {
+            VERTEX_SHADER: 1,
+            FRAGMENT_SHADER: 2,
+            LINK_STATUS,
+            COMPILE_STATUS,
+            ACTIVE_UNIFORMS: 3,
+            createShader: vi.fn(() => ({})),
+            shaderSource: vi.fn(),
+            compileShader: vi.fn(),
+            getShaderParameter: vi.fn(() => state.compiled),
+            getShaderInfoLog: vi.fn(() => "bad shader"),
+            deleteShader: vi.fn(),
+            createProgram: vi.fn(() => ({})),
+            attachShader: vi.fn(),
+            detachShader: vi.fn(),
+            bindAttribLocation: vi.fn(),
+            linkProgram: vi.fn(),
+            getProgramParameter: vi.fn((_p: unknown, name: number) => {
+                if (name === COMPLETION_STATUS) {
+                    return state.done;
+                }
+                return name === LINK_STATUS ? state.linked : 0;
+            }),
+            getProgramInfoLog: vi.fn(() => "bad link"),
+            deleteProgram: vi.fn(),
+            useProgram: vi.fn(),
+            isContextLost: vi.fn(() => false),
+        };
+        const ctx = {
+            gl,
+            parallelCompile,
+            addResource: vi.fn(),
+            removeResource: vi.fn(),
+        } as unknown as GLContext;
+        const linkChecks = () =>
+            gl.getProgramParameter.mock.calls.filter(
+                (c) => c[1] === LINK_STATUS,
+            ).length;
+        return { ctx, gl, state, linkChecks };
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("checks the link at once without `parallel`", () => {
+        const { ctx, linkChecks } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es");
+        expect(linkChecks()).toBe(1);
+        expect(p.isReady).toBe(true);
+    });
+
+    it("checks the link at once when the extension is missing", () => {
+        const { ctx, linkChecks } = makeCtx(false);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        expect(linkChecks()).toBe(1);
+        expect(p.isReady).toBe(true);
+    });
+
+    it("does not read the link status while the compile runs", () => {
+        const { ctx, state, linkChecks } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        expect(p.isReady).toBe(false);
+        expect(linkChecks()).toBe(0);
+
+        state.done = true;
+        expect(p.isReady).toBe(true);
+        expect(linkChecks()).toBe(1);
+    });
+
+    it("resolves `ready` once the compile is done", async () => {
+        const { ctx, state } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        const done = vi.fn();
+        p.ready.then(done);
+
+        await vi.advanceTimersByTimeAsync(50);
+        expect(done).not.toHaveBeenCalled();
+
+        state.done = true;
+        await vi.advanceTimersByTimeAsync(50);
+        expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for the compile when used early", async () => {
+        const { ctx, gl, linkChecks } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        const done = vi.fn();
+        p.ready.then(done);
+
+        p.use();
+        expect(linkChecks()).toBe(1);
+        expect(gl.useProgram).toHaveBeenCalledTimes(1);
+        expect(p.isReady).toBe(true);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects `ready` with the shader's error, and throws on use", async () => {
+        const { ctx, state } = makeCtx(true);
+        state.linked = false;
+        state.compiled = false;
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        const ready = p.ready;
+
+        state.done = true;
+        await vi.advanceTimersByTimeAsync(50);
+        await expect(ready).rejects.toThrow(
+            /Shader compile failed: bad shader/,
+        );
+        expect(p.isReady).toBe(true);
+        expect(() => p.use()).toThrow(/Shader compile failed/);
+    });
+
+    it("reports a link error when the shaders compiled", () => {
+        const { ctx, state } = makeCtx(false);
+        state.linked = false;
+        expect(() => new Program(ctx, "V", "F", "300 es")).toThrow(
+            /Program link failed: bad link/,
+        );
+    });
+
+    it("rejects pending readiness on disposal", async () => {
+        const { ctx } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        const ready = p.ready;
+        p.dispose();
+        await expect(ready).rejects.toThrow(/disposed/);
+        await expect(p.ready).rejects.toThrow(/disposed/);
+    });
+
+    it("restores prepared programs without synchronously checking the link", async () => {
+        const { ctx, state, linkChecks } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        state.done = true;
+        await p.ready;
+        state.done = false;
+        p.restore();
+        expect(linkChecks()).toBe(1);
+        expect(p.isReady).toBe(false);
+        const done = vi.fn();
+        p.ready.then(done);
+        await vi.advanceTimersByTimeAsync(20);
+        expect(done).not.toHaveBeenCalled();
+        state.done = true;
+        await vi.advanceTimersByTimeAsync(20);
+        expect(done).toHaveBeenCalledOnce();
+        expect(linkChecks()).toBe(2);
+    });
+
+    it("stops polling when disposed", async () => {
+        const { ctx, gl } = makeCtx(true);
+        const p = new Program(ctx, "V", "F", "300 es", true);
+        void p.ready;
+        p.dispose();
+        const calls = gl.getProgramParameter.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(100);
+        expect(gl.getProgramParameter.mock.calls.length).toBe(calls);
     });
 });

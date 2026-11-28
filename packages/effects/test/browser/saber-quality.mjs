@@ -304,6 +304,7 @@ export async function createSaberFixture({
     let capturedSize;
     let record = false;
     let draws = [];
+    let rendered = false;
     function instrument(ctx) {
         context = ctx;
         if (trackResources && !resources) {
@@ -320,7 +321,15 @@ export async function createSaberFixture({
                 readbacks.push({ width: target.width, height: target.height });
                 return ctx.readPixels(target, opts);
             },
+            createProgram(opts) {
+                return ctx.createProgram(
+                    transformDraw ? transformDraw(opts, ctx) : opts,
+                );
+            },
             draw(opts) {
+                if (opts.uniforms?.coreGain !== undefined) {
+                    rendered = true;
+                }
                 if (transformDraw) {
                     opts = transformDraw(opts, ctx);
                 }
@@ -378,7 +387,25 @@ export async function createSaberFixture({
         vfx.setTime(time);
         vfx.render();
     };
-    render();
+    const settle = async (time = 2) => {
+        const deadline = performance.now() + 30000;
+        for (;;) {
+            rendered = false;
+            render(time);
+            if (
+                rendered ||
+                (!(effect instanceof SaberEffect) &&
+                    !effect.params?.coreDistortion)
+            ) {
+                return;
+            }
+            if (performance.now() > deadline) {
+                throw new Error("Saber preparation timed out");
+            }
+            await frame();
+        }
+    };
+    await settle();
     const gl = context.gl;
     const timer = gl.getExtension("EXT_disjoint_timer_query_webgl2");
     const fixture = {
@@ -396,7 +423,9 @@ export async function createSaberFixture({
             return resources;
         },
         render,
+        settle,
         async capture(name = "core", time = 2) {
+            await settle(time);
             captureName = name;
             capturePromise = null;
             record = true;

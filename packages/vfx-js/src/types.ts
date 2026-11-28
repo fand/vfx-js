@@ -909,10 +909,51 @@ export type EffectReadPixelsOpts = {
     flipY?: boolean;
 };
 
-export type EffectDrawOpts = {
-    frag: string;
-    vert?: string;
+/**
+ * A shader pair to draw with, compiled ahead of the draw.
+ * Create one with {@link EffectContext.createProgram}.
+ *
+ * Its compile runs in the background where the browser supports it,
+ * avoiding synchronous compile waits on that path.
+ * Drawing with a program that is not ready waits for the compile.
+ *
+ * Programs are shared and owned by the VFX instance: there is nothing to dispose.
+ */
+export type EffectProgram = {
+    readonly __brand: "EffectProgram";
 
+    /**
+     * Resolves when the program can draw without a wait.
+     * Rejects when the shaders fail to compile or a pending program is disposed.
+     */
+    readonly ready: Promise<void>;
+
+    /** Whether the program can draw without a wait now. */
+    readonly isReady: boolean;
+};
+
+/** Options for {@link EffectContext.createProgram}. */
+export type EffectProgramOpts = {
+    frag: string;
+
+    /** Default: the same vertex shader as `ctx.draw()` without `vert`. */
+    vert?: string;
+};
+
+/**
+ * The shaders of a draw: their source, or a program made from it.
+ * @see {@link EffectDrawOpts}
+ */
+export type EffectDrawShader =
+    | { frag: string; vert?: string; program?: undefined }
+    | {
+          /** A program from {@link EffectContext.createProgram}. */
+          program: EffectProgram;
+          frag?: undefined;
+          vert?: undefined;
+      };
+
+export type EffectDrawOpts = EffectDrawShader & {
     /** Default: `ctx.quad`. */
     geometry?: EffectQuad | EffectGeometry;
     uniforms?: EffectUniforms;
@@ -1088,6 +1129,21 @@ export type EffectContext = {
             filter?: EffectTextureFilter;
         },
     ): EffectTexture;
+
+    /**
+     * Start compiling a shader pair, and get a handle to draw with:
+     * `ctx.draw({ program })`.
+     *
+     * Use it for a large shader, or one an effect switches to later:
+     * wait for `program.ready` in `init()`, or keep drawing with another
+     * program until `program.isReady`.
+     *
+     * Valid in `init()`, `update()` and `render()`.
+     * The same sources give the same program. Without parallel-compilation
+     * support, creation compiles synchronously. After context restoration,
+     * check readiness again before drawing.
+     */
+    createProgram(opts: EffectProgramOpts): EffectProgram;
 
     /**
      * Run a draw call.

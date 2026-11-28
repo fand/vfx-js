@@ -568,3 +568,19 @@ page.dispose();      // free it and restore the element
 - After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`, and before `render` returns. End transform feedback first.
 - Use `ctx.dims` for pixel sizes. Don't read DOM sizes in `render`.
 - Read pixels with `ctx.readPixels`, not raw `gl.readPixels`. It copies the target as it is when you call it, so call it in `render` after the draw you want to read. The promise rejects when the effect is disposed or the context is lost: always handle the rejection.
+
+
+### Preparing shaders without blocking a draw
+
+`ctx.createProgram({ frag, vert? })` returns a VFX-owned `EffectProgram`.
+In `async init(ctx)`, await `program.ready`, then use `ctx.draw({ program, uniforms })`.
+For live changes, check `program.isReady` and defer drawing until ready.
+Sources are cached; a later `ctx.draw({ frag, vert })` reuses the prepared program too.
+`EffectProgramOpts` specifies its sources; `EffectDrawShader` accepts either sources
+or a program. Handles must belong to the same VFX context. No effect-owned disposal.
+Compilation uses `KHR_parallel_shader_compile` when available. Without it,
+creation falls back to synchronous compilation. Drawing before readiness also
+waits synchronously. `ready` rejects on compilation failure or disposal while pending.
+After context restoration, check readiness again (the program compiles again).
+Saber prepares its current shader configuration automatically, including live
+preset/layout changes. While a new configuration compiles, its rendering is deferred.

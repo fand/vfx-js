@@ -825,6 +825,7 @@ export async function resizeChecks() {
                         await new Promise(requestAnimationFrame);
                         fixture.render(2);
                         await new Promise(requestAnimationFrame);
+                        await fixture.settle(2);
                         const shot = fixture.screen(2);
                         if (
                             fixture.dims.element[0] !== width ||

@@ -490,3 +490,27 @@ reports vertical gradients for aspect sweeps. GPU regressions:
 `resizeChecks()` in `saber-quality-checks.mjs` exercises actual CSS size changes
 for Fire/Arc Reactor/Windy/Torch at DPR1/2. It checks round-trip pixels, updated
 effect dimensions, stable repeated allocations and complete resource disposal.
+
+
+### Asynchronous Saber preparation
+
+`saber-async-checks.mjs` measures first-display responsiveness with a frozen
+before/after effects **and core** build. Use `baseline/`, `baseline-core/`,
+`candidate/` and `core/`; make `saber-quality-baseline.mjs` from
+`saber-quality.mjs` with its VFX import pointing at `./baseline-core/index.js`.
+The ordinary fixture uses the candidate core import map. Run `asyncChecks()`.
+It exports each row to `results/stage29-evidence/async.json` through the review
+server. All shader sources get a fresh entry-function name per fixture.
+This requests new compilation; it cannot guarantee a cold driver binary cache.
+
+Observe Long Tasks, requestAnimationFrame gaps and a5ms timer during setup and
+first draw. Compiler-related API timings and render call durations are separate.
+Do not add synchronous readback/finish to this interval: it measures page
+responsiveness, not GPU completion. `firstDrawMs` ends after the first actual
+Saber draw is submitted, not after presentation. Modules and source decoding are
+loaded before measurement. Alternate renderer order over three runs per preset.
+
+The fixture now waits for Saber's composite before returning. After changing
+params/layout, `await fixture.settle(time)` before synchronous `screen()` or
+allocation snapshots. `capture()` settles automatically. This avoids comparing
+an intentional pending frame with a completed synchronous frame.
