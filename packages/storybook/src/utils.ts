@@ -1,15 +1,19 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import {
     type BloomEffect,
+    type BubbleParams,
     type DatamoshEffect,
     type FluidEffect,
+    type GlassParams,
     type HalftoneEffect,
     type HalftoneInkPresetName,
     type LightStreakEffect,
+    type OrbitCameraParams,
     type ParticleEffect,
     type ParticleExplodeEffect,
     type PixelSortEffect,
     type SaberEffect,
+    type SourceChannel,
     SWIRL_PARTICLE_PALETTES,
     type SwirlParticleColorStop,
     type SwirlParticlePaletteName,
@@ -46,6 +50,18 @@ function trackPane(pane: Pane): void {
     const w = window as any;
     w.__vfxPanes ??= [];
     w.__vfxPanes.push(pane);
+}
+
+/** A tracked Tweakpane in the top-right corner (disposed with the story). */
+export function makePane(title: string, expanded = true): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:300px;max-height:calc(100vh - 32px);overflow:auto;z-index:10000";
+    document.body.appendChild(container);
+    const pane = new Pane({ container, title, expanded });
+    trackPane(pane);
+    return pane;
 }
 
 export const isChromatic = (): boolean =>
@@ -801,6 +817,19 @@ export function attachClockPane(
     return pane;
 }
 
+// Options for a `cameraOrigin` dropdown (GlassEffect, SwirlParticleEffect).
+const CAMERA_ORIGIN_OPTIONS = {
+    element: "element",
+    viewport: "viewport",
+} satisfies Record<OrbitCameraParams["cameraOrigin"], string>;
+
+// Options for a `sourceChannel` dropdown (GlassEffect, SwirlParticleEffect).
+const SOURCE_CHANNEL_OPTIONS = {
+    alpha: "alpha",
+    luminance: "luminance",
+    none: "none",
+} satisfies Record<SourceChannel, SourceChannel>;
+
 /** Source picker for {@link attachSwirlParticlePane}. */
 export type SwirlSourceSelector = {
     keys: readonly string[];
@@ -856,6 +885,12 @@ export function attachSwirlParticlePane(
     const particles = pane.addFolder({ title: "Particles" });
     bind(particles, "count", {
         options: {
+            "1k": 1024,
+            "2k": 2048,
+            "4k": 4096,
+            "8k": 8192,
+            "16k": 16384,
+            "32k": 32768,
             "65k": 65536,
             "131k": 131072,
             "262k": 262144,
@@ -872,6 +907,7 @@ export function attachSwirlParticlePane(
     bind(particles, "streak", range(0, 1.5, 0.01));
 
     const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
     bind(shape, "depth", range(0.02, 1, 0.01));
 
     const flow = pane.addFolder({ title: "Flow" });
@@ -930,17 +966,19 @@ export function attachSwirlParticlePane(
     const camera = pane.addFolder({ title: "Camera" });
     bind(camera, "yaw", range(-180, 180, 0.5));
     bind(camera, "pitch", range(-85, 85, 0.5));
-    bind(camera, "orbit", range(0, 90, 0.5));
+    bind(camera, "orbitAnimation", range(0, 90, 0.5));
+    bind(camera, "orbitSpeed", range(0, 10, 0.1));
     bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
     bind(camera, "drag");
+    bind(camera, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
 
-    const mouse = pane.addFolder({ title: "Mouse" });
-    bind(mouse, "mouse", {
+    const pointer = pane.addFolder({ title: "Pointer" });
+    bind(pointer, "pointer", {
         options: { none: "none", repel: "repel", tilt: "tilt" },
     });
-    bind(mouse, "mouseRadius", range(10, 400, 1));
-    bind(mouse, "mouseStrength", range(0, 3, 0.01));
+    bind(pointer, "pointerRadius", range(10, 400, 1));
+    bind(pointer, "pointerStrength", range(0, 4, 0.01));
 
     // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
     const padState = {
@@ -1136,6 +1174,260 @@ export function attachSaberPane(title: string, effect: SaberEffect): Pane {
     output.addBinding(p, "source");
     output.addBinding(padState, "fullscreen").on("change", writePad);
     output.addBinding(padState, "pad", range(0, 400, 1)).on("change", writePad);
+
+    trackPane(pane);
+    return pane;
+}
+
+/** Params of {@link attachGlassPane} that Tweakpane edits. */
+export type GlassPaneParams = Omit<GlassParams, "backdrop" | "backdropColors">;
+
+/**
+ * Tweakpane for GlassEffect. Binds to a story-owned `params` object and
+ * calls `apply` on every edit. `backdrop` is a key of the story's own
+ * list, so images can be picked by name.
+ */
+export function attachGlassPane(
+    title: string,
+    params: GlassPaneParams,
+    apply: () => void,
+    pickers: {
+        source: SwirlSourceSelector;
+        backdrop: SwirlSourceSelector;
+        palette: SwirlSourceSelector;
+        colors: { a: string; b: string };
+    },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    // The effect orbits on window pointer drags; keep panel drags out.
+    container.addEventListener("pointerdown", (e) => e.stopPropagation());
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+    const bind = (
+        folder: FolderApi | Pane,
+        key: keyof GlassPaneParams,
+        opts: BindingParams = {},
+    ) => {
+        folder.addBinding(params, key, opts).on("change", apply);
+    };
+    const pick = (
+        folder: FolderApi | Pane,
+        label: string,
+        sel: SwirlSourceSelector,
+    ) => {
+        const state = { value: sel.value };
+        folder
+            .addBinding(state, "value", {
+                label,
+                options: Object.fromEntries(sel.keys.map((k) => [k, k])),
+            })
+            .on("change", (ev) => sel.onChange(ev.value));
+    };
+
+    pick(pane, "source", pickers.source);
+
+    const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
+    bind(shape, "depth", range(0.02, 1.5, 0.01));
+    bind(shape, "bevel", range(0, 0.4, 0.005));
+    bind(shape, "bevelShape", {
+        options: { round: "round", chamfer: "chamfer" },
+    });
+    bind(shape, "bulge", range(0, 0.5, 0.005));
+    bind(shape, "bulgeWidth", range(0.01, 1, 0.005));
+    bind(shape, "relief", range(-0.3, 0.3, 0.005));
+    bind(shape, "reliefBlur", range(0, 0.1, 0.001));
+
+    const glass = pane.addFolder({ title: "Glass" });
+    bind(glass, "ior", range(1, 2.5, 0.01));
+    bind(glass, "dispersion", range(0, 0.5, 0.005));
+    bind(glass, "paths", range(1, 4, 1));
+    bind(glass, "samples", range(1, 16, 1));
+    bind(glass, "bounces", range(0, 5, 1));
+    bind(glass, "jitter", range(0, 1, 0.01));
+    bind(glass, "tint", { view: "color" });
+    bind(glass, "absorption", range(0, 10, 0.1));
+    bind(glass, "reflection", range(0, 3, 0.05));
+    bind(glass, "bump", range(0, 1, 0.01));
+    bind(glass, "bumpScale", range(0.02, 1, 0.005));
+    bind(glass, "frost", range(0, 1, 0.01));
+
+    const backdrop = pane.addFolder({ title: "Backdrop" });
+    pick(backdrop, "backdrop", pickers.backdrop);
+    pick(backdrop, "palette", pickers.palette);
+    bind(backdrop, "backdropVisible");
+    bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
+    bind(backdrop, "backdropDistance", range(0, 3, 0.01));
+    bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
+    bind(backdrop, "backdropRatio", range(0, 1, 0.01));
+    bind(backdrop, "backdropSoftness", range(0, 1, 0.01));
+    backdrop
+        .addBinding(pickers.colors, "a", { view: "color", label: "colorA" })
+        .on("change", apply);
+    backdrop
+        .addBinding(pickers.colors, "b", { view: "color", label: "colorB" })
+        .on("change", apply);
+
+    const light = pane.addFolder({ title: "Lights" });
+    bind(light, "lightIntensity", range(0, 8, 0.05));
+    bind(light, "lightSoftness", range(0, 1, 0.01));
+
+    const view = pane.addFolder({ title: "View" });
+    bind(view, "yaw", range(-180, 180, 0.5));
+    bind(view, "pitch", range(-85, 85, 0.5));
+    bind(view, "orbitAnimation", range(0, 90, 0.5));
+    bind(view, "orbitSpeed", range(0, 10, 0.1));
+    bind(view, "fov", range(5, 90, 1));
+    bind(view, "zoom", range(0.1, 2, 0.01));
+    bind(view, "drag");
+    bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
+    bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
+    bind(view, "pointerStrength", range(0, 4, 0.01));
+    bind(view, "resolution", range(0.25, 2, 0.05));
+    bind(view, "antialias");
+    bind(view, "debug", {
+        options: { off: "off", outer: "outer", inner: "inner", total: "total" },
+    });
+
+    trackPane(pane);
+    return pane;
+}
+
+/** Params of {@link attachBubblePane} that Tweakpane edits. */
+export type BubblePaneParams = Omit<
+    BubbleParams,
+    "backdrop" | "backdropColors"
+>;
+
+/**
+ * Tweakpane for BubbleEffect. Binds to a story-owned `params` object and
+ * calls `apply` on every edit. `source` and `backdrop` are keys of the
+ * story's own lists.
+ */
+export function attachBubblePane(
+    title: string,
+    params: BubblePaneParams,
+    apply: () => void,
+    pickers: {
+        source: SwirlSourceSelector;
+        backdrop: SwirlSourceSelector;
+        palette: SwirlSourceSelector;
+    },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    // The effect orbits on window pointer drags; keep panel drags out.
+    container.addEventListener("pointerdown", (e) => e.stopPropagation());
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+    const bind = (
+        folder: FolderApi | Pane,
+        key: keyof BubblePaneParams,
+        opts: BindingParams = {},
+    ) => {
+        folder.addBinding(params, key, opts).on("change", apply);
+    };
+    const pick = (
+        folder: FolderApi | Pane,
+        label: string,
+        sel: SwirlSourceSelector,
+    ) => {
+        const state = { value: sel.value };
+        folder
+            .addBinding(state, "value", {
+                label,
+                options: Object.fromEntries(sel.keys.map((k) => [k, k])),
+            })
+            .on("change", (ev) => sel.onChange(ev.value));
+    };
+
+    pick(pane, "source", pickers.source);
+
+    const bubbles = pane.addFolder({ title: "Bubbles" });
+    bind(bubbles, "sourceChannel", { options: SOURCE_CHANNEL_OPTIONS });
+    bind(bubbles, "depth", range(0.02, 1.5, 0.01));
+    bind(bubbles, "bevel", range(0, 0.4, 0.005));
+    bind(bubbles, "cellSize", range(0.02, 0.6, 0.005));
+    bind(bubbles, "cellSizeRandomness", range(0, 1, 0.01));
+    bind(bubbles, "seed", range(0, 100, 1));
+    bind(bubbles, "roundness", range(0, 1, 0.01));
+    bind(bubbles, "minSize", range(0.05, 1, 0.01));
+    bind(bubbles, "containment", range(0, 1, 0.01));
+    bind(bubbles, "wobble", range(0, 0.15, 0.005));
+    bind(bubbles, "speed", range(0, 2, 0.01));
+    bind(bubbles, "maxLayers", range(1, 16, 1));
+
+    const film = pane.addFolder({ title: "Film" });
+    bind(film, "iridescence", range(0, 1, 0.01));
+    bind(film, "thickness", range(0, 1500, 5));
+    bind(film, "thicknessVariation", range(0, 1, 0.01));
+    bind(film, "drain", range(0, 1, 0.01));
+    bind(film, "swirlScale", range(0, 6, 0.05));
+    bind(film, "swirlSpeed", range(-1, 1, 0.01));
+    bind(film, "reflection", range(0, 4, 0.05));
+    bind(film, "rim", range(0, 1, 0.01));
+    bind(film, "tint", { view: "color" });
+    bind(film, "tintStrength", range(0, 1, 0.01));
+    bind(film, "opacity", range(0, 1, 0.01));
+    bind(film, "color", { view: "color" });
+
+    const borders = pane.addFolder({ title: "Borders" });
+    bind(borders, "borderWidth", range(0, 0.5, 0.005));
+    bind(borders, "borderHighlight", range(0, 2, 0.01));
+
+    const backdrop = pane.addFolder({ title: "Backdrop" });
+    pick(backdrop, "backdrop", pickers.backdrop);
+    pick(backdrop, "palette", pickers.palette);
+    bind(backdrop, "backdropVisible");
+    bind(backdrop, "backdropAround");
+    bind(backdrop, "backdropScale", range(0.02, 3, 0.01));
+    bind(backdrop, "backdropDistance", range(0, 3, 0.01));
+    bind(backdrop, "backdropSpeed", range(-2, 2, 0.01));
+    bind(backdrop, "backdropRatio", range(0, 1, 0.01));
+    bind(backdrop, "backdropSoftness", range(0, 1, 0.01));
+
+    const light = pane.addFolder({ title: "Lights" });
+    bind(light, "lightIntensity", range(0, 8, 0.05));
+    bind(light, "lightSoftness", range(0, 1, 0.01));
+
+    const view = pane.addFolder({ title: "View" });
+    bind(view, "yaw", range(-180, 180, 0.5));
+    bind(view, "pitch", range(-85, 85, 0.5));
+    bind(view, "orbitAnimation", range(0, 90, 0.5));
+    bind(view, "orbitSpeed", range(0, 10, 0.1));
+    bind(view, "fov", range(5, 90, 1));
+    bind(view, "zoom", range(0.1, 2, 0.01));
+    bind(view, "drag");
+    bind(view, "cameraOrigin", { options: CAMERA_ORIGIN_OPTIONS });
+    bind(view, "pointer", { options: { none: "none", tilt: "tilt" } });
+    bind(view, "pointerStrength", range(0, 4, 0.01));
+    bind(view, "resolution", range(0.25, 2, 0.05));
+    bind(view, "antialias");
+    bind(view, "debug", {
+        options: {
+            off: "off",
+            cost: "cost",
+            layers: "layers",
+            cells: "cells",
+        },
+    });
 
     trackPane(pane);
     return pane;

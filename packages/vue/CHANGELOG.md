@@ -1,5 +1,19 @@
 # @vfx-js/vue
 
+## 0.4.0
+
+### Minor Changes
+
+- f10c035: Support `keepPlaying` in `<VFXTransition>` for Nuxt and SvelteKit.
+
+  - Nuxt: gives `<NuxtPage>` a page transition that hands the leaving page to core.
+  - SvelteKit: wraps pages in `{#key}` on the pathname, and the leaving page's outro lasts until core gives it back.
+
+- 1c1f9e8: Support `keepPlaying` in `<VFXTransition>` from `@vfx-js/vue/router`.
+
+  - It renders the `<RouterView>` page in a `<Transition>` keyed by path, and the leaving page stays until core gives it back.
+  - `<RouterView>` must be a direct child. A `<RouterView v-slot>` works if the slot renders one root node.
+
 ## 0.3.0
 
 ### Minor Changes

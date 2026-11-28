@@ -18,9 +18,11 @@ type Props = {
     class?: string;
     /** Keep the page out of search results, e.g. 404. */
     noindex?: boolean;
+    /** The animated background: spheres and noise, noise only, or nothing. */
+    background?: "full" | "noise" | "off";
 };
 
-const { page, class: mainClass, noindex } = Astro.props;
+const { page, class: mainClass, noindex, background = "noise" } = Astro.props;
 const description =
     Astro.props.description ?? (page ? findNav(page).blurb : siteDescription);
 const title =
@@ -87,7 +89,7 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
         <!-- End Cloudflare Web Analytics -->
     </head>
 
-    <body class:list={{ DocPage: page }}>
+    <body class:list={{ DocPage: page }} data-background={background}>
         <Background />
         <Header current={page} />
 

@@ -1,3 +1,13 @@
+export type { HoloSettingId } from "./_holo/data/params.js";
+export type { HoloStartingPointNames } from "./_holo/data/starting-points.js";
+export type { OrbitCameraParams } from "./_orbit-camera.js";
+export {
+    BACKDROP_PALETTES,
+    type BackdropImageSource,
+    type BackdropPaletteName,
+    type BackdropPatternName,
+} from "./_scene3d.js";
+export type { SourceChannel } from "./_source.js";
 export {
     ASCII_PRESETS,
     type AsciiCharRamp,
@@ -9,6 +19,13 @@ export {
 } from "./ascii.js";
 export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg.js";
 export { BloomEffect, type BloomParams } from "./bloom.js";
+export {
+    type BubbleDebugView,
+    BubbleEffect,
+    type BubbleEffectOptions,
+    type BubbleParams,
+    type BubblePointer,
+} from "./bubble.js";
 export { ChromaticEffect, type ChromaticParams } from "./chromatic.js";
 export {
     ColoredEdgesEffect,
@@ -23,6 +40,14 @@ export {
 export { DitherEffect, type DitherParams, type DitherStyle } from "./dither.js";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone.js";
 export { FluidEffect, type FluidParams } from "./fluid.js";
+export {
+    type GlassBevelShape,
+    type GlassDebugView,
+    GlassEffect,
+    type GlassEffectOptions,
+    type GlassParams,
+    type GlassPointer,
+} from "./glass.js";
 export { GlitchEffect, type GlitchParams } from "./glitch.js";
 export {
     GradientMapEffect,
@@ -38,6 +63,26 @@ export {
     type HalftoneMode,
     type HalftoneParams,
 } from "./halftone.js";
+export {
+    type HoloCopyBlob,
+    HoloEffect,
+    type HoloLogo,
+    type HoloMaterial,
+    type HoloParams,
+    type HoloPointer,
+    type HoloQuality,
+    type HoloSceneParams,
+    type HoloSettingSpec,
+    type HoloSettings,
+    type HoloSettingsInput,
+    type HoloSettingValue,
+    type HoloSourceChannel,
+    type HoloStartingPoint,
+    type HoloStartingPoints,
+    type HoloStudio,
+    type HoloTone,
+    type HoloVec2,
+} from "./holo.js";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch.js";
 export { LightStreakEffect, type LightStreakParams } from "./light-streak.js";
@@ -92,6 +137,7 @@ export {
     type SwirlParticleEffectOptions,
     type SwirlParticlePaletteName,
     type SwirlParticleParams,
+    type SwirlParticlePointer,
 } from "./swirl-particle.js";
 export {
     TilePixelateEffect,

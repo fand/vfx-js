@@ -1,5 +1,24 @@
 # react-vfx
 
+## 1.0.8
+
+### Patch Changes
+
+- Updated dependencies [4d9d7fa]
+- Updated dependencies [a855df0]
+- Updated dependencies [2a81073]
+- Updated dependencies [1c4c7d7]
+- Updated dependencies [83b6e1a]
+- Updated dependencies [5fa1487]
+- Updated dependencies [f10c035]
+- Updated dependencies [f10c035]
+- Updated dependencies
+- Updated dependencies [f85b3b0]
+- Updated dependencies [4598345]
+- Updated dependencies [f10c035]
+  - @vfx-js/core@1.7.0
+  - @vfx-js/react@1.6.0
+
 ## 1.0.7
 
 ### Patch Changes

@@ -46,6 +46,7 @@ uniform float bandIntensity;
 uniform float spot;
 uniform float chroma;
 uniform float noise;
+uniform float showSpheres;
 uniform float noiseIntensity;
 uniform float noiseScale;
 uniform float noiseSpeed;
@@ -187,7 +188,7 @@ void main() {
     vec3 ro = vec3(0, 0, 4.2);
     vec3 rd = normalize(vec3(p, -1.6));
     vec3 n;
-    float t = nextSurface(ro, rd, n);
+    float t = showSpheres > .5 ? nextSurface(ro, rd, n) : -1.;
 
     vec4 current = vec4(0);
     if (t >= 0.) {
@@ -352,6 +353,7 @@ export class SpheresEffect implements Effect {
     center: [number, number];
     zoom: number;
     exposure: number;
+    showSpheres: boolean;
     // Soft rainbow glow where the spheres aren't.
     noise: boolean;
     noiseIntensity: number;
@@ -368,6 +370,7 @@ export class SpheresEffect implements Effect {
             center?: [number, number];
             zoom?: number;
             exposure?: number;
+            showSpheres?: boolean;
             noise?: boolean;
             noiseIntensity?: number;
             noiseScale?: number;
@@ -378,6 +381,7 @@ export class SpheresEffect implements Effect {
         this.center = opts.center ?? [0.5, 0.5];
         this.zoom = opts.zoom ?? 1;
         this.exposure = opts.exposure ?? 1;
+        this.showSpheres = opts.showSpheres ?? true;
         this.noise = opts.noise ?? true;
         this.noiseIntensity = opts.noiseIntensity ?? 0.2;
         this.noiseScale = opts.noiseScale ?? 0.4;
@@ -418,6 +422,7 @@ export class SpheresEffect implements Effect {
                 spot: 0,
                 bandWidth: 0.3,
                 bandIntensity: 0.4,
+                showSpheres: this.showSpheres ? 1 : 0,
                 noise: this.noise ? 1 : 0,
                 noiseIntensity: this.noiseIntensity,
                 noiseScale: this.noiseScale,

@@ -11,6 +11,8 @@ const { current } = Astro.props;
 // API pages list the packages and their declarations.
 const apiPath = Astro.url.pathname.replace(url(), "");
 const api = current === "docs" ? loadApi() : undefined;
+// Subpages like effects/bloom/ link back to the sections of their parent.
+const sectionBase = apiPath === `${current}/` ? "" : url(`${current}/`);
 ---
 
 <nav class="DocSidebar" aria-label="Docs">
@@ -75,8 +77,10 @@ const api = current === "docs" ? loadApi() : undefined;
                             {item.sections.map((section) => (
                                 <li>
                                     <a
-                                        href={`#${section.id}`}
-                                        data-section={section.id}
+                                        href={`${sectionBase}#${section.id}`}
+                                        data-section={
+                                            sectionBase ? undefined : section.id
+                                        }
                                     >
                                         <span class="DocSidebarLabel">{section.label}</span>
                                     </a>

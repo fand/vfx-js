@@ -4,5 +4,18 @@
     "extends": ["../../biome.json"],
     "files": {
         "includes": ["**/src/**/*.ts", "**/test/**/*.mjs"]
-    }
+    },
+    "overrides": [
+        {
+            "includes": ["**/*.test.ts"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noAssignInExpressions": "off",
+                        "useIterableCallbackReturn": "off"
+                    }
+                }
+            }
+        }
+    ]
 }

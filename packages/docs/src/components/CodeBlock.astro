@@ -3,13 +3,15 @@ import type { ComponentProps } from "astro/types";
 import { Code } from "astro:components";
 
 type Props = {
-    code: string;
+    code?: string;
+    /** Highlighted <pre>, in place of `code`. */
+    html?: string;
     lang?: ComponentProps<typeof Code>["lang"];
     /** File name or a short label. Defaults to the language. */
     label?: string;
 };
 
-const { code, lang = "ts" } = Astro.props;
+const { code = "", html, lang = "ts" } = Astro.props;
 const label = Astro.props.label ?? String(lang);
 ---
 
@@ -18,7 +20,13 @@ const label = Astro.props.label ?? String(lang);
         <span>{label}</span>
         <button class="CodeBlockCopy" type="button">Copy</button>
     </figcaption>
-    <Code code={code.trim()} lang={lang} theme="github-dark" />
+    {
+        html ? (
+            <Fragment set:html={html} />
+        ) : (
+            <Code code={code.trim()} lang={lang} theme="github-dark" />
+        )
+    }
 </figure>
 
 <script>

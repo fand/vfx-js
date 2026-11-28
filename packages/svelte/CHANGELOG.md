@@ -1,5 +1,14 @@
 # @vfx-js/svelte
 
+## 0.4.0
+
+### Minor Changes
+
+- f10c035: Support `keepPlaying` in `<VFXTransition>` for Nuxt and SvelteKit.
+
+  - Nuxt: gives `<NuxtPage>` a page transition that hands the leaving page to core.
+  - SvelteKit: wraps pages in `{#key}` on the pathname, and the leaving page's outro lasts until core gives it back.
+
 ## 0.3.0
 
 ### Minor Changes

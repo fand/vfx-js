@@ -3,6 +3,7 @@ import CodeBlock from "../components/CodeBlock.astro";
 import {
     type DemoMedia,
     effectDemos,
+    effectSlug,
     presetDemos,
     revealPresetDemos,
 } from "../effects-list";
@@ -75,10 +76,80 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
 >
     <h1>Effects</h1>
     <p>
-        There are two ways to style an element. Pass a preset name to
-        <code>shader</code>, or pass effect objects to <code>effect</code>. Use
+        There are two ways to style an element. Pass effect objects to
+        <code>effect</code>, or pass a preset name to <code>shader</code>. Use
         one or the other, not both.
     </p>
+    <ul class="EffectsToc">
+        <li>
+            <a href="#gallery">@vfx-js/effects</a>: ready-made effect classes
+            with params.
+        </li>
+        <li>
+            <a href="#presets">Shader presets</a>: built into
+            <code>@vfx-js/core</code>. Pass the name to <code>shader</code>.
+        </li>
+    </ul>
+
+    <section id="gallery">
+        <h2>@vfx-js/effects</h2>
+        <p>
+            <code>@vfx-js/effects</code> has ready-made effects. Each one is a
+            class. Make one instance per element. Click one to see its demo, code
+            and params.
+        </p>
+        <CodeBlock
+            code="npm i @vfx-js/core @vfx-js/effects"
+            lang="bash"
+            label="Terminal"
+        />
+        <CodeBlock code={effectCode} lang="ts" label="main.ts" />
+        <div class="DemoGrid">
+            {
+                effectDemos.map((demo) => (
+                    <a
+                        class="DemoTile DemoLink"
+                        href={url(`effects/${effectSlug(demo.name)}/`)}
+                    >
+                        <div class="DemoMedia">
+                            <img
+                                src={media[demo.media]}
+                                alt=""
+                                data-effect={demo.name}
+                            />
+                        </div>
+                        <div class="DemoCaption">
+                            <code>{demo.name}</code>
+                            <span>{demo.text}</span>
+                        </div>
+                    </a>
+                ))
+            }
+        </div>
+    </section>
+
+    <section id="chaining">
+        <h2>Chaining</h2>
+        <p>
+            Pass an array to <code>effect</code>. Each effect reads the output of
+            the one before it.
+        </p>
+        <CodeBlock code={chainCode} lang="ts" label="main.ts" />
+        <div class="Demo">
+            <video
+                id="ChainDemo"
+                src={url("jellyfish.mp4")}
+                autoplay
+                loop
+                muted
+                playsinline></video>
+        </div>
+        <p>
+            <code>overflow</code> does not apply to effects. Effects that draw
+            outside the element, like <code>BloomEffect</code>, have their own
+            <code>pad</code> param.
+        </p>
+    </section>
 
     <section id="presets">
         <h2>Shader presets</h2>
@@ -169,65 +240,6 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
         </div>
     </section>
 
-    <section id="gallery">
-        <h2>@vfx-js/effects</h2>
-        <p>
-            <code>@vfx-js/effects</code> has ready-made effects. Each one is a
-            class. Make one instance per element.
-        </p>
-        <CodeBlock
-            code="npm i @vfx-js/core @vfx-js/effects"
-            lang="bash"
-            label="Terminal"
-        />
-        <CodeBlock code={effectCode} lang="ts" label="main.ts" />
-        <div class="DemoGrid">
-            {
-                effectDemos.map((demo) => (
-                    <figure class="DemoTile">
-                        <div class="DemoMedia" data-clickable={!!demo.onClick}>
-                            <img
-                                src={media[demo.media]}
-                                alt=""
-                                data-effect={demo.name}
-                            />
-                        </div>
-                        <figcaption>
-                            <code>{demo.name}</code>
-                            <span>{demo.text}</span>
-                            {demo.hint && (
-                                <span class="DemoHint">{demo.hint}</span>
-                            )}
-                        </figcaption>
-                    </figure>
-                ))
-            }
-        </div>
-    </section>
-
-    <section id="chaining">
-        <h2>Chaining</h2>
-        <p>
-            Pass an array to <code>effect</code>. Each effect reads the output of
-            the one before it.
-        </p>
-        <CodeBlock code={chainCode} lang="ts" label="main.ts" />
-        <div class="Demo">
-            <video
-                id="ChainDemo"
-                src={url("jellyfish.mp4")}
-                autoplay
-                loop
-                muted
-                playsinline></video>
-        </div>
-        <p>
-            <code>overflow</code> does not apply to effects. Effects that draw
-            outside the element, like <code>BloomEffect</code>, have their own
-            <code>pad</code> param.
-        </p>
-    </section>
-
     <section id="storybook">
         <h2>Storybook</h2>
         <p>
@@ -263,24 +275,15 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
 
         for (const demo of effectDemos) {
             const img = document.querySelector<HTMLElement>(
-                `[data-effect="${demo.name}"]`,
+                `.DemoGrid [data-effect="${demo.name}"]`,
             );
             if (!img) {
                 continue;
             }
-            let current: ReturnType<typeof demo.create> | undefined;
-            lazyDemo(img, () => {
-                current = demo.create();
-                return { effect: current, zIndex: demo.zIndex };
-            });
-            const onClick = demo.onClick;
-            if (onClick) {
-                img.addEventListener("click", () => {
-                    if (current) {
-                        onClick(current);
-                    }
-                });
-            }
+            lazyDemo(img, () => ({
+                effect: demo.create(),
+                zIndex: demo.zIndex,
+            }));
         }
 
         const uniformsDemo = document.getElementById("UniformsDemo");
@@ -324,15 +327,24 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
         border-radius: 4px;
         box-sizing: border-box;
     }
-    .DemoMedia[data-clickable="true"] {
-        cursor: pointer;
+    .DemoLink {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+    }
+    .DemoLink:hover .DemoMedia {
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+    .DemoLink:hover code {
+        text-decoration: underline;
     }
     .DemoMedia img {
         display: block;
         max-width: 100%;
         max-height: 100%;
     }
-    .DemoTile figcaption {
+    .DemoTile figcaption,
+    .DemoCaption {
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -341,15 +353,14 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
         line-height: 1.5;
         color: rgba(255, 255, 255, 0.7);
     }
-    .DemoTile figcaption code {
+    .DemoTile figcaption code,
+    .DemoCaption code {
         align-self: start;
         font-size: 14px;
         color: white;
     }
-    .DemoHint {
-        font-family: var(--mono);
-        font-size: 12px;
-        color: white;
+    .EffectsToc {
+        line-height: 1.8;
     }
     .Demo {
         display: flex;
